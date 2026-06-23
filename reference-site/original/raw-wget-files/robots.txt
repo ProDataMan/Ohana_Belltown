@@ -1,0 +1,12 @@
+Sitemap: http://www.ohanasushigrill.com/sitemap.xml
+
+User-agent: NerdyBot
+Disallow: /
+
+User-agent: dotbot
+Crawl-delay: 10
+
+User-agent: *
+Disallow: /ajax/
+Disallow: /apps/
+Disallow: /https://ordering.chownow.com/order/24080/locations?add_cn_ordering_class=true
