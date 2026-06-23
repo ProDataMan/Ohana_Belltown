@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>Admin — Ohana (Menu Editor)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        body {
+            font-family: system-ui, -apple-system, Roboto, Arial;
+            padding: 20px;
+
+            < !doctype html><html><head><meta charset="utf-8" /><title>Ohana Admin — Menu Editor</title><meta name="viewport" content="width=device-width,initial-scale=1" /><style>body {
+                font-family: system-ui, Arial;
+                margin: 20px
+            }
+
+            .cat {
+                border: 1px solid #ddd;
+                padding: 10px;
+                margin: 10px 0
+            }
+
+            .item {
+                padding: 6px 0;
+                border-top: 1px dashed #eee
+            }
+
+            label {
+                display: block;
+                margin-top: 6px
+            }
+
+            input[type=file] {
+                display: block
+            }
+    </style>
+</head>
+
+<body>
+    <h1>Menu Editor</h1>
+    <div id="app">Loading…</div>
+    <script>
+        async function load() {
+            const res = await fetch('/api/menu')
+            const data = await res.json()
+            const app = document.getElementById('app')
+            app.innerHTML = ''
+            const saveBtn = document.createElement('button')
+            saveBtn.textContent = 'Save Menu'
+            saveBtn.onclick = save
+            app.appendChild(saveBtn)
+            data.categories = data.categories || []
+            data.categories.forEach((cat, ci) => {
+                const cdiv = document.createElement('div')
+                cdiv.className = 'cat'
+                const h = document.createElement('h3')
+                h.textContent = cat.name
+                cdiv.appendChild(h)
+                cat.items = cat.items || []
+                cat.items.forEach((it, ii) => {
+                    const idiv = document.createElement('div')
+                    idiv.className = 'item'
+                    const name = document.createElement('input')
+                    name.value = it.name || ''
+                    name.onchange = e => { it.name = e.target.value }
+                    idiv.appendChild(name)
+                    const desc = document.createElement('textarea')
+                    desc.rows = 2; desc.cols = 60; desc.value = it.description || ''
+                    desc.onchange = e => { it.description = e.target.value }
+                    idiv.appendChild(desc)
+                    const price = document.createElement('input')
+                    price.value = it.price == null ? '' : it.price
+                    price.type = 'number'
+                    price.step = '0.01'
+                    price.onchange = e => { it.price = e.target.value ? parseFloat(e.target.value) : null }
+                    idiv.appendChild(price)
+                    // image upload
+                    const imgLabel = document.createElement('label')
+                    imgLabel.textContent = 'Upload image:'
+                    const imgInput = document.createElement('input')
+                    imgInput.type = 'file'
+                    imgInput.onchange = async e => {
+                        const file = e.target.files[0]
+                        const fd = new FormData()
+                        fd.append('file', file)
+                        fd.append('filename', file.name)
+                        const r = await fetch('/api/upload-image', { method: 'POST', body: fd })
+                        const j = await r.json()
+                        if (j.ok) {
+                            it.image = j.path
+                            alert('Uploaded: ' + j.path)
+                        } else if (j.warning) {
+                            alert('Saved locally; remote commit failed: ' + j.error)
+                            it.image = j.path || ''
+                        } else {
+                            alert('Upload failed')
+                        }
+                    }
+                    imgLabel.appendChild(imgInput)
+                    idiv.appendChild(imgLabel)
+
+                    cdiv.appendChild(idiv)
+                })
+                app.appendChild(cdiv)
+            })
+            window.__menu = data
+        }
+        async function save() {
+            const res = await fetch('/api/save-menu', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(window.__menu) })
+            const j = await res.json()
+            if (j.ok) { alert('Saved') }
+            else if (j.warning) { alert('Saved locally; remote commit failed: ' + j.error) }
+            else alert('Save failed')
+        }
+        load()
+    </script>
+</body>
+
+</html>

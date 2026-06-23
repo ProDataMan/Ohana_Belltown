@@ -1,0 +1,53 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>Menu Preview</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, Roboto, Arial;
+            padding: 20px
+        }
+
+        .item {
+            border-bottom: 1px solid #eee;
+            padding: 8px 0
+        }
+    </style>
+</head>
+
+<body>
+    <div id="root">Loading...</div>
+    <script>
+        const e = React.createElement;
+        async function fetchMenu() {
+            const r = await fetch('/api/menu');
+            return r.json();
+        }
+
+        function MenuApp({ menu }) {
+            return e('div', null,
+                e('h1', null, menu.restaurant.name || 'Ohana Menu'),
+                menu.categories.map(cat => e('section', { key: cat.id },
+                    e('h2', null, cat.name),
+                    cat.items.map(it => e('div', { className: 'item', key: it.id },
+                        e('strong', null, it.name), ' ', it.price ? ('$' + it.price) : '',
+                        e('div', null, it.description || '')
+                    ))
+                ))
+            );
+        }
+
+        (async () => {
+            const menu = await fetchMenu();
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(e(MenuApp, { menu }));
+        })();
+    </script>
+</body>
+
+</html>
