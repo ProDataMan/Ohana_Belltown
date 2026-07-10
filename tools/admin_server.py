@@ -81,7 +81,10 @@ def save_menu():
     if GITHUB_TOKEN:
         # commit to same path under repo: database/menu.json
         try:
+            # commit canonical menu.json (useful for API-backed sites)
             github_put_file('database/menu.json', json.dumps(data, ensure_ascii=False, indent=2).encode('utf-8'), 'Update menu via admin UI')
+            # also commit a copy under docs so Pages using /docs can read it
+            github_put_file('docs/database/menu.json', json.dumps(data, ensure_ascii=False, indent=2).encode('utf-8'), 'Update menu (docs) via admin UI')
         except Exception as e:
             return jsonify({'warning': 'Saved locally but failed to commit to GitHub', 'error': str(e)}), 202
     return jsonify({'ok': True})
@@ -93,13 +96,15 @@ def upload_image():
         return jsonify({'error': 'no file part'}), 400
     f = request.files['file']
     filename = request.form.get('filename') or f.filename
-    relpath = Path('images') / 'uploads' / filename
+    # save locally under frontend/public/uploads
+    relpath = Path('frontend') / 'public' / 'uploads' / filename
     local_path = PUBLIC_UPLOADS / filename
     f.save(str(local_path))
     # commit to gh-pages branch under relpath
     if GITHUB_TOKEN:
         try:
             with open(local_path, 'rb') as fh:
+                # commit the uploaded file into the repo at frontend/public/uploads/<filename>
                 github_put_file(str(relpath), fh.read(), f'Upload image {filename} via admin UI')
         except Exception as e:
             return jsonify({'warning': 'Saved locally but failed to commit to GitHub', 'error': str(e)}), 202

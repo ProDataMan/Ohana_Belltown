@@ -31,8 +31,39 @@
                 margin-top: 6px
             }
 
+            < !doctype html><html><head><meta charset="utf-8" /><title>Ohana Admin — Menu Editor</title><meta name="viewport" content="width=device-width,initial-scale=1" /><style>body {
+                font-family: system-ui, Arial;
+                margin: 20px
+            }
+
+            .cat {
+                border: 1px solid #ddd;
+                padding: 10px;
+                margin: 10px 0
+            }
+
+            .item {
+                padding: 6px 0;
+                border-top: 1px dashed #eee
+            }
+
+            label {
+                display: block;
+                margin-top: 6px
+            }
+
             input[type=file] {
                 display: block
+            }
+
+            input[type=number] {
+                width: 100px;
+                margin-left: 8px
+            }
+
+            textarea {
+                display: block;
+                margin-top: 6px
             }
     </style>
 </head>
@@ -75,6 +106,16 @@
                     price.step = '0.01'
                     price.onchange = e => { it.price = e.target.value ? parseFloat(e.target.value) : null }
                     idiv.appendChild(price)
+                    // Yoshi (second) price
+                    const yLabel = document.createElement('label')
+                    yLabel.textContent = 'Yoshi price (optional):'
+                    const yInput = document.createElement('input')
+                    yInput.type = 'number'
+                    yInput.step = '0.01'
+                    yInput.value = it.yoshi_price == null ? '' : it.yoshi_price
+                    yInput.onchange = e => { it.yoshi_price = e.target.value ? parseFloat(e.target.value) : null }
+                    yLabel.appendChild(yInput)
+                    idiv.appendChild(yLabel)
                     // image upload
                     const imgLabel = document.createElement('label')
                     imgLabel.textContent = 'Upload image:'
@@ -87,15 +128,9 @@
                         fd.append('filename', file.name)
                         const r = await fetch('/api/upload-image', { method: 'POST', body: fd })
                         const j = await r.json()
-                        if (j.ok) {
-                            it.image = j.path
-                            alert('Uploaded: ' + j.path)
-                        } else if (j.warning) {
-                            alert('Saved locally; remote commit failed: ' + j.error)
-                            it.image = j.path || ''
-                        } else {
-                            alert('Upload failed')
-                        }
+                        if (j.ok) { it.image = j.path; alert('Uploaded: ' + j.path) }
+                        else if (j.warning) { alert('Saved locally; remote commit failed: ' + j.error); it.image = j.path || '' }
+                        else alert('Upload failed')
                     }
                     imgLabel.appendChild(imgInput)
                     idiv.appendChild(imgLabel)
