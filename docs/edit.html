@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Edit Menu — Ohana Belltown</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <p class="eyebrow">Ohana Belltown — Staff</p>
+        <h1>Edit Menu</h1>
+        <p>
+          Changes made here are saved directly to the live website. Connect with a
+          GitHub access token, make your edits, then click Save.
+        </p>
+        <p class="admin-link"><a href="./index.html">&larr; Back to menu</a></p>
+      </header>
+
+      <section id="token-panel" class="panel">
+        <h2>Connect to GitHub</h2>
+        <p class="hint">
+          You'll need a GitHub <strong>personal access token</strong> with permission to
+          edit this repository's contents. Create a
+          <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">fine-grained token</a>
+          scoped to only the <code>Ohana_Belltown</code> repository with
+          <strong>Contents: Read and write</strong> access. Treat this token like a
+          password &mdash; anyone with it (or with access to this browser) can edit the
+          site.
+        </p>
+        <div class="token-row">
+          <input
+            id="token-input"
+            type="password"
+            placeholder="GitHub personal access token"
+            autocomplete="off"
+          />
+          <button id="connect-btn" type="button">Connect</button>
+        </div>
+        <label class="remember-row">
+          <input type="checkbox" id="remember-token" />
+          Remember this token on this device
+        </label>
+        <p id="token-status" class="status"></p>
+      </section>
+
+      <section id="editor-panel" class="panel" hidden>
+        <div class="editor-toolbar">
+          <h2>Menu Items</h2>
+          <div class="toolbar-actions">
+            <button id="reload-btn" type="button" class="secondary">Reload latest</button>
+            <button id="disconnect-btn" type="button" class="secondary">Disconnect</button>
+          </div>
+        </div>
+        <div id="categories"></div>
+        <button id="add-category-btn" type="button" class="secondary">+ Add category</button>
+
+        <div class="save-row">
+          <button id="save-btn" type="button">Save changes</button>
+          <p id="save-status" class="status"></p>
+        </div>
+      </section>
+    </main>
+
+    <script src="./edit.js"></script>
+  </body>
+</html>
