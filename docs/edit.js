@@ -4,40 +4,19 @@ const REPO_BRANCH = 'main';
 const FILE_PATH = 'docs/menu.json';
 const API_BASE = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`;
 
-const tokenInput = document.getElementById('token-input');
-const connectBtn = document.getElementById('connect-btn');
-const rememberCheckbox = document.getElementById('remember-token');
+// Fine-grained token scoped to only this repo's Contents (read/write). Intentionally
+// public: this page has no login, so anyone with the edit.html link can save changes.
+const GITHUB_TOKEN = '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';
+
 const tokenStatus = document.getElementById('token-status');
-const tokenPanel = document.getElementById('token-panel');
 const editorPanel = document.getElementById('editor-panel');
 const categoriesContainer = document.getElementById('categories');
 const addCategoryBtn = document.getElementById('add-category-btn');
 const reloadBtn = document.getElementById('reload-btn');
-const disconnectBtn = document.getElementById('disconnect-btn');
 const saveBtn = document.getElementById('save-btn');
 const saveStatus = document.getElementById('save-status');
 
-let token = '';
 let currentSha = null;
-
-function getStoredToken() {
-  return localStorage.getItem('ohana-gh-token') || sessionStorage.getItem('ohana-gh-token') || '';
-}
-
-function storeToken(value, remember) {
-  if (remember) {
-    localStorage.setItem('ohana-gh-token', value);
-    sessionStorage.removeItem('ohana-gh-token');
-  } else {
-    sessionStorage.setItem('ohana-gh-token', value);
-    localStorage.removeItem('ohana-gh-token');
-  }
-}
-
-function clearStoredToken() {
-  localStorage.removeItem('ohana-gh-token');
-  sessionStorage.removeItem('ohana-gh-token');
-}
 
 function setStatus(el, message, isError) {
   el.textContent = message;
@@ -144,7 +123,7 @@ async function githubRequest(method, body) {
   const response = await fetch(API_BASE + (method === 'GET' ? `?ref=${REPO_BRANCH}` : ''), {
     method,
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${GITHUB_TOKEN}`,
       Accept: 'application/vnd.github+json',
       ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
@@ -165,28 +144,7 @@ async function loadMenu() {
   currentSha = file.sha;
   const data = JSON.parse(base64ToUtf8(file.content));
   renderEditor(data);
-  editorPanel.hidden = false;
-  setStatus(tokenStatus, 'Connected. You can now edit the menu below.', false);
-}
-
-async function connect() {
-  const value = tokenInput.value.trim();
-  if (!value) {
-    setStatus(tokenStatus, 'Enter a token first.', true);
-    return;
-  }
-  token = value;
-  connectBtn.disabled = true;
-  try {
-    await loadMenu();
-    storeToken(token, rememberCheckbox.checked);
-    tokenInput.value = '';
-  } catch (error) {
-    setStatus(tokenStatus, error.message, true);
-    editorPanel.hidden = true;
-  } finally {
-    connectBtn.disabled = false;
-  }
+  setStatus(tokenStatus, '', false);
 }
 
 async function saveMenu() {
@@ -222,30 +180,10 @@ async function saveMenu() {
   }
 }
 
-function disconnect() {
-  token = '';
-  currentSha = null;
-  clearStoredToken();
-  editorPanel.hidden = true;
-  categoriesContainer.innerHTML = '';
-  setStatus(tokenStatus, 'Disconnected.', false);
-  setStatus(saveStatus, '', false);
-}
-
-connectBtn.addEventListener('click', connect);
-disconnectBtn.addEventListener('click', disconnect);
-reloadBtn.addEventListener('click', () => loadMenu().catch((error) => setStatus(saveStatus, error.message, true)));
+reloadBtn.addEventListener('click', () => loadMenu().catch((error) => setStatus(tokenStatus, error.message, true)));
 saveBtn.addEventListener('click', saveMenu);
 addCategoryBtn.addEventListener('click', () => {
   categoriesContainer.appendChild(categoryBlock('New Category', []));
 });
 
-const stored = getStoredToken();
-if (stored) {
-  token = stored;
-  rememberCheckbox.checked = Boolean(localStorage.getItem('ohana-gh-token'));
-  loadMenu().catch((error) => {
-    setStatus(tokenStatus, `Saved token didn't work: ${error.message}`, true);
-    disconnect();
-  });
-}
+loadMenu().catch((error) => setStatus(tokenStatus, error.message, true));
