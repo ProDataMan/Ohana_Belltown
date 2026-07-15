@@ -25,7 +25,7 @@ async function loadPlacesPhotos() {
       .map(
         (p, i) => `
           <figure class="places-photo-slide${i === 0 ? ' active' : ''}">
-            <img src="${escapeHtmlPP(p.url)}" alt="Photo of Ohana Belltown from Google Maps" loading="lazy" />
+            <img src="${escapeHtmlPP(p.url)}" alt="Photo of Ohana Belltown from Google Maps" loading="lazy" data-caption="Photo by ${escapeHtmlPP(p.attributionName)}, via Google" />
             <figcaption>
               Photo by
               ${p.attributionUrl ? `<a href="${escapeHtmlPP(p.attributionUrl)}" target="_blank" rel="noopener">${escapeHtmlPP(p.attributionName)}</a>` : escapeHtmlPP(p.attributionName)}
@@ -35,6 +35,10 @@ async function loadPlacesPhotos() {
         `
       )
       .join('');
+
+    container.querySelectorAll('.places-photo-slide img').forEach((img) => {
+      img.addEventListener('click', () => window.openLightbox(img.src, img.dataset.caption));
+    });
 
     if (photos.length > 1) {
       setInterval(() => {
