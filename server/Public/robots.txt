@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /edit.html
+Disallow: /api/
+Disallow: /uploads/
+
+Sitemap: https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/sitemap.xml
