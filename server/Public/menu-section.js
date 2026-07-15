@@ -1,7 +1,23 @@
 const menuContainer = document.getElementById('menu');
 
+const TAG_LABELS = {
+  vegetarian: 'Vegetarian',
+  'gluten-free-available': 'GF available',
+  shellfish: 'Shellfish',
+  fish: 'Fish',
+  peanuts: 'Peanuts',
+  egg: 'Egg',
+  soy: 'Soy',
+  wheat: 'Wheat',
+  corn: 'Corn',
+  sesame: 'Sesame',
+  dairy: 'Dairy',
+  raw: 'Raw/undercooked',
+};
+
 let itemsByIndex = [];
 let googlePhotosCache = null;
+let activeTagFilter = null;
 
 function escapeHtml(value) {
   return String(value)
@@ -20,20 +36,43 @@ function slugify(value) {
 }
 
 function renderControls(categories) {
-  if (categories.length < 2) return;
+  const usedTags = new Set();
+  categories.forEach((c) => (c.items || []).forEach((it) => (it.tags || []).forEach((t) => usedTags.add(t))));
+
+  if (categories.length < 2 && !usedTags.size) return;
 
   const controls = document.createElement('div');
   controls.className = 'menu-controls';
   controls.innerHTML = `
     <input type="search" class="menu-search" id="menu-search" placeholder="Search this menu..." />
-    <div class="menu-jump">
-      ${categories.map((c) => `<a href="#cat-${slugify(c.name)}">${escapeHtml(c.name)}</a>`).join('')}
-    </div>
+    ${
+      categories.length > 1
+        ? `<div class="menu-jump">${categories.map((c) => `<a href="#cat-${slugify(c.name)}">${escapeHtml(c.name)}</a>`).join('')}</div>`
+        : ''
+    }
+    ${
+      usedTags.size
+        ? `<div class="tag-filter-chips">
+            ${Array.from(usedTags)
+              .map((t) => `<button type="button" class="tag-chip" data-tag="${escapeHtml(t)}">${escapeHtml(TAG_LABELS[t] || t)}</button>`)
+              .join('')}
+          </div>`
+        : ''
+    }
   `;
   menuContainer.before(controls);
 
   document.getElementById('menu-search').addEventListener('input', (event) => {
     filterMenu(event.target.value.trim().toLowerCase());
+  });
+
+  controls.querySelectorAll('.tag-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const tag = chip.dataset.tag;
+      activeTagFilter = activeTagFilter === tag ? null : tag;
+      controls.querySelectorAll('.tag-chip').forEach((c) => c.classList.toggle('active', c.dataset.tag === activeTagFilter));
+      filterMenu(document.getElementById('menu-search').value.trim().toLowerCase());
+    });
   });
 }
 
@@ -47,7 +86,10 @@ function filterMenu(query) {
 
     items.forEach((item) => {
       const haystack = item.dataset.search || '';
-      const matches = !query || haystack.includes(query);
+      const matchesQuery = !query || haystack.includes(query);
+      const itemTags = (item.dataset.tags || '').split(',').filter(Boolean);
+      const matchesTag = !activeTagFilter || itemTags.includes(activeTagFilter);
+      const matches = matchesQuery && matchesTag;
       item.classList.toggle('item-hidden', !matches);
       if (matches) categoryHasMatch = true;
     });
@@ -128,12 +170,19 @@ function renderMenu(data) {
             ? `<img class="item-photo" src="${escapeHtml(featuredImage)}" alt="${escapeHtml(item.name)}" loading="lazy" />`
             : '';
           const searchText = `${item.name} ${item.description || ''}`.toLowerCase();
+          const tags = item.tags || [];
+          const tagsMarkup = tags.length
+            ? `<div class="item-tags">${tags.map((t) => `<span class="item-tag-badge">${escapeHtml(TAG_LABELS[t] || t)}</span>`).join('')}</div>`
+            : '';
+          const specialBadge = item.featured ? '<span class="special-badge">&#9733; Today\'s Special</span>' : '';
           return `
-            <article class="item" data-search="${escapeHtml(searchText)}" data-index="${index}">
+            <article class="item" data-search="${escapeHtml(searchText)}" data-index="${index}" data-tags="${escapeHtml(tags.join(','))}">
               ${imageMarkup}
               <div class="item-body">
+                ${specialBadge}
                 <h3>${escapeHtml(item.name)}</h3>
                 ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ''}
+                ${tagsMarkup}
               </div>
               ${priceMarkup}
             </article>
@@ -171,6 +220,7 @@ function ensureItemModal() {
       <h3 class="item-modal-name"></h3>
       <div class="item-modal-price"></div>
       <p class="item-modal-desc"></p>
+      <div class="item-tags item-modal-tags"></div>
       <div class="item-modal-google-section" hidden>
         <p class="item-modal-google-label">More photos from our Google page (general restaurant photos, not necessarily this dish):</p>
         <div class="item-modal-google-strip"></div>
@@ -225,6 +275,10 @@ async function openItemModal(index) {
   const priceEl = modal.querySelector('.item-modal-price');
   priceEl.textContent = item.price != null ? `$${Number(item.price).toFixed(2)}` : '';
   priceEl.hidden = item.price == null;
+
+  const tagsEl = modal.querySelector('.item-modal-tags');
+  const tags = item.tags || [];
+  tagsEl.innerHTML = tags.map((t) => `<span class="item-tag-badge">${escapeHtml(TAG_LABELS[t] || t)}</span>`).join('');
 
   if (galleryRotationInterval) {
     clearInterval(galleryRotationInterval);

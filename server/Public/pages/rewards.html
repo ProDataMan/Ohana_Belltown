@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sushi Punch Card | Ohana Belltown</title>
+    <meta name="description" content="Ohana Belltown's sushi punch card: earn a punch with every sushi order, plus bonus punches for sharing photos or tagging us on social. 10 punches gets you a free roll." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Ohana Belltown" />
+    <meta property="og:title" content="Sushi Punch Card | Ohana Belltown" />
+    <meta property="og:description" content="Earn a punch with every sushi order, plus bonus punches for sharing photos or tagging us on social. 10 punches gets you a free roll." />
+    <meta property="og:url" content="https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/rewards" />
+    <link rel="canonical" href="https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/rewards" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="site-header-inner">
+        <a href="/" class="brand">
+          <img src="/images/logo.png" alt="Ohana Belltown logo" class="brand-logo" />
+          <span class="brand-name">Ohana Belltown</span>
+        </a>
+        <button class="nav-toggle" id="nav-toggle" type="button" aria-label="Toggle navigation">
+          <span></span><span></span><span></span>
+        </button>
+        <nav class="site-nav" id="site-nav">
+          <a href="/">Home</a>
+          <div class="nav-dropdown">
+            <button class="nav-dropdown-toggle" type="button">Menu &#9662;</button>
+            <div class="nav-dropdown-menu">
+              <a href="/menu">Food Menu</a>
+              <a href="/sushi">Sushi</a>
+              <a href="/drinks">Drinks</a>
+              <a href="/happy-hour">Happy Hour</a>
+            </div>
+          </div>
+          <a href="/local">Local</a>
+          <a href="/about">About</a>
+          <a href="/catering">Catering</a>
+          <a href="/contact">Contact</a>
+          <a href="/rewards" class="active">Rewards</a>
+          <a class="nav-order-btn" href="https://ordering.chownow.com/order/24080/locations?add_cn_ordering_class=true" target="_blank" rel="noopener">Order Online</a>
+        </nav>
+      </div>
+    </header>
+
+    <section class="hero-banner" style="background-image: url('/images/hero-aloha.jpg');">
+      <div class="hero-banner-inner">
+        <p class="eyebrow">Sushi Punch Card</p>
+        <h1>10 Punches, One Free Roll.</h1>
+        <p>Order sushi, earn a punch. Share the aloha, earn a bonus.</p>
+      </div>
+    </section>
+
+    <section class="content-section">
+      <div class="panel">
+        <h2>How It Works</h2>
+        <ul>
+          <li>Give staff your phone number the first time you order sushi &mdash; that's your card.</li>
+          <li>Earn <strong>1 punch</strong> every time you order sushi.</li>
+          <li>Earn a <strong>bonus punch</strong> when you share a photo of your dish or tag us on social &mdash; submit it below and our staff will review it.</li>
+          <li>Collect <strong>10 punches</strong> and your next roll is on us.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="content-section">
+      <div class="panel">
+        <h2>Check My Card</h2>
+        <div class="cta-row">
+          <input type="tel" id="check-phone-input" placeholder="Your phone number" />
+          <button id="check-btn" type="button">Check my card</button>
+        </div>
+        <p id="check-status" class="status"></p>
+        <div id="check-result"></div>
+      </div>
+    </section>
+
+    <section class="content-section">
+      <div class="panel">
+        <h2>Submit a Bonus Punch</h2>
+        <p class="hint">Share a photo of your dish, or tag @ohanabelltown on Instagram or Facebook, then tell us about it here. Our staff reviews every submission and adds your bonus punch once approved.</p>
+        <form id="bonus-form">
+          <label>Your phone number
+            <input type="tel" id="bonus-phone-input" required />
+          </label>
+
+          <fieldset class="bonus-type-fieldset">
+            <legend>What are you sharing?</legend>
+            <label><input type="radio" name="bonus-type" value="photo" checked /> A photo of my dish</label>
+            <label><input type="radio" name="bonus-type" value="social" /> A social media tag</label>
+          </fieldset>
+
+          <label id="bonus-photo-label">Choose a photo
+            <input type="file" id="bonus-photo-input" accept="image/*" />
+          </label>
+
+          <label id="bonus-social-label" hidden>Link to your post (or your @handle)
+            <input type="text" id="bonus-social-input" placeholder="https://instagram.com/p/... or @yourhandle" />
+          </label>
+
+          <label>Note (optional)
+            <textarea id="bonus-note-input" rows="2" placeholder="Anything you'd like us to know"></textarea>
+          </label>
+
+          <button type="submit">Submit for review</button>
+          <p id="bonus-status" class="status"></p>
+        </form>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <div>
+          <p class="footer-brand">Ohana Belltown</p>
+          <p>2207 1st Avenue, Belltown, Seattle, WA 98121</p>
+          <p><a href="tel:+12069569329">(206) 956-9329</a></p>
+        </div>
+        <div>
+          <p class="footer-brand">Follow Along</p>
+          <div class="footer-social">
+            <a href="https://www.instagram.com/ohanabelltown" target="_blank" rel="noopener">Instagram</a>
+            <a href="https://www.facebook.com/ohanabelltown" target="_blank" rel="noopener">Facebook</a>
+          </div>
+        </div>
+        <div>
+          <p class="footer-brand">Order</p>
+          <p><a href="https://ordering.chownow.com/order/24080/locations?add_cn_ordering_class=true" target="_blank" rel="noopener">Order Online (ChowNow)</a></p>
+          <p><a href="/catering">Catering</a></p>
+        </div>
+      </div>
+      <p class="footer-copyright">&copy; 2026 Ohana Belltown. All rights reserved.</p>
+    </footer>
+    <script src="/nav.js"></script>
+    <script src="/rewards.js"></script>
+  </body>
+</html>

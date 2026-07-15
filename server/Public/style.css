@@ -172,6 +172,30 @@ h1 {
   text-decoration: underline;
 }
 
+.staff-tools-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.staff-tools-nav a {
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+}
+
+.staff-tools-nav a:hover,
+.staff-tools-nav a.active {
+  border-color: var(--pink);
+  color: var(--pink);
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--panel-border);
@@ -433,6 +457,38 @@ button.secondary:hover {
 
 .edit-item-fields .item-desc {
   width: 100%;
+}
+
+.featured-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+}
+
+.tags-details summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--pink);
+  font-weight: 600;
+  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+}
+
+.tags-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.tag-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
 }
 
 select {
@@ -946,6 +1002,65 @@ select {
   color: var(--pink);
 }
 
+.tag-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.tag-chip {
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.tag-chip:hover {
+  border-color: var(--violet);
+  color: var(--violet);
+}
+
+.tag-chip.active {
+  background: var(--gradient-brand);
+  border-color: transparent;
+  color: #fff;
+}
+
+.item-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+}
+
+.item-tag-badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #f3ecee;
+  color: var(--text-muted);
+  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+}
+
+.special-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: var(--gold-bright);
+  color: #1c1626;
+  margin-bottom: 0.35rem;
+  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+}
+
 .item.item-hidden,
 .category.category-hidden {
   display: none;
@@ -1021,6 +1136,10 @@ select {
   padding: 2rem;
 }
 
+.lightbox-overlay[hidden] {
+  display: none;
+}
+
 .lightbox-image {
   max-width: 90vw;
   max-height: 80vh;
@@ -1069,6 +1188,10 @@ select {
   justify-content: center;
   z-index: 250;
   padding: 1.25rem;
+}
+
+.item-modal-overlay[hidden] {
+  display: none;
 }
 
 .item-modal {
@@ -1149,6 +1272,10 @@ select {
   font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
 }
 
+.item-modal-price[hidden] {
+  display: none;
+}
+
 .item-modal-desc {
   color: var(--text-muted);
   line-height: 1.6;
@@ -1180,4 +1307,121 @@ select {
   border-radius: 10px;
   flex: none;
   cursor: zoom-in;
+}
+
+/* ---- Forms: rewards + staff admin pages ---- */
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  margin-bottom: 0.9rem;
+}
+
+input[type="text"],
+input[type="tel"],
+input[type="search"],
+textarea {
+  padding: 0.6rem 0.7rem;
+  border: 1px solid #d9cdd3;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 400;
+  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  color: var(--text);
+  background: #fff;
+}
+
+textarea {
+  resize: vertical;
+}
+
+fieldset {
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  margin: 0 0 0.9rem;
+}
+
+fieldset legend {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 0 0.4rem;
+}
+
+.bonus-type-fieldset label {
+  flex-direction: row;
+  align-items: center;
+  font-weight: 400;
+  margin-bottom: 0.4rem;
+}
+
+/* ---- Pills, cards, tables: loyalty + events ---- */
+
+.pill {
+  display: inline-block;
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  background: #f3ecee;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+}
+
+.pill-approved {
+  background: #dcf5e3;
+  color: #15803d;
+}
+
+.pill-denied {
+  background: #fdeaea;
+  color: #b91c1c;
+}
+
+.loyalty-card-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.data-table {
+  overflow-x: auto;
+}
+
+.data-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 0.6rem 0.7rem;
+  border-bottom: 1px solid var(--panel-border);
+  white-space: nowrap;
+}
+
+.data-table th {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+}
+
+.data-table td .approve-btn,
+.data-table td .deny-btn {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.82rem;
 }

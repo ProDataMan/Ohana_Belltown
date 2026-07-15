@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Loyalty — Ohana Belltown</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <p class="eyebrow">Ohana Belltown — Staff</p>
+        <h1>Sushi Punch Card</h1>
+        <p>
+          Look up a guest's card by phone number, add a punch for a sushi order, redeem a
+          free roll at 10 punches, and review bonus-punch requests for photo or social
+          media shares. These actions require the staff PIN.
+        </p>
+        <p class="admin-link"><a href="/menu">&larr; Back to menu</a></p>
+        <div class="staff-tools-nav">
+          <a href="/edit.html">Menu Editor</a>
+          <a href="/loyalty-admin.html" class="active">Loyalty</a>
+          <a href="/events-admin.html">Events</a>
+          <a href="/table-card.html">Table Cards</a>
+        </div>
+      </header>
+
+      <section class="panel">
+        <h2>Look Up / Punch a Card</h2>
+        <div class="cta-row">
+          <input type="tel" id="phone-input" placeholder="Phone number" />
+          <button id="lookup-btn" type="button" class="secondary">Look up</button>
+          <button id="punch-btn" type="button">+1 Punch (sushi order)</button>
+          <button id="redeem-btn" type="button" class="secondary">Redeem free roll</button>
+        </div>
+        <p id="card-status" class="status"></p>
+        <div id="card-result"></div>
+      </section>
+
+      <section class="panel">
+        <div class="editor-toolbar">
+          <h2>Bonus Requests (photo / social tag)</h2>
+          <div class="toolbar-actions">
+            <button id="reload-bonus-btn" type="button" class="secondary">Reload</button>
+          </div>
+        </div>
+        <div id="bonus-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="editor-toolbar">
+          <h2>All Cards</h2>
+          <div class="toolbar-actions">
+            <button id="reload-customers-btn" type="button" class="secondary">Reload</button>
+          </div>
+        </div>
+        <div id="customers-list"></div>
+      </section>
+    </main>
+
+    <script src="./staff-auth.js"></script>
+    <script src="./loyalty-admin.js"></script>
+  </body>
+</html>

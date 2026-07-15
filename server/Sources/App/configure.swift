@@ -10,6 +10,8 @@ func configure(_ app: Application) throws {
     MenuStore.shared.configure(dataDirectory: dataDirectory, resourcesDirectory: app.directory.resourcesDirectory)
     Uploads.configure(dataDirectory: dataDirectory)
     PlacesPhotoCache.shared.configure(dataDirectory: dataDirectory)
+    EventsStore.shared.configure(dataDirectory: dataDirectory)
+    LoyaltyStore.shared.configure(dataDirectory: dataDirectory)
 
     app.routes.defaultMaxBodySize = "10mb"
 

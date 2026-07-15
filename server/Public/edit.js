@@ -5,6 +5,21 @@ const SECTIONS = [
   { key: 'happy_hour', label: 'Happy Hour' },
 ];
 
+const TAGS = [
+  { key: 'vegetarian', label: 'Vegetarian friendly' },
+  { key: 'gluten-free-available', label: 'Gluten-free available on request' },
+  { key: 'shellfish', label: 'Contains shellfish' },
+  { key: 'fish', label: 'Contains fish' },
+  { key: 'peanuts', label: 'Contains peanuts' },
+  { key: 'egg', label: 'Contains egg' },
+  { key: 'soy', label: 'Contains soy' },
+  { key: 'wheat', label: 'Contains wheat' },
+  { key: 'corn', label: 'Contains corn' },
+  { key: 'sesame', label: 'Contains sesame' },
+  { key: 'dairy', label: 'Contains dairy' },
+  { key: 'raw', label: 'May contain raw/undercooked items' },
+];
+
 const statusEl = document.getElementById('status');
 const categoriesContainer = document.getElementById('categories');
 const addCategoryBtn = document.getElementById('add-category-btn');
@@ -48,7 +63,7 @@ function categoryBlock(section, name, note, items) {
   (items || []).forEach((item) => itemsContainer.appendChild(itemRow(item)));
 
   section_.querySelector('.add-item').addEventListener('click', () => {
-    itemsContainer.appendChild(itemRow({ name: '', description: '', price: null, images: [] }));
+    itemsContainer.appendChild(itemRow({ name: '', description: '', price: null, images: [], tags: [], featured: false }));
   });
 
   section_.querySelector('.remove-category').addEventListener('click', () => {
@@ -85,6 +100,23 @@ function itemRow(item) {
         <button type="button" class="remove-item secondary" aria-label="Remove item">&times;</button>
       </div>
       <input class="item-desc" placeholder="Description" value="${escapeAttr(item.description || '')}" />
+      <label class="featured-toggle">
+        <input type="checkbox" class="item-featured" ${item.featured ? 'checked' : ''} />
+        &#9733; Today's special (shows on homepage)
+      </label>
+      <details class="tags-details">
+        <summary>Dietary &amp; allergen tags${(item.tags || []).length ? ` (${item.tags.length} set)` : ''}</summary>
+        <div class="tags-grid">
+          ${TAGS.map(
+            (t) => `
+              <label class="tag-checkbox">
+                <input type="checkbox" class="item-tag" value="${t.key}" ${(item.tags || []).includes(t.key) ? 'checked' : ''} />
+                ${escapeAttr(t.label)}
+              </label>
+            `
+          ).join('')}
+        </div>
+      </details>
     </div>
   `;
   renderThumbGallery(row);
@@ -280,7 +312,9 @@ function collectMenuData() {
       const priceRaw = row.querySelector('.item-price').value.trim();
       const price = priceRaw === '' ? null : Number.parseFloat(priceRaw);
       const images = getRowImages(row);
-      items.push({ name: itemName, description, price, images });
+      const featured = row.querySelector('.item-featured').checked;
+      const tags = Array.from(row.querySelectorAll('.item-tag:checked')).map((cb) => cb.value);
+      items.push({ name: itemName, description, price, images, tags, featured });
     }
 
     categories.push({ section, name, note, items });

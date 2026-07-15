@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Edit Menu — Ohana Belltown</title>
+    <title>Events &amp; Specials — Ohana Belltown</title>
     <meta name="robots" content="noindex, nofollow" />
     <link rel="stylesheet" href="./style.css" />
   </head>
@@ -11,42 +11,32 @@
     <main class="page">
       <header class="hero">
         <p class="eyebrow">Ohana Belltown — Staff</p>
-        <h1>Edit Menu</h1>
+        <h1>Events &amp; Specials</h1>
         <p>
-          Changes made here are saved directly to the live website. Make your edits,
-          then click Save &mdash; no login required.
-        </p>
-        <p class="hint">
-          This page has no password. Anyone with this link can change menu prices, so
-          don't share it outside the team.
+          Manage the events shown on the Local page &mdash; karaoke nights, live music,
+          and anything else worth telling guests about. Requires the staff PIN to save.
         </p>
         <p class="admin-link"><a href="/menu">&larr; Back to menu</a></p>
         <div class="staff-tools-nav">
           <a href="/edit.html">Menu Editor</a>
           <a href="/loyalty-admin.html">Loyalty</a>
-          <a href="/events-admin.html">Events</a>
+          <a href="/events-admin.html" class="active">Events</a>
           <a href="/table-card.html">Table Cards</a>
         </div>
       </header>
 
       <p id="status" class="status"></p>
 
-      <section id="editor-panel" class="panel">
+      <section id="events-panel" class="panel">
         <div class="editor-toolbar">
-          <h2>Menu Items</h2>
+          <h2>Events</h2>
           <div class="toolbar-actions">
             <button id="reload-btn" type="button" class="secondary">Reload latest</button>
           </div>
         </div>
-        <div id="categories"></div>
+        <div id="events-list"></div>
         <div class="cta-row">
-          <select id="add-category-section">
-            <option value="menu">Food Menu</option>
-            <option value="sushi">Sushi</option>
-            <option value="drinks">Drinks</option>
-            <option value="happy_hour">Happy Hour</option>
-          </select>
-          <button id="add-category-btn" type="button" class="secondary">+ Add category</button>
+          <button id="add-event-btn" type="button" class="secondary">+ Add event</button>
         </div>
 
         <div class="save-row">
@@ -56,6 +46,7 @@
       </section>
     </main>
 
-    <script src="./edit.js"></script>
+    <script src="./staff-auth.js"></script>
+    <script src="./events-admin.js"></script>
   </body>
 </html>
