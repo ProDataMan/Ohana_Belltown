@@ -16,7 +16,9 @@ struct BonusReviewRequest: Content {
 }
 
 func requireStaffPin(_ req: Request) throws {
-    let expected = Environment.get("STAFF_PIN") ?? "ohana2026"
+    guard let expected = Environment.get("STAFF_PIN"), !expected.isEmpty else {
+        throw Abort(.internalServerError, reason: "Staff PIN is not configured on this server.")
+    }
     guard let provided = req.headers.first(name: "X-Staff-Pin"), provided == expected else {
         throw Abort(.unauthorized, reason: "Staff PIN required.")
     }
