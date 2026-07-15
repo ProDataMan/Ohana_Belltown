@@ -123,8 +123,9 @@ function renderMenu(data) {
           itemsByIndex.push({ item, categoryName: category.name });
 
           const priceMarkup = item.price != null ? `<div class="price">$${Number(item.price).toFixed(2)}</div>` : '';
-          const imageMarkup = item.image
-            ? `<img class="item-photo" src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" loading="lazy" />`
+          const featuredImage = (item.images || [])[0];
+          const imageMarkup = featuredImage
+            ? `<img class="item-photo" src="${escapeHtml(featuredImage)}" alt="${escapeHtml(item.name)}" loading="lazy" />`
             : '';
           const searchText = `${item.name} ${item.description || ''}`.toLowerCase();
           return `
@@ -165,7 +166,7 @@ function ensureItemModal() {
   modal.innerHTML = `
     <div class="item-modal">
       <button type="button" class="item-modal-close" aria-label="Close">&times;</button>
-      <img class="item-modal-photo" src="" alt="" hidden />
+      <div class="item-modal-gallery" hidden></div>
       <p class="item-modal-category"></p>
       <h3 class="item-modal-name"></h3>
       <div class="item-modal-price"></div>
@@ -189,9 +190,15 @@ function ensureItemModal() {
   return modal;
 }
 
+let galleryRotationInterval = null;
+
 function closeItemModal() {
   const modal = document.getElementById('item-modal-overlay');
   if (modal) modal.hidden = true;
+  if (galleryRotationInterval) {
+    clearInterval(galleryRotationInterval);
+    galleryRotationInterval = null;
+  }
 }
 
 async function loadGooglePhotosOnce() {
@@ -219,14 +226,36 @@ async function openItemModal(index) {
   priceEl.textContent = item.price != null ? `$${Number(item.price).toFixed(2)}` : '';
   priceEl.hidden = item.price == null;
 
-  const photoEl = modal.querySelector('.item-modal-photo');
-  if (item.image) {
-    photoEl.src = item.image;
-    photoEl.alt = item.name;
-    photoEl.hidden = false;
-    photoEl.onclick = () => window.openLightbox(item.image, item.name);
+  if (galleryRotationInterval) {
+    clearInterval(galleryRotationInterval);
+    galleryRotationInterval = null;
+  }
+
+  const gallery = modal.querySelector('.item-modal-gallery');
+  const images = item.images || [];
+  if (images.length) {
+    gallery.hidden = false;
+    gallery.innerHTML = images
+      .map(
+        (src, i) =>
+          `<img class="item-modal-gallery-img${i === 0 ? ' active' : ''}" src="${escapeHtml(src)}" alt="${escapeHtml(item.name)}" loading="lazy" />`
+      )
+      .join('');
+    const imgs = gallery.querySelectorAll('img');
+    imgs.forEach((imgEl) => {
+      imgEl.addEventListener('click', () => window.openLightbox(imgEl.src, item.name));
+    });
+    if (imgs.length > 1) {
+      let current = 0;
+      galleryRotationInterval = setInterval(() => {
+        imgs[current].classList.remove('active');
+        current = (current + 1) % imgs.length;
+        imgs[current].classList.add('active');
+      }, 4000);
+    }
   } else {
-    photoEl.hidden = true;
+    gallery.hidden = true;
+    gallery.innerHTML = '';
   }
 
   modal.hidden = false;

@@ -48,7 +48,7 @@ function categoryBlock(section, name, note, items) {
   (items || []).forEach((item) => itemsContainer.appendChild(itemRow(item)));
 
   section_.querySelector('.add-item').addEventListener('click', () => {
-    itemsContainer.appendChild(itemRow({ name: '', description: '', price: null, image: null }));
+    itemsContainer.appendChild(itemRow({ name: '', description: '', price: null, images: [] }));
   });
 
   section_.querySelector('.remove-category').addEventListener('click', () => {
@@ -63,15 +63,19 @@ function categoryBlock(section, name, note, items) {
 function itemRow(item) {
   const row = document.createElement('div');
   row.className = 'edit-item';
-  row.dataset.image = item.image || '';
+  const initialImages = item.images || (item.image ? [item.image] : []);
+  row.dataset.images = JSON.stringify(initialImages);
   const priceValue = item.price != null ? Number(item.price).toFixed(2) : '';
   row.innerHTML = `
     <div class="edit-item-photo">
-      <img class="item-thumb" src="${escapeAttr(item.image || '')}" ${item.image ? '' : 'hidden'} alt="" />
-      <label class="photo-upload-btn secondary">
-        Photo
-        <input type="file" class="item-image-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
-      </label>
+      <div class="item-thumb-gallery"></div>
+      <div class="photo-actions">
+        <label class="photo-upload-btn secondary">
+          + Upload
+          <input type="file" class="item-image-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+        </label>
+        <button type="button" class="photo-google-btn secondary">+ Google</button>
+      </div>
       <p class="photo-status status"></p>
     </div>
     <div class="edit-item-fields">
@@ -83,16 +87,68 @@ function itemRow(item) {
       <input class="item-desc" placeholder="Description" value="${escapeAttr(item.description || '')}" />
     </div>
   `;
+  renderThumbGallery(row);
   row.querySelector('.remove-item').addEventListener('click', () => row.remove());
   row.querySelector('.item-image-input').addEventListener('change', (event) => uploadItemImage(row, event));
+  row.querySelector('.photo-google-btn').addEventListener('click', () => openGooglePhotoPicker(row));
   return row;
+}
+
+function getRowImages(row) {
+  try {
+    return JSON.parse(row.dataset.images || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function setRowImages(row, images) {
+  row.dataset.images = JSON.stringify(images);
+  renderThumbGallery(row);
+}
+
+function renderThumbGallery(row) {
+  const images = getRowImages(row);
+  const gallery = row.querySelector('.item-thumb-gallery');
+  gallery.innerHTML = images
+    .map(
+      (src, i) => `
+        <div class="item-thumb-wrap">
+          <img class="item-thumb" src="${escapeAttr(src)}" alt="" />
+          ${
+            i === 0
+              ? '<span class="thumb-featured-badge" title="Featured photo">&#9733;</span>'
+              : `<button type="button" class="thumb-feature-btn" data-index="${i}" title="Set as featured">&#9733;</button>`
+          }
+          <button type="button" class="thumb-remove-btn" data-index="${i}" title="Remove photo">&times;</button>
+        </div>
+      `
+    )
+    .join('');
+
+  gallery.querySelectorAll('.thumb-feature-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.index);
+      const imgs = getRowImages(row);
+      const [chosen] = imgs.splice(idx, 1);
+      imgs.unshift(chosen);
+      setRowImages(row, imgs);
+    });
+  });
+  gallery.querySelectorAll('.thumb-remove-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.index);
+      const imgs = getRowImages(row);
+      imgs.splice(idx, 1);
+      setRowImages(row, imgs);
+    });
+  });
 }
 
 async function uploadItemImage(row, event) {
   const file = event.target.files[0];
   if (!file) return;
   const statusEl = row.querySelector('.photo-status');
-  const thumb = row.querySelector('.item-thumb');
   setStatus(statusEl, 'Uploading...', false);
 
   const formData = new FormData();
@@ -104,13 +160,79 @@ async function uploadItemImage(row, event) {
       throw new Error(`Upload failed (${response.status}).`);
     }
     const result = await response.json();
-    row.dataset.image = result.url;
-    thumb.src = result.url;
-    thumb.hidden = false;
+    const imgs = getRowImages(row);
+    imgs.push(result.url);
+    setRowImages(row, imgs);
     setStatus(statusEl, 'Photo added.', false);
   } catch (error) {
     setStatus(statusEl, error.message, true);
+  } finally {
+    event.target.value = '';
   }
+}
+
+let googlePhotosForPicker = null;
+
+async function openGooglePhotoPicker(row) {
+  let picker = document.getElementById('google-photo-picker');
+  if (!picker) {
+    picker = document.createElement('div');
+    picker.id = 'google-photo-picker';
+    picker.className = 'item-modal-overlay';
+    picker.hidden = true;
+    picker.innerHTML = `
+      <div class="item-modal google-picker-modal">
+        <button type="button" class="item-modal-close" aria-label="Close">&times;</button>
+        <h3 class="item-modal-name">Choose a photo from Google</h3>
+        <p class="hint">These are the photos currently on Ohana's Google Business listing &mdash; only pick one if you're sure it actually shows this dish.</p>
+        <div class="google-picker-grid"></div>
+      </div>
+    `;
+    document.body.appendChild(picker);
+    picker.addEventListener('click', (event) => {
+      if (event.target === picker) picker.hidden = true;
+    });
+    picker.querySelector('.item-modal-close').addEventListener('click', () => {
+      picker.hidden = true;
+    });
+  }
+
+  const grid = picker.querySelector('.google-picker-grid');
+  grid.innerHTML = '<p class="hint">Loading...</p>';
+  picker.hidden = false;
+
+  if (!googlePhotosForPicker) {
+    try {
+      const response = await fetch('/api/places-photos');
+      googlePhotosForPicker = response.ok ? await response.json() : [];
+    } catch {
+      googlePhotosForPicker = [];
+    }
+  }
+
+  if (!googlePhotosForPicker.length) {
+    grid.innerHTML = '<p class="hint">No Google photos are available right now.</p>';
+    return;
+  }
+
+  grid.innerHTML = googlePhotosForPicker
+    .map(
+      (p, i) =>
+        `<img src="${escapeAttr(p.url)}" data-index="${i}" alt="Photo by ${escapeAttr(p.attributionName)}" title="Photo by ${escapeAttr(p.attributionName)}" />`
+    )
+    .join('');
+
+  grid.querySelectorAll('img').forEach((imgEl) => {
+    imgEl.addEventListener('click', () => {
+      const photo = googlePhotosForPicker[Number(imgEl.dataset.index)];
+      const imgs = getRowImages(row);
+      if (!imgs.includes(photo.url)) {
+        imgs.push(photo.url);
+        setRowImages(row, imgs);
+      }
+      picker.hidden = true;
+    });
+  });
 }
 
 function renderEditor(data) {
@@ -157,8 +279,8 @@ function collectMenuData() {
       const description = row.querySelector('.item-desc').value.trim() || null;
       const priceRaw = row.querySelector('.item-price').value.trim();
       const price = priceRaw === '' ? null : Number.parseFloat(priceRaw);
-      const image = row.dataset.image || null;
-      items.push({ name: itemName, description, price, image });
+      const images = getRowImages(row);
+      items.push({ name: itemName, description, price, images });
     }
 
     categories.push({ section, name, note, items });
