@@ -4,209 +4,281 @@
   "categories": [
     {
       "section": "menu",
-      "name": "PUPUS (Appetizers)",
+      "name": "Pupu's (Appetizers)",
       "note": null,
       "items": [
         {
-          "name": "Hawaiian Style Poke",
-          "description": "Cubed fresh tuna and salmon, sliced onions tossed with sesame oil, soy sauce, red pepper flakes and green onions. Served with homemade taro chips.",
-          "price": null
-        },
-        {
-          "name": "BBQ Pork",
-          "description": "Chef Marco's homemade BBQ Pork, Chinese Style served with BBQ sauce and hot mustard.",
-          "price": null
-        },
-        {
-          "name": "Gyoza Yaki",
-          "description": "Tender crisp cabbage and pork dumplings, spiked with ginger, soy sauce & Mirin. Served with a chili oil and Shoyu Dipping sauce.",
-          "price": null
-        },
-        {
-          "name": "Robata (grilled skewers)",
-          "description": "Tender pieces of sirloin marinated in shoyu, brown sugar, and pineapple juice.",
-          "price": null
-        },
-        {
-          "name": "Tacos (Fish or Kalua Pork)",
-          "description": "Two tasty tacos filled with lightly fried Panko dusted seasonal fresh fish, or our homemade Kalua pork served in a grilled flour tortilla with homemade pico de gallo.",
-          "price": null
-        },
-        {
-          "name": "Agedashi Tofu",
-          "description": "Lightly breaded tofu served with bonito flakes and tempura sauce.",
-          "price": null
+          "name": "Yosh's Pupu Platter",
+          "description": "Our fearless leader's favorite assortment of pupu's, including coconut prawns, gyoza, lumpia shanghai, BBQ pork & 2 beef robatas, accompanied by an assortment of sauces.",
+          "price": 39,
+          "image": null
         },
         {
           "name": "Spicy Fried Rice",
-          "description": "White rice fried with Portuguese sausage, peas, eggs, carrots, green onion, Sambal chili sauce, and BBQ Pork. ( Add fried egg for $1.50) Add bacon Bits",
-          "price": null
+          "description": "Our own combination of Portuguese sausage, peas, carrots, onions, eggs & our homemade BBQ pork combined with white rice, sriracha & oyster sauce topped with green onions. Options: add fried egg +$3.50, add Spam +$6, add bacon +$5.50.",
+          "price": 17,
+          "image": null
         },
         {
-          "name": "Oh So Ono Coconut Prawns",
-          "description": "4 Prawns, citrus marinated then dusted with sweet coconut flake & fried. Served with a Sweet Chili Sauce.",
-          "price": null
+          "name": "Edamame (Chibi)",
+          "description": "Boiled soybeans, lightly seasoned w/ kosher salt.",
+          "price": 10,
+          "image": null
         },
         {
-          "name": "Ohana Sliders (Kalua or Spam)",
-          "description": "Your choice of homemade Kalua pork, or grilled spam on dinner rolls. Served with spicy coleslaw and a pesto mayo sauce, with fries.",
-          "price": null
-        },
-        {
-          "name": "Spam Musubi",
-          "description": "Grilled slices of original recipe SPAM on top of blocks of rice & wrapped with nori, lightly drizzled with an oyster plum sauce. (Add tamago (egg) for $2.00)",
-          "price": null
+          "name": "Edamame (Kahuna)",
+          "description": "Boiled soybeans, lightly seasoned w/ kosher salt. Larger portion.",
+          "price": 13,
+          "image": null
         },
         {
           "name": "Tempura Sampler",
-          "description": "3 Traditional Japanese Tempura Prawns & Assorted vegetables. Served with Tempura Sauce.",
-          "price": null
+          "description": "Traditional Japanese tempura w/ prawns & assorted vegetables, served w/ tempura sauce.",
+          "price": 16,
+          "image": null
         },
         {
-          "name": "Lumpia Shanghai",
-          "description": "Thin crisp Filipino-style egg rolls filled with shrimp and pork. Served with sweet chili dipping sauce.",
-          "price": null
+          "name": "Hawaiian Style Poke",
+          "description": "Cubed fresh tuna, salmon, sliced white & green onions tossed w/ sesame oil, shoyu, red pepper flakes, served w/ homemade taro chips.",
+          "price": 18,
+          "image": null
+        },
+        {
+          "name": "BBQ Pork",
+          "description": "Chef Marcos' homemade BBQ pork, Chinese style, served w/ homemade BBQ sauce & spicy mustard.",
+          "price": 14,
+          "image": null
         },
         {
           "name": "Veggie Spring Rolls",
-          "description": "2 Rice Flour wraps filled with Somen noodles, carrots, cilantro, and lettuce. Served with a Thai Peanut Sauce.",
-          "price": null
+          "description": "Rice flour wraps filled w/ somen noodles, carrots, cilantro, cucumber & lettuce, served w/ spicy peanut sauce. Add salmon or shrimp +$5.",
+          "price": 13.5,
+          "image": null
+        },
+        {
+          "name": "Gyoza Yaki",
+          "description": "Tender crisp cabbage & pork dumplings, spiked w/ ginger, soy sauce & mirin, served w/ a chili oil & shoyu sauce.",
+          "price": 13,
+          "image": null
+        },
+        {
+          "name": "Lumpia Shanghai",
+          "description": "Thin crisp Filipino style egg rolls filled with shrimp & pork, served w/ sweet chili sauce.",
+          "price": 13,
+          "image": null
+        },
+        {
+          "name": "Beef Robata",
+          "description": "Tender pieces of beef marinated in our homemade teriyaki sauce.",
+          "price": 14,
+          "image": null
+        },
+        {
+          "name": "Oh So Ono Coconut Prawns",
+          "description": "4 prawns, citrus marinated then dusted w/ sweet coconut flakes & fried, served w/ sweet chili sauce.",
+          "price": 15,
+          "image": null
+        },
+        {
+          "name": "Fish or Kalua Pork Tacos",
+          "description": "Two tasty tacos filled w/ lightly fried panko dusted cod, grated cheese & tartar sauce, or homemade kalua pork served on grilled flour tortilla's w/ homemade pico de gallo.",
+          "price": 13,
+          "image": null
+        },
+        {
+          "name": "Ohana Sliders (Kalua or Spam)",
+          "description": "Your choice of homemade kalua pork or grilled spam on dinner rolls topped w/ spicy coleslaw & pesto mayo w/ fries.",
+          "price": 13.5,
+          "image": null
+        },
+        {
+          "name": "Agedashi Tofu",
+          "description": "Soft tofu dipped in cornstarch & fried golden brown, served w/ bonito flakes & tempura sauce.",
+          "price": 14,
+          "image": null
+        },
+        {
+          "name": "Spicy Teriyaki or Buffalo Wings",
+          "description": "Fried chicken wings tossed in your choice of spicy teriyaki sauce or traditional buffalo sauce.",
+          "price": 15,
+          "image": null
         }
       ]
     },
     {
       "section": "menu",
-      "name": "ENTREES",
-      "note": null,
+      "name": "Musubi's",
+      "note": "Assorted protein served on a block of musubi rice wrapped with a strip of nori. Set of 2 per order. Add homemade tamago to any musubi for $4.50.",
+      "items": [
+        {
+          "name": "Musubi Sampler",
+          "description": "Get one each of our specialty musubi's.",
+          "price": 39,
+          "image": null
+        },
+        {
+          "name": "Spam Musubi",
+          "description": "Grilled slices of original recipe Spam lightly drizzled w/ an oyster plum sauce.",
+          "price": 12.5,
+          "image": null
+        },
+        {
+          "name": "Chicken Katsu Musubi",
+          "description": "Our homemade chicken katsu fried crisp served w/ our homemade katsu sauce.",
+          "price": 12.5,
+          "image": null
+        },
+        {
+          "name": "Portuguese Sausage Musubi",
+          "description": "Hawaiian Portuguese sausage grilled.",
+          "price": 12.5,
+          "image": null
+        },
+        {
+          "name": "Veggie Tempura Musubi",
+          "description": "One piece each of sweet potato & zucchini, tempura fried lightly drizzled w/ an oyster plum sauce.",
+          "price": 11,
+          "image": null
+        },
+        {
+          "name": "Buffalo Katsu Musubi",
+          "description": "Our homemade chicken katsu tossed in a spicy buffalo sauce.",
+          "price": 12.5,
+          "image": null
+        },
+        {
+          "name": "Red Hot Dog Musubi",
+          "description": "Hawaiian style red hot dog tossed in a shoyu/sugar sauce then grilled.",
+          "price": 12.5,
+          "image": null
+        }
+      ]
+    },
+    {
+      "section": "menu",
+      "name": "'Aina Pa'ina (Entrees)",
+      "note": "Prices shown are regular plate size / YOSH size (double portion for less cost).",
       "items": [
         {
           "name": "Loco Moco",
-          "description": "Da Braddah's favorite! A grilled beef patty topped with 2 fried eggs over rice, smothered with brown gravy & grilled onions. Served with potato/mac salad. Customize to your taste with fried rice, kalua pork, chicken katsu, spam, and bacon.",
-          "price": null
-        },
-        {
-          "name": "Big Kahuna Fish & Chips",
-          "description": "4 tender pieces of line caught true cod, Panko battered & fried. Served over fries with our homemade tartar sauce & spicy coleslaw.",
-          "price": null
-        },
-        {
-          "name": "Ginger Chicken Broccoli",
-          "description": "Strips of chicken stir fried with broccoli, onions, carrots and bell peppers in a ginger oyster sauce. Served with steamed rice.",
-          "price": null
+          "description": "Da Braddah's favorite! A grilled beef patty topped w/ 2 fried eggs over rice, smothered w/ brown gravy & grilled onions. Served w/ potato & mac salad. Options: sub fried rice +$6, sub kalua pork (no charge), add bacon +$5.50, add katsu or Spam +$6. YOSH size: $53.20.",
+          "price": 28,
+          "image": null
         },
         {
           "name": "Kalua Pork",
-          "description": "Hawaiian style roasted pork served with cabbage and rice & mac/potato salad.",
-          "price": null
+          "description": "Hawaiian style slow roasted pork served w/ cabbage, rice & a side of potato & mac salad. YOSH size: $51.30.",
+          "price": 27,
+          "image": null
         },
         {
           "name": "Curry Rice",
-          "description": "Rich pork curry stew with onion, green peppers, celery, potatoes, and carrots. Served with pickled radish. Make it a Katsu Curry rice with chicken Katsu",
-          "price": null
-        },
-        {
-          "name": "Kalua Pork Sandwich",
-          "description": "Slow roasted lu’au style pork served with shredded cabbage and crispy fries or mini salad.",
-          "price": null
-        },
-        {
-          "name": "Island Style Baby Back Ribs",
-          "description": "Ribs rubbed with aromatic spices, grilled then brushed with a spicy tropical fruit BBQ sauce, and served with steamed rice.",
-          "price": null
+          "description": "Rich pork curry stew w/ onion, green pepper, celery, potato & carrots. Served w/ rice & an orange, seaweed salad & takuan. Add chicken katsu +$6. YOSH size: $49.40.",
+          "price": 26,
+          "image": null
         },
         {
           "name": "Adobo",
-          "description": "Chicken drumettes slowly braised with garlic bay leaves, shoyu, coconut milk, and then grilled with a caramelized crust, served with steamed rice.",
-          "price": null
-        },
-        {
-          "name": "Chicken Katsu",
-          "description": "Tender fillets lightly battered then coated in Panko breadcrumbs and fried to a crisp. Served with rice and Spicy Coleslaw.",
-          "price": null
-        },
-        {
-          "name": "Ohana Cheeseburger",
-          "description": "1/3 pound lean handmade beef patty, pesto mayo, pineapple, and grilled onions. Served with crispy fries. (Add Bacon $3.50)",
-          "price": null
+          "description": "Chicken drumettes slowly braised w/ garlic, bay leaves, shoyu & coconut milk, then grilled for a caramelized crust. Served w/ rice & broccoli. YOSH size: $53.20.",
+          "price": 28,
+          "image": null
         },
         {
           "name": "Yakisoba",
-          "description": "Fresh vegetables, tofu, and soba noodles sautéed in a homemade Yakisoba sauce. Your choice of Tofu or Chicken",
-          "price": null
+          "description": "Fresh vegetables, fried tofu & yakisoba noodles sauteed in a homemade yakisoba sauce. Extra tofu +$3. With chicken: $27 / YOSH $51.30. YOSH size: $43.70.",
+          "price": 23,
+          "image": null
         },
         {
-          "name": "Ohana Bento Box",
-          "description": "Served with Miso soup, rice, coleslaw, pickled radish, and Wakame salad",
-          "price": null
+          "name": "Kalua Pork Sandwich",
+          "description": "Slow roasted luau style pork served w/ shredded cabbage & your choice of crispy fries or side salad.",
+          "price": 26,
+          "image": null
         },
         {
-          "name": "Shogun",
-          "description": "Chicken Katsu with your choice or chicken or beef teriyaki",
-          "price": null
+          "name": "Chicken Katsu",
+          "description": "Tender fillets lightly battered then coated in panko breadcrumbs & fried to a crisp, served w/ rice & your choice of potato & mac salad or spicy coleslaw. YOSH size: $53.20.",
+          "price": 28,
+          "image": null
         },
         {
-          "name": "Sumo",
-          "description": "Chicken Katsu & salmon teriyaki with your choice of chicken or beef teriyaki.",
-          "price": null
-        }
-      ]
-    },
-    {
-      "section": "menu",
-      "name": "Yosh's Teriyaki Ohana",
-      "note": "All Teriyaki Entrees come with miso soup, rice and broccoli.",
-      "items": [
-        {
-          "name": "Tofu Teriyaki",
-          "description": null,
-          "price": null
+          "name": "Ginger Chicken Broccoli",
+          "description": "Strips of chicken stir fried w/ broccoli, onions, carrots & bell peppers in a ginger-oyster sauce & served w/ rice. Sub noodles +$3. YOSH size: $53.20.",
+          "price": 28,
+          "image": null
         },
         {
-          "name": "Chicken Teriyaki",
-          "description": null,
-          "price": null
+          "name": "Big Kahuna Fish & Chips",
+          "description": "4 tender pieces of line caught cod, dipped in citrus milk, panko battered & fried. Served over fries w/ our homemade tartar sauce, ketchup & spicy coleslaw. YOSH size: $55.10.",
+          "price": 29,
+          "image": null
         },
         {
-          "name": "Spicy Chicken",
-          "description": null,
-          "price": null
+          "name": "Ohana Cheese Burger",
+          "description": "1/3 pound lean beef patty, American/Swiss cheese, pesto mayo, pineapple, grilled onions, lettuce & tomato. Served w/ your choice of crispy fries or a side salad. Add bacon +$5.50.",
+          "price": 26,
+          "image": null
         },
         {
-          "name": "Beef Teriyaki",
-          "description": null,
-          "price": null
-        },
-        {
-          "name": "Salmon",
-          "description": null,
-          "price": null
-        },
-        {
-          "name": "Spicy Beef Teriyaki",
-          "description": null,
-          "price": null
-        }
-      ]
-    },
-    {
-      "section": "menu",
-      "name": "Greens & Soup",
-      "note": null,
-      "items": [
-        {
-          "name": "Edamame",
-          "description": "Boiled soybeans lightly seasoned with kosher salt",
-          "price": null
+          "name": "Island Style Baby Back Ribs",
+          "description": "1/2 rack of ribs rubbed w/ blackened aromatic spices, grilled then brushed w/ a spicy tropical fruit BBQ sauce. Served w/ steamed rice & broccoli. YOSH size: $60.80.",
+          "price": 32,
+          "image": null
         },
         {
           "name": "Nabeyaki Udon",
-          "description": "Udon noodles served traditional style with shitake mushrooms, spinach, fishcake, bbq pork, egg in a seafood broth. Served with a tempura prawn.",
-          "price": null
+          "description": "Udon noodles served in the traditional style w/ mushrooms, spinach, fishcake, BBQ pork & poached egg in a seafood broth, served w/ tempura shrimp.",
+          "price": 23,
+          "image": null
         },
         {
           "name": "Ohana Salad",
-          "description": "Seasonal house lettuce blend, tossed in a miso peanut butter vinaigrette, topped with roasted peppers & rice crackers. (add chicken or salmon)",
-          "price": null
+          "description": "Spring mix tossed in a miso-peanut butter vinaigrette topped w/ roasted pepper & rice cracker. Add chicken +$6, add salmon +$6. YOSH size: $24.70.",
+          "price": 13,
+          "image": null
+        }
+      ]
+    },
+    {
+      "section": "menu",
+      "name": "Teriyaki Plates",
+      "note": "All meals come with rice & miso soup. Prices shown are regular plate size / YOSH size (double portion for less cost).",
+      "items": [
+        {
+          "name": "Chicken Teriyaki / Spicy Chicken Teriyaki",
+          "description": "Grilled chicken thighs marinated in our homemade teriyaki sauce, served w/ broccoli. YOSH size: $53.20.",
+          "price": 28,
+          "image": null
+        },
+        {
+          "name": "Salmon Teriyaki",
+          "description": "Fresh salmon lightly seasoned & grilled to perfection topped w/ our homemade teriyaki sauce & served w/ broccoli. YOSH size: $58.90.",
+          "price": 31,
+          "image": null
+        },
+        {
+          "name": "Shogun Bento",
+          "description": "Chicken katsu served w/ your choice of chicken or beef teriyaki, coleslaw, takuan & seaweed salad.",
+          "price": 28,
+          "image": null
+        },
+        {
+          "name": "Beef Teriyaki / Spicy Beef Teriyaki",
+          "description": "Tender grilled steak marinated in teriyaki sauce, served w/ broccoli. YOSH size: $58.90.",
+          "price": 31,
+          "image": null
+        },
+        {
+          "name": "Tofu Teriyaki",
+          "description": "Grilled tofu cutlet topped w/ our homemade teriyaki sauce & served w/ broccoli.",
+          "price": 18,
+          "image": null
+        },
+        {
+          "name": "Sumo Bento",
+          "description": "Chicken katsu & salmon teriyaki w/ your choice of chicken or beef teriyaki, coleslaw, takuan & seaweed salad.",
+          "price": 32,
+          "image": null
         }
       ]
     },
@@ -217,469 +289,1128 @@
       "items": [
         {
           "name": "Banana Cream Pie",
-          "description": "Ohana’s own version of banana cream pie, Oreo cookie crust, fresh banana’s, vanilla pudding and whipped cream. Whole pies are available with 48-hour notice.",
-          "price": null
-        },
-        {
-          "name": "Chocolate Molten Lava Cake",
-          "description": "Rich chocolate pudding in a dark chocolate cake, served with a scoop of vanilla ice cream.",
-          "price": null
-        },
-        {
-          "name": "Ice Cream",
-          "description": "Locally made ice cream and sorbet. Your choice of Toasted Coconut and Vanilla. Green Tea and Rocky Road available in Issaquah.",
-          "price": null
+          "description": "Our homemade version of this classic, Oreo cookie crust, fresh bananas, vanilla pudding & whipped cream. Served with an Oreo cookie, sliced bananas and chocolate sauce.",
+          "price": 12,
+          "image": null
         },
         {
           "name": "Pele's Ice Cream",
-          "description": "Your choice of any of our ice cream flavors, wrapped in pound cake and tempura fried to a crisp.",
-          "price": null
+          "description": "Your choice of any of our ice cream flavors, wrapped in pound cake & tempura fried.",
+          "price": 13,
+          "image": null
+        },
+        {
+          "name": "Chocolate Lava Cake",
+          "description": "Rich chocolate pudding in a dark chocolate cake, served w/ a scoop of vanilla ice cream.",
+          "price": 13,
+          "image": null
+        },
+        {
+          "name": "Ice Cream",
+          "description": "Locally made rich & creamy ice cream. Your choice of Toasted Coconut or Madagascar Vanilla.",
+          "price": 10.5,
+          "image": null
         }
       ]
     },
     {
-      "section": "sushi",
-      "name": "Appetizers",
+      "section": "menu",
+      "name": "Extra & Sides",
       "note": null,
       "items": [
         {
-          "name": "Seaweed Salad",
-          "description": "wakame tossed with sesame oil and sesame seed.",
-          "price": null
+          "name": "Potato & Mac Salad",
+          "description": null,
+          "price": 7,
+          "image": null
         },
         {
-          "name": "Hamachi Jalapeno",
-          "description": "sliced yellowtail on white onions topped with a citrus yuzu sauce, jalapenos and masago",
-          "price": null
+          "name": "Coleslaw",
+          "description": null,
+          "price": 7,
+          "image": null
         },
         {
-          "name": "Ohana Tuna Poke",
-          "description": "Diced tuna and veggies mixed with a spicy shoyu sauce.",
-          "price": null
-        }
-      ]
-    },
-    {
-      "section": "sushi",
-      "name": "Nigiri and Sashimi",
-      "note": null,
-      "items": [
-        {
-          "name": "Saba",
-          "description": "Mackerel",
-          "price": null
+          "name": "Fries",
+          "description": null,
+          "price": 8,
+          "image": null
         },
         {
-          "name": "Tamago",
-          "description": "Sweet egg omelet",
-          "price": null
+          "name": "Broccoli (Small)",
+          "description": null,
+          "price": 8,
+          "image": null
         },
         {
-          "name": "Masago",
-          "description": "Smelt roe",
-          "price": null
+          "name": "Broccoli (Large)",
+          "description": null,
+          "price": 10,
+          "image": null
         },
         {
-          "name": "Ebi",
-          "description": "Prawn",
-          "price": null
+          "name": "White Rice",
+          "description": null,
+          "price": 5,
+          "image": null
         },
         {
-          "name": "Shiro Maguro",
-          "description": "Albacore",
-          "price": null
+          "name": "Miso Soup",
+          "description": null,
+          "price": 5,
+          "image": null
         },
         {
-          "name": "Shiromi",
-          "description": "White Fish",
-          "price": null
+          "name": "BBQ Sauce or Gravy",
+          "description": null,
+          "price": 3,
+          "image": null
         },
         {
-          "name": "Tobiko",
-          "description": "Flying Fish Roe",
-          "price": null
-        },
-        {
-          "name": "Tako",
-          "description": "Octopus",
-          "price": null
-        },
-        {
-          "name": "Sake",
-          "description": "Salmon",
-          "price": null
-        },
-        {
-          "name": "Hamachi",
-          "description": "Yellowtail",
-          "price": null
-        },
-        {
-          "name": "Maguro",
-          "description": "Tuna",
-          "price": null
-        },
-        {
-          "name": "Unagi",
-          "description": "Barbequed Eel",
-          "price": null
-        },
-        {
-          "name": "Hotate",
-          "description": "Scallop",
-          "price": null
-        },
-        {
-          "name": "Ikura",
-          "description": "Salmon Roe",
-          "price": null
-        },
-        {
-          "name": "Inari",
-          "description": "Sweet Tofu Pouch",
-          "price": null
-        }
-      ]
-    },
-    {
-      "section": "sushi",
-      "name": "Sushi Rolls",
-      "note": null,
-      "items": [
-        {
-          "name": "Avocado Roll",
-          "description": "fresh avocado wrapped in nori and sushi rice.",
-          "price": null
-        },
-        {
-          "name": "Cucumber Roll",
-          "description": "(Kappa Maki) – thinly sliced cucumbers wrapped in nori and sushi rice",
-          "price": null
-        },
-        {
-          "name": "Oshinko Roll",
-          "description": "takuan (pickled radish) wrapped in nori and sushi rice",
-          "price": null
-        },
-        {
-          "name": "Tuna or Salmon Roll (Tekka or Sake Maki)",
-          "description": "Fresh cut fish sliced and wrapped in nori and sushi rice.",
-          "price": null
-        },
-        {
-          "name": "Veggie Roll",
-          "description": "Yamagobo (pickled carrot), Kaiware (radish sprouts), avocado, cucumber, takuan (pickled radish) wrapped together in nori and sushi rice",
-          "price": null
-        },
-        {
-          "name": "California Roll",
-          "description": "Krab, avocado and cucumber wrapped in sushi rice and nori, sprinkled with sesame seeds.",
-          "price": null
-        },
-        {
-          "name": "Belltown Roll",
-          "description": "fresh salmon, cucumber and avocado wrapped in sushi rice and nori and topped with masago (smelt roe).",
-          "price": null
-        },
-        {
-          "name": "Creamy Crunchy Salmon",
-          "description": "fresh salmon, cream cheese, spicy mayo and crunchy tempura flakes",
-          "price": null
-        },
-        {
-          "name": "Spicy Tuna Roll",
-          "description": "Our Spicy tuna mixture, cucumber and kaiware (radish sprouts) wrapped in nori and sushi rice",
-          "price": null
-        },
-        {
-          "name": "Spicy Salmon Roll",
-          "description": "fresh sliced salmon with spicy mayo, cucumber and kaiware (radish sprouts) wrapped in nori and sushi rice",
-          "price": null
-        },
-        {
-          "name": "Aloha Roll",
-          "description": "Krab, scallops, avocado wrapped in sushi rice and nori and topped with masago (smelt roe)",
-          "price": null
-        },
-        {
-          "name": "Salmon Skin",
-          "description": "Crispy fried salmon skin, cucumber, yamagobo (burdock root), and kaiware wrapped in nori and sushi rice",
-          "price": null
-        },
-        {
-          "name": "Da Kine Roll",
-          "description": "Tempura shrimp and avocado wrapped in sushi rice and nori and topped with eel sauce.",
-          "price": null
-        },
-        {
-          "name": "Eel Roll",
-          "description": "Baked eel, cucumber, avocado wrapped in nori and sushi rice and topped with eel sauce.",
-          "price": null
-        },
-        {
-          "name": "Chizuko Roll",
-          "description": "Tempura shrimp, cucumber, avocado, kaiware (radish sprouts), and masago (smelt roe) wrapped in nori and sushi rice",
-          "price": null
-        },
-        {
-          "name": "King & I Roll",
-          "description": "Fresh salmon, avocado, eel, krab, cream cheese, crunchies wrapped in thinly sliced cucumber and topped with eel sauce",
-          "price": null
-        },
-        {
-          "name": "Spider Roll",
-          "description": "fried soft shell crab, cucumber, avocado, kaiware and masago wrapped in nori and sushi rice",
-          "price": null
-        },
-        {
-          "name": "Super Crunchy Roll",
-          "description": "your choice of spicy tuna or spicy salmon with tempura flakes wrapped in sushi rice and nori and topped with prawns",
-          "price": null
-        },
-        {
-          "name": "Sakura Roll",
-          "description": "Yellowtail, cilantro, jalapeno, kaiware and onion wrapped in sushi rice and nori and topped with albacore, avocado and tobiko (Flying Fish roe)",
-          "price": null
-        },
-        {
-          "name": "Crunchy Dynamite",
-          "description": "Shrimp tempura and krab rolled in sushi rice, nori, egg and coconut flakes then fried crispy brown. Topped with a honey mayo sauce",
-          "price": null
-        },
-        {
-          "name": "Dragon Roll",
-          "description": "our California roll topped with eel",
-          "price": null
-        },
-        {
-          "name": "Rainbow Roll",
-          "description": "California topped with an assortment of fish",
-          "price": null
-        },
-        {
-          "name": "Firecracker Roll",
-          "description": "krab, tuna, salmon, avocado, cream cheese and tobiko wrapped in nori and sushi rice, fried in tempura batter and served with a spicy peanut sauce and spicy mayo on the side. (15 min. Prep Time)",
-          "price": null
-        },
-        {
-          "name": "Half Baked",
-          "description": "California roll topped with assorted baked fish mixed with spicy mayo, eel sauce and green onions. (15 min. Prep time)",
-          "price": null
-        }
-      ]
-    },
-    {
-      "section": "sushi",
-      "name": "Chef’s Choice Dinner Plates with Miso Soup. (No Substitutions)",
-      "note": null,
-      "items": [
-        {
-          "name": "Sushi Combo",
-          "description": "8 pieces of chef’s choice assorted sushi and your choice of a California roll or Belltown roll",
-          "price": null
-        },
-        {
-          "name": "Sashimi Combo",
-          "description": "Assortment of 3 fresh sliced fish selected for you by our sushi chef’s",
-          "price": null
-        },
-        {
-          "name": "Sushi and Sashimi Combo",
-          "description": "6 pieces of chef’s choice assorted sushi and 6 pieces of sashimi with your choice of a California roll or a Belltown roll.",
-          "price": null
+          "name": "Extra Sauces",
+          "description": "Teriyaki, katsu, adobo, gyoza, tartar, or sweet chili.",
+          "price": 2,
+          "image": null
         }
       ]
     },
     {
       "section": "drinks",
-      "name": "Cocktails",
+      "name": "Ohana's Specialty Cocktails",
       "note": null,
       "items": [
         {
-          "name": "Blue Hawaiian",
-          "description": "Rum, Pineapple juice, sour mix and Blue Curacao served over ice. “ A Hawaiian Classic”",
-          "price": null
+          "name": "Mahalo Mai Tai",
+          "description": "Rum, amaretto, grenadine, pineapple juice, orange juice & a float of dark rum.",
+          "price": 16,
+          "image": null
         },
         {
           "name": "Big Island Ice Tea",
-          "description": "Vodka, House Gin, Rum, Triple Sec, Pass-O-Guava juice and lemon-lime soda and a dash of mango puree served over ice. “An Ohana twist on the classic Long Island!”",
-          "price": null
-        },
-        {
-          "name": "Mala Shake",
-          "description": "Coconut Rum and White Rum, Strawberry and Mango puree, fresh banana, pineapple juice, coconut milk and Pass-O- guava juice blended together. “Ohana’s tribute to Yosh’s dog Mala, thanks for guarding the door.”",
-          "price": null
-        },
-        {
-          "name": "KJ’s Pearl",
-          "description": "Peach vodka, Triple Sec, Lychee juice, lime juice, sour mix and coconut milk blended smooth.",
-          "price": null
-        },
-        {
-          "name": "Mango Madness",
-          "description": "Vodka, Pineapple juice, coconut milk and mango puree, blended to perfection.",
-          "price": null
-        },
-        {
-          "name": "Mahalo Mai Tai",
-          "description": "White Rum, Grenadine, Pineapple juice, orange juice and amaretto with a float of Dark rum",
-          "price": null
-        },
-        {
-          "name": "Lychee Martini",
-          "description": "Vodka, Lychee juice and lime juice shaken and served in a chilled martini glass.",
-          "price": null
-        },
-        {
-          "name": "Lava Flow",
-          "description": "White Rum, pineapple juice and coconut milk, blended smooth and swirled with strawberry puree. “Pele would be pleased”",
-          "price": null
-        },
-        {
-          "name": "Strawberry Guava Martini",
-          "description": "Vodka, Triple Sec, Strawberry Puree and Pass-o-Guava juice, shaken and served up.",
-          "price": null
-        },
-        {
-          "name": "Molokai Mule",
-          "description": "Choose between vodka, whiskey or spiced rum served with lime juice and ginger beer",
-          "price": null
-        },
-        {
-          "name": "Toshiro Old Fashion",
-          "description": "Iichiko Shochu, simple syrup and a dash of bitters over ice.",
-          "price": null
-        }
-      ]
-    },
-    {
-      "section": "happy_hour",
-      "name": "Drinks",
-      "note": "Happy Hour: Monday - Friday, 3-6pm. Beer, wine, sake & spirits.",
-      "items": [
-        {
-          "name": "Draft Beer",
-          "description": null,
-          "price": null
-        },
-        {
-          "name": "Rotating Hard Cider",
-          "description": null,
-          "price": null
-        },
-        {
-          "name": "House Red or White",
-          "description": "(Red - Cabernet or White-Chardonnay, Pinot Grigio)",
-          "price": null
-        },
-        {
-          "name": "House Wells",
-          "description": null,
-          "price": null
-        },
-        {
-          "name": "Hot or Cold Sake",
-          "description": null,
-          "price": null
-        },
-        {
-          "name": "Raspberry Lemondrop",
-          "description": "Raspberry vodka, Triple Sec, lemon juice, sweet & sour mix",
-          "price": null
+          "description": "Vodka, gin, rum, triple sec, pass-o-guava juice, lemon-lime soda & a dash of mango puree over ice.",
+          "price": 16,
+          "image": null
         },
         {
           "name": "Blue Hawaiian",
-          "description": "Rum, Blue Curacao, pineapple juice and sweet & sour mix",
-          "price": null
+          "description": "Rum, pineapple juice, sour mix & blue curacao served over ice.",
+          "price": 16,
+          "image": null
         },
         {
-          "name": "Gold Apple at Sea",
-          "description": "Spiced Rum, Sour Apple Liqueur and pineapple juice",
-          "price": null
+          "name": "Molokai Mule",
+          "description": "Ketel One vodka served w/ lime juice & ginger beer.",
+          "price": 16,
+          "image": null
         },
         {
-          "name": "Aloha Iced Tea",
-          "description": "Sweet Tea Vodka, lemonade and a splash of soda water",
-          "price": null
+          "name": "Paniolo Skinny Margarita",
+          "description": "21 Seeds cucumber jalapeno tequila, triple sec, fresh lime juice, soda water & a Tajin rim.",
+          "price": 15,
+          "image": null
         },
         {
-          "name": "Strawberry Sake Margarita",
-          "description": "Sake, Triple Sec, strawberry puree and pineapple juice",
-          "price": null
+          "name": "Mauna Loa Sunrise",
+          "description": "Gin, pineapple and grapefruit juice, splash of lime and black raspberry liqueur.",
+          "price": 16,
+          "image": null
+        },
+        {
+          "name": "Hawaiian Harbor",
+          "description": "Aviation gin, orgeat (almond), lemon & lime juice & Angostura bitters.",
+          "price": 15,
+          "image": null
+        },
+        {
+          "name": "Howzit Dark & Stormy",
+          "description": "Kraken dark rum, fresh lime juice & ginger beer.",
+          "price": 15,
+          "image": null
+        },
+        {
+          "name": "Paradise Paloma",
+          "description": "Reposado tequila, grapefruit juice, soda water with a Tajin rim.",
+          "price": 15,
+          "image": null
         }
       ]
     },
     {
-      "section": "happy_hour",
-      "name": "From the Water",
+      "section": "drinks",
+      "name": "Old Fashion's",
       "note": null,
       "items": [
         {
-          "name": "Rolls",
-          "description": "California Cucumber Salmon Salmon Skin Veggie Spicy Tuna Belltown Spicy California Spicy Crunchy Salmon Spicy Crunchy Tuna",
-          "price": null
+          "name": "Toshiro Old Fashion",
+          "description": "Iichiko shochu, simple syrup & a dash of bitters served over ice.",
+          "price": 14.5,
+          "image": null
+        },
+        {
+          "name": "Zacapa Old Fashioned",
+          "description": "Zacapa No. 25 Guatemalan rum, tiki bitters & sugar. Elevate with Ron Zacapa XO, aged in cognac casks, +$9.",
+          "price": 15.5,
+          "image": null
         }
       ]
+    },
+    {
+      "section": "drinks",
+      "name": "Blended Cocktails",
+      "note": null,
+      "items": [
+        {
+          "name": "Lava Flow",
+          "description": "Rum, pineapple juice & coconut creme, blended smooth & served w/ a strawberry swirl.",
+          "price": 17.5,
+          "image": null
+        },
+        {
+          "name": "Mala Shake",
+          "description": "Rum, coconut rum & white rum, strawberry & mango puree, fresh banana, pineapple juice, coconut creme & pass-o-guava juice.",
+          "price": 17.5,
+          "image": null
+        },
+        {
+          "name": "Mango Madness",
+          "description": "Vodka, pineapple juice, coconut creme & mango puree.",
+          "price": 17.5,
+          "image": null
+        }
+      ]
+    },
+    {
+      "section": "drinks",
+      "name": "Martini's",
+      "note": null,
+      "items": [
+        {
+          "name": "Lychee Martini",
+          "description": "Vodka, lychee juice shaken & served in a chilled martini glass.",
+          "price": 15,
+          "image": null
+        },
+        {
+          "name": "Tini Bit Tiki",
+          "description": "Ketel One Peach & Orange Blossom Botanical, fresh lemon juice, orgeat (almond) & Aperol.",
+          "price": 16,
+          "image": null
+        },
+        {
+          "name": "East Sider",
+          "description": "Empress gin & lychee juice shaken up cold & served straight up.",
+          "price": 15,
+          "image": null
+        }
+      ]
+    },
+    {
+      "section": "drinks",
+      "name": "Sake",
+      "note": "Sake is served in 8oz carafes (tokkuri) unless otherwise noted.",
+      "items": [
+        {
+          "name": "House Sake (hot or cold)",
+          "description": null,
+          "price": 9.5,
+          "image": null
+        },
+        {
+          "name": "Junmai Ginjo/Premium Sake - Kinokuniya Bunzaemon",
+          "description": null,
+          "price": 16,
+          "image": null
+        },
+        {
+          "name": "Junmai Ginjo/Premium Sake - Hakushika Kuromatsu",
+          "description": null,
+          "price": 16,
+          "image": null
+        },
+        {
+          "name": "Hakatsuru Chika Sake Cup (200ml Bottle)",
+          "description": "Keep the cup — for $2 get a small scoop of vanilla ice cream to have with it.",
+          "price": 11,
+          "image": null
+        },
+        {
+          "name": "Homare Lychee Nigori (300ml Bottle)",
+          "description": null,
+          "price": 16.5,
+          "image": null
+        },
+        {
+          "name": "Homare Strawberry Nigori (300ml Bottle)",
+          "description": null,
+          "price": 16.5,
+          "image": null
+        },
+        {
+          "name": "Kukai Mango Nigori (300ml Bottle)",
+          "description": null,
+          "price": 16.5,
+          "image": null
+        },
+        {
+          "name": "Momokawa Diamond",
+          "description": null,
+          "price": 16.5,
+          "image": null
+        },
+        {
+          "name": "Moonstone Asian Pear",
+          "description": null,
+          "price": 16.5,
+          "image": null
+        },
+        {
+          "name": "Nigori, Unfiltered",
+          "description": null,
+          "price": 14,
+          "image": null
+        },
+        {
+          "name": "Plum Wine (5oz glass)",
+          "description": null,
+          "price": 8,
+          "image": null
+        }
+      ]
+    },
+    {
+      "section": "drinks",
+      "name": "Wine",
+      "note": "Prices shown as Glass / Bottle.",
+      "items": [
+        {
+          "name": "Chardonnay",
+          "description": null,
+          "price": 10,
+          "image": null
+        },
+        {
+          "name": "Pinot Grigio",
+          "description": null,
+          "price": 9.5,
+          "image": null
+        },
+        {
+          "name": "Sauvignon Blanc",
+          "description": null,
+          "price": 9.5,
+          "image": null
+        },
+        {
+          "name": "Cabernet Sauvignon",
+          "description": null,
+          "price": 9.5,
+          "image": null
+        },
+        {
+          "name": "Merlot",
+          "description": null,
+          "price": 10,
+          "image": null
+        },
+        {
+          "name": "Pinot Noir, Cavit",
+          "description": null,
+          "price": 9.5,
+          "image": null
+        },
+        {
+          "name": "Malbec, Septima",
+          "description": null,
+          "price": 10,
+          "image": null
+        },
+        {
+          "name": "Champagne Split (187ml Bottle)",
+          "description": null,
+          "price": 11.5,
+          "image": null
+        },
+        {
+          "name": "Brut Rose Split (187ml Bottle)",
+          "description": null,
+          "price": 11.5,
+          "image": null
+        }
+      ]
+    },
+    {
+      "section": "drinks",
+      "name": "Beer",
+      "note": null,
+      "items": [
+        {
+          "name": "Kona Rotating (Draft)",
+          "description": null,
+          "price": 8.5,
+          "image": null
+        },
+        {
+          "name": "Elysian Rotating (Draft)",
+          "description": null,
+          "price": 9.5,
+          "image": null
+        },
+        {
+          "name": "Rotating Draft Beer",
+          "description": null,
+          "price": 8.5,
+          "image": null
+        },
+        {
+          "name": "Rotating Light Beer",
+          "description": null,
+          "price": 7.5,
+          "image": null
+        },
+        {
+          "name": "Bud Light",
+          "description": null,
+          "price": 7,
+          "image": null
+        },
+        {
+          "name": "Budweiser",
+          "description": null,
+          "price": 7,
+          "image": null
+        },
+        {
+          "name": "Corona",
+          "description": null,
+          "price": 7.5,
+          "image": null
+        },
+        {
+          "name": "Hard Cider Rotator",
+          "description": null,
+          "price": 8.5,
+          "image": null
+        },
+        {
+          "name": "Kirin",
+          "description": null,
+          "price": 7.5,
+          "image": null
+        },
+        {
+          "name": "Kona Longboard (16oz)",
+          "description": null,
+          "price": 8.5,
+          "image": null
+        },
+        {
+          "name": "Mexican Beer (Rotator)",
+          "description": null,
+          "price": 7.5,
+          "image": null
+        },
+        {
+          "name": "Rainier",
+          "description": null,
+          "price": 7,
+          "image": null
+        },
+        {
+          "name": "Red Stripe",
+          "description": null,
+          "price": 7.5,
+          "image": null
+        },
+        {
+          "name": "Sapporo (22oz)",
+          "description": null,
+          "price": 11,
+          "image": null
+        },
+        {
+          "name": "Twisted Ice Tea",
+          "description": null,
+          "price": 8,
+          "image": null
+        },
+        {
+          "name": "White Claw Rotator",
+          "description": null,
+          "price": 8,
+          "image": null
+        },
+        {
+          "name": "Non-Alcoholic Beer",
+          "description": null,
+          "price": 7,
+          "image": null
+        }
+      ]
+    },
+    {
+      "section": "drinks",
+      "name": "Non-Alcoholic",
+      "note": null,
+      "items": [
+        {
+          "name": "Virgin Pina Colada",
+          "description": "Add strawberry, mango, or banana +$1.50.",
+          "price": 8.5,
+          "image": null
+        },
+        {
+          "name": "Palon-Nah",
+          "description": "Seedlip Notas de Agave mixed with Filthy Paloma mix & soda water.",
+          "price": 10.5,
+          "image": null
+        },
+        {
+          "name": "Fruit Juices",
+          "description": "Pineapple, cranberry, grapefruit, lemonade, OJ, passion-orange & guava (POG).",
+          "price": 4.5,
+          "image": null
+        },
+        {
+          "name": "Soft Drinks (Seattle Soda Company)",
+          "description": "Cola, diet cola, ginger ale, lemon-lime.",
+          "price": 4.5,
+          "image": null
+        },
+        {
+          "name": "Canned Soda",
+          "description": "Coke, Diet Coke, Sprite.",
+          "price": 5,
+          "image": null
+        },
+        {
+          "name": "Hawaiian Sun Drinks",
+          "description": "Lilikoi, luau punch, guava, passion-orange.",
+          "price": 5,
+          "image": null
+        },
+        {
+          "name": "Red Bull (Assorted)",
+          "description": null,
+          "price": 7.5,
+          "image": null
+        },
+        {
+          "name": "Ginger Beer",
+          "description": null,
+          "price": 7,
+          "image": null
+        }
+      ]
+    },
+    {
+      "section": "sushi",
+      "name": "Starters",
+      "note": null,
+      "items": [
+        {
+          "name": "Seaweed Salad",
+          "description": "Seaweed salad w/ sesame oil and sesame seeds.",
+          "price": 10,
+          "image": null
+        },
+        {
+          "name": "Takoyaki",
+          "description": "5 pcs deep fried octopus fritters topped w/ garlic kewpie, eel sauce, furikake & bonito.",
+          "price": 9.5,
+          "image": null
+        },
+        {
+          "name": "Seared Salmon Sampler",
+          "description": "3 pieces of seared salmon prepared 3 different ways.",
+          "price": 13.5,
+          "image": null
+        },
+        {
+          "name": "Hamachi Jalapeno",
+          "description": "5 slices of yellowtail on a bed of onions topped w/ jalapeno, masago & ponzu.",
+          "price": 15,
+          "image": null
+        },
+        {
+          "name": "Garlic Albacore Tataki",
+          "description": "5 slices of garlic seared albacore served with spring greens, daikon & homemade ponzu.",
+          "price": 14,
+          "image": null
+        }
+      ]
+    },
+    {
+      "section": "sushi",
+      "name": "Nigiri & Sashimi",
+      "note": null,
+      "items": [
+        {
+          "name": "Garlic Albacore (Shiro Maguro) Nigiri",
+          "description": "2 pieces.",
+          "price": 9.0,
+          "image": null
+        },
+        {
+          "name": "Garlic Albacore (Shiro Maguro) Sashimi",
+          "description": "3 pieces.",
+          "price": 11.5,
+          "image": null
+        },
+        {
+          "name": "Hamachi (Yellowtail) Nigiri",
+          "description": "2 pieces.",
+          "price": 8.5,
+          "image": null
+        },
+        {
+          "name": "Hamachi (Yellowtail) Sashimi",
+          "description": "3 pieces.",
+          "price": 10.5,
+          "image": null
+        },
+        {
+          "name": "Inari (Sweet Tofu Pouch) Nigiri",
+          "description": "2 pieces.",
+          "price": 6.0,
+          "image": null
+        },
+        {
+          "name": "Inari (Sweet Tofu Pouch) Sashimi",
+          "description": "3 pieces.",
+          "price": 7.5,
+          "image": null
+        },
+        {
+          "name": "Ikura (Salmon Roe) Nigiri",
+          "description": "2 pieces.",
+          "price": 9.0,
+          "image": null
+        },
+        {
+          "name": "Ikura (Salmon Roe) Sashimi",
+          "description": "3 pieces.",
+          "price": 11.5,
+          "image": null
+        },
+        {
+          "name": "Mackerel (Saba) Nigiri",
+          "description": "2 pieces.",
+          "price": 8.0,
+          "image": null
+        },
+        {
+          "name": "Mackerel (Saba) Sashimi",
+          "description": "3 pieces.",
+          "price": 10.5,
+          "image": null
+        },
+        {
+          "name": "Octopus (Tako) Nigiri",
+          "description": "2 pieces.",
+          "price": 8.0,
+          "image": null
+        },
+        {
+          "name": "Octopus (Tako) Sashimi",
+          "description": "3 pieces.",
+          "price": 10.5,
+          "image": null
+        },
+        {
+          "name": "Prawn (Ebi) Nigiri",
+          "description": "2 pieces.",
+          "price": 6.0,
+          "image": null
+        },
+        {
+          "name": "Prawn (Ebi) Sashimi",
+          "description": "3 pieces.",
+          "price": 8.5,
+          "image": null
+        },
+        {
+          "name": "Salmon (Sake) Nigiri",
+          "description": "2 pieces.",
+          "price": 8.5,
+          "image": null
+        },
+        {
+          "name": "Salmon (Sake) Sashimi",
+          "description": "3 pieces.",
+          "price": 10.5,
+          "image": null
+        },
+        {
+          "name": "Scallop (Hotate) Nigiri",
+          "description": "2 pieces.",
+          "price": 9.5,
+          "image": null
+        },
+        {
+          "name": "Scallop (Hotate) Sashimi",
+          "description": "3 pieces.",
+          "price": 11.5,
+          "image": null
+        },
+        {
+          "name": "Snow Crab (Zuwaigani) Nigiri",
+          "description": "2 pieces.",
+          "price": 10.0,
+          "image": null
+        },
+        {
+          "name": "Snow Crab (Zuwaigani) Sashimi",
+          "description": "3 pieces.",
+          "price": 12.0,
+          "image": null
+        },
+        {
+          "name": "Tamago (Japanese Omelette) Nigiri",
+          "description": "2 pieces.",
+          "price": 6.0,
+          "image": null
+        },
+        {
+          "name": "Tamago (Japanese Omelette) Sashimi",
+          "description": "3 pieces.",
+          "price": 8.5,
+          "image": null
+        },
+        {
+          "name": "Tobiko (Flying Fish Roe) Nigiri",
+          "description": "2 pieces.",
+          "price": 8.5,
+          "image": null
+        },
+        {
+          "name": "Tobiko (Flying Fish Roe) Sashimi",
+          "description": "3 pieces.",
+          "price": 10.5,
+          "image": null
+        },
+        {
+          "name": "Tuna (Maguro) Nigiri",
+          "description": "2 pieces.",
+          "price": 9.5,
+          "image": null
+        },
+        {
+          "name": "Tuna (Maguro) Sashimi",
+          "description": "3 pieces.",
+          "price": 11.5,
+          "image": null
+        },
+        {
+          "name": "Unagi (BBQ Fresh Water Eel) Nigiri",
+          "description": "2 pieces.",
+          "price": 10.0,
+          "image": null
+        },
+        {
+          "name": "Unagi (BBQ Fresh Water Eel) Sashimi",
+          "description": "3 pieces.",
+          "price": 12.5,
+          "image": null
+        },
+        {
+          "name": "White Fish (Seasonal) Nigiri",
+          "description": "2 pieces.",
+          "price": 10.0,
+          "image": null
+        },
+        {
+          "name": "White Fish (Seasonal) Sashimi",
+          "description": "3 pieces.",
+          "price": 12.5,
+          "image": null
+        },
+        {
+          "name": "Uni Nigiri (Seasonal)",
+          "description": "2 pieces. Market price.",
+          "price": null,
+          "image": null
+        },
+        {
+          "name": "Uni Sashimi (Seasonal)",
+          "description": "3 pieces. Market price.",
+          "price": null,
+          "image": null
+        }
+      ]
+    },
+    {
+      "section": "sushi",
+      "name": "Rolls",
+      "note": null,
+      "items": [
+        {
+          "name": "Cucumber, Avocado, or Oshinko Roll",
+          "description": "Your choice of cucumber, avocado, or oshinko (pickled radish).",
+          "price": 7,
+          "image": null
+        },
+        {
+          "name": "Tuna Roll",
+          "description": null,
+          "price": 8.5,
+          "image": null
+        },
+        {
+          "name": "Salmon Roll",
+          "description": null,
+          "price": 8.5,
+          "image": null
+        },
+        {
+          "name": "Veggie Roll",
+          "description": "Yamagobo (pickled carrot), kaiware (radish sprouts), avocado, cucumber, takuan (pickled radish).",
+          "price": 8,
+          "image": null
+        },
+        {
+          "name": "Salmon Skin Roll",
+          "description": "Crispy salmon skin, avocado, cucumber, tobiko, kaiware & garlic kewpie.",
+          "price": 8,
+          "image": null
+        },
+        {
+          "name": "Spicy Tuna Roll",
+          "description": "Spicy tuna mixture, cucumber & kaiware (radish sprouts).",
+          "price": 10.5,
+          "image": null
+        },
+        {
+          "name": "Spicy Salmon Roll",
+          "description": "Salmon, spicy mayo, cucumber & kaiware (radish sprouts).",
+          "price": 10.5,
+          "image": null
+        },
+        {
+          "name": "Creamy Crunchy Salmon Roll",
+          "description": "Cream cheese, salmon, spicy mayo, crunchies.",
+          "price": 10.5,
+          "image": null
+        },
+        {
+          "name": "Negihama Roll",
+          "description": "Chopped yellowtail & scallions.",
+          "price": 10,
+          "image": null
+        },
+        {
+          "name": "Belltown Roll",
+          "description": "Salmon, avocado, cucumber, tobiko.",
+          "price": 10.5,
+          "image": null
+        },
+        {
+          "name": "Da Kine Roll",
+          "description": "Tempura shrimp, avocado, eel sauce.",
+          "price": 10.5,
+          "image": null
+        },
+        {
+          "name": "Eel Roll",
+          "description": "BBQ eel, avocado, cucumber, eel sauce.",
+          "price": 11,
+          "image": null
+        },
+        {
+          "name": "California Roll",
+          "description": "Snow crab mix, avocado, cucumber.",
+          "price": 11,
+          "image": null
+        },
+        {
+          "name": "Aloha Roll",
+          "description": "Scallop, snow crab mix, avocado, topped w/ masago (smelt roe).",
+          "price": 14,
+          "image": null
+        },
+        {
+          "name": "Spider Roll",
+          "description": "Tempura soft shell crab, avocado, cucumber, tobiko, kaiware & garlic kewpie.",
+          "price": 14,
+          "image": null
+        },
+        {
+          "name": "Chizuko Roll",
+          "description": "Tempura shrimp, avocado, cucumber, tobiko, kaiware.",
+          "price": 12,
+          "image": null
+        },
+        {
+          "name": "Kylee Roll",
+          "description": "Cream cheese, cucumber, salmon, crunchies topped w/ ginger, torched eel, eel sauce, scallion & tobiko.",
+          "price": 21,
+          "image": null
+        }
+      ]
+    },
+    {
+      "section": "sushi",
+      "name": "Ohana Signatures",
+      "note": null,
+      "items": [
+        {
+          "name": "Black Widow",
+          "description": "Tempura soft shell crab, cucumber & avocado roll topped w/ hamachi, house pickled jalapenos & homemade poke sauce.",
+          "price": 25,
+          "image": null
+        },
+        {
+          "name": "Same, Same but Different",
+          "description": "Tempura shrimp, cucumber & avocado roll topped with krab, baked & finished w/ a honey glaze.",
+          "price": 20,
+          "image": null
+        },
+        {
+          "name": "Panko Popper",
+          "description": "Cream cheese, jalapeno, avocado, eel, spicy tuna, shrimp tempura, tobiko, panko fried. Finished w/ a trio of sauces, tobiko & scallions.",
+          "price": 22,
+          "image": null
+        },
+        {
+          "name": "Crunchy Dynamite",
+          "description": "Tempura shrimp, kani, coconut flakes. Deep fried, topped w/ honey glaze, sesame seeds. (15 min prep time)",
+          "price": 20,
+          "image": null
+        },
+        {
+          "name": "Ohana Roll",
+          "description": "Tempura shrimp & kani, topped w/ snow crab mix and creamy scallops. Finished w/ a trio of sauces, scallions & tobiko.",
+          "price": 25,
+          "image": null
+        },
+        {
+          "name": "Alaska Roll",
+          "description": "Salmon, kani, avocado, cream cheese. Deep fried & topped with sweet chili sauce & scallions.",
+          "price": 18.5,
+          "image": null
+        }
+      ]
+    },
+    {
+      "section": "sushi",
+      "name": "Fusion Rolls",
+      "note": null,
+      "items": [
+        {
+          "name": "Firecracker Roll",
+          "description": "Snow crab mix, tuna, salmon, cream cheese, avocado, tobiko. Deep fried & served w/ trio of sauces & peanut sauce. (15 min prep time)",
+          "price": 22,
+          "image": null
+        },
+        {
+          "name": "Half Baked Roll",
+          "description": "California roll topped w/ baked salmon, spicy mayo, tobiko, eel sauce, scallions, sesame seeds. (15 min prep time)",
+          "price": 22,
+          "image": null
+        },
+        {
+          "name": "Volcano Roll",
+          "description": "Tempura shrimp, cream cheese, avocado topped w/ spicy tuna, spicy mayo, eel sauce, tobiko, scallions.",
+          "price": 20,
+          "image": null
+        },
+        {
+          "name": "Kilauea Roll",
+          "description": "Spicy tuna, avocado, cilantro topped w/ hamachi, jalapeno, thin sliced lime.",
+          "price": 19,
+          "image": null
+        },
+        {
+          "name": "Rainbow Roll",
+          "description": "California roll topped w/ 5 different fish.",
+          "price": 20,
+          "image": null
+        },
+        {
+          "name": "Bikini Roll",
+          "description": "Salmon, tuna, yellowtail, avocado, scallions, tobiko wrapped in nori then rolled in soy paper.",
+          "price": 18,
+          "image": null
+        },
+        {
+          "name": "Maui Wowie Roll",
+          "description": "California roll topped w/ seared salmon, eel sauce, honey glaze, pineapple salsa.",
+          "price": 20,
+          "image": null
+        },
+        {
+          "name": "Dragon Roll",
+          "description": "California roll topped w/ BBQ eel, eel sauce, sesame seeds.",
+          "price": 20,
+          "image": null
+        },
+        {
+          "name": "Caterpillar Roll",
+          "description": "BBQ eel, cucumber topped with avocado, eel sauce, sesame seeds.",
+          "price": 18,
+          "image": null
+        },
+        {
+          "name": "Super Crunchy Roll",
+          "description": "Spicy tuna or spicy salmon, crunchies topped w/ sushi prawns.",
+          "price": 18,
+          "image": null
+        }
+      ]
+    },
+    {
+      "section": "sushi",
+      "name": "Bowls",
+      "note": "Served on a bed of sushi rice & furikake.",
+      "items": [
+        {
+          "name": "Ohana Style Poke Bowl",
+          "description": "Fresh tuna, cucumber, onions marinated in our signature shoyu poke sauce. Served with seaweed and snow crab mix.",
+          "price": 23,
+          "image": null
+        },
+        {
+          "name": "Spicy Salmon Poke Bowl",
+          "description": "Semi-spicy. Salmon, avocado, scallions, tobiko marinated in our creamy spicy poke sauce. Served with seaweed and snow crab mix.",
+          "price": 20,
+          "image": null
+        },
+        {
+          "name": "Chirashi Bowl",
+          "description": "Chef's choice of assorted sashimi, pickles & vegetables. Assortment changes based on season & availability.",
+          "price": 40,
+          "image": null
+        }
+      ]
+    },
+    {
+      "section": "sushi",
+      "name": "Combo Plates",
+      "note": "All served with miso soup. No substitutions.",
+      "items": [
+        {
+          "name": "Veggie Combo",
+          "description": "Veggie roll served with an assortment of 6 vegetable nigiri. (Miso is kelp base.)",
+          "price": 22.5,
+          "image": null
+        },
+        {
+          "name": "Sushi Combo",
+          "description": "Chef's choice 8 pcs nigiri and a Belltown roll or California roll.",
+          "price": 40,
+          "image": null
+        },
+        {
+          "name": "Sushi/Sashimi Combo",
+          "description": "Chef's choice 6 pcs nigiri, 6 pcs sashimi and a Belltown roll or California roll.",
+          "price": 55,
+          "image": null
+        },
+        {
+          "name": "Sashimi Combo",
+          "description": "Assortment of fresh sliced fish, 15 pcs total.",
+          "price": 45,
+          "image": null
+        }
+      ]
+    },
+    {
+      "name": "Drinks",
+      "items": [
+        {
+          "name": "Draft Beer"
+        },
+        {
+          "name": "Rotating Hard Cider"
+        },
+        {
+          "description": "(Red - Cabernet or White-Chardonnay, Pinot Grigio)",
+          "name": "House Red or White"
+        },
+        {
+          "name": "House Wells"
+        },
+        {
+          "name": "Hot or Cold Sake"
+        },
+        {
+          "description": "Raspberry vodka, Triple Sec, lemon juice, sweet & sour mix",
+          "name": "Raspberry Lemondrop"
+        },
+        {
+          "description": "Rum, Blue Curacao, pineapple juice and sweet & sour mix",
+          "name": "Blue Hawaiian"
+        },
+        {
+          "description": "Spiced Rum, Sour Apple Liqueur and pineapple juice",
+          "name": "Gold Apple at Sea"
+        },
+        {
+          "description": "Sweet Tea Vodka, lemonade and a splash of soda water",
+          "name": "Aloha Iced Tea"
+        },
+        {
+          "name": "Strawberry Sake Margarita",
+          "description": "Sake, Triple Sec, strawberry puree and pineapple juice"
+        }
+      ],
+      "section": "happy_hour",
+      "note": "Happy Hour: Monday - Friday, 3-6pm. Beer, wine, sake & spirits."
+    },
+    {
+      "items": [
+        {
+          "name": "Rolls",
+          "description": "California Cucumber Salmon Salmon Skin Veggie Spicy Tuna Belltown Spicy California Spicy Crunchy Salmon Spicy Crunchy Tuna"
+        }
+      ],
+      "name": "From the Water",
+      "section": "happy_hour"
     },
     {
       "section": "happy_hour",
       "name": "From the Beach",
-      "note": null,
       "items": [
         {
-          "name": "Ohana Sliders",
           "description": "(Set of 2) Your choice of Kalua pork or spam",
-          "price": null
+          "name": "Ohana Sliders"
         },
         {
-          "name": "Chicken Katsu Fillet",
-          "description": null,
-          "price": null
+          "name": "Chicken Katsu Fillet"
         },
         {
-          "name": "BBQ Pork",
           "description": "with hot mustard and ketchup",
-          "price": null
+          "name": "BBQ Pork"
         },
         {
-          "name": "Temaki Hand Rolls",
           "description": "Crunchy Spicy Salmon Crunchy Spicy Tuna Crunchy Eel Belltown Shrimp Tempura Veggie",
-          "price": null
+          "name": "Temaki Hand Rolls"
         },
         {
           "name": "Gyoza",
-          "description": "(pork dumplings) choice of fried or traditional",
-          "price": null
+          "description": "(pork dumplings) choice of fried or traditional"
         },
         {
           "name": "Mini Ohana Salad",
-          "description": "with miso vinaigrette dressing",
-          "price": null
+          "description": "with miso vinaigrette dressing"
         },
         {
-          "name": "Spam Musubi",
-          "description": null,
-          "price": null
+          "price": 12,
+          "name": "Spam Musubi"
         },
         {
-          "name": "Agedashi Tofu",
-          "description": null,
-          "price": null
+          "name": "Agedashi Tofu"
         },
         {
           "name": "Sushi Special",
-          "description": "4 pieces of sushi (tuna, salmon, yellowtail, white fish) NO Substitutions",
-          "price": null
+          "description": "4 pieces of sushi (tuna, salmon, yellowtail, white fish) NO Substitutions"
         },
         {
           "name": "Sashimi Special",
-          "description": "5 slices of fresh sashimi (albacore, tuna, salmon, yellowtail, white fish) NO Substitutions",
-          "price": null
+          "description": "5 slices of fresh sashimi (albacore, tuna, salmon, yellowtail, white fish) NO Substitutions"
         },
         {
-          "name": "Hawaiian Style Poke",
           "description": "Cubed fresh salmon and tuna, sliced onions tossed with sesame oil, shoyu, red pepper flakes and green onions. Served with homemade taro chips",
-          "price": null
+          "name": "Hawaiian Style Poke"
         }
       ]
     }
