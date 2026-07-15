@@ -12,6 +12,31 @@ func routes(_ app: Application) throws {
         return try MenuStore.shared.save(incoming)
     }
 
+    app.on(.POST, "api", "upload", body: .collect(maxSize: "8mb")) { req throws -> UploadResponse in
+        let upload = try req.content.decode(ImageUpload.self)
+        let allowedExtensions = ["jpg", "jpeg", "png", "webp", "gif"]
+        let ext = (upload.image.extension ?? "").lowercased()
+        guard allowedExtensions.contains(ext) else {
+            throw Abort(.unsupportedMediaType, reason: "Only jpg, png, webp, or gif images are allowed.")
+        }
+        guard let data = upload.image.data.getData(
+            at: upload.image.data.readerIndex,
+            length: upload.image.data.readableBytes
+        ) else {
+            throw Abort(.badRequest)
+        }
+        let filename = UUID().uuidString + "." + ext
+        try data.write(to: URL(fileURLWithPath: Uploads.directory + filename))
+        return UploadResponse(url: "/uploads/\(filename)")
+    }
+
+    app.get("uploads", ":filename") { req async throws -> Response in
+        guard let filename = req.parameters.get("filename"), !filename.contains("..") else {
+            throw Abort(.badRequest)
+        }
+        return try await req.fileio.asyncStreamFile(at: Uploads.directory + filename)
+    }
+
     func serveStatic(_ req: Request, file: String) async throws -> Response {
         let path = req.application.directory.publicDirectory + file
         return try await req.fileio.asyncStreamFile(at: path)

@@ -23,9 +23,13 @@ function renderMenu(data) {
       const itemMarkup = (category.items || [])
         .map((item) => {
           const priceMarkup = item.price != null ? `<div class="price">$${Number(item.price).toFixed(2)}</div>` : '';
+          const imageMarkup = item.image
+            ? `<img class="item-photo" src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" loading="lazy" />`
+            : '';
           return `
             <article class="item">
-              <div>
+              ${imageMarkup}
+              <div class="item-body">
                 <h3>${escapeHtml(item.name)}</h3>
                 ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ''}
               </div>

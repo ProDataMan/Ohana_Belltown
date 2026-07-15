@@ -48,7 +48,7 @@ function categoryBlock(section, name, note, items) {
   (items || []).forEach((item) => itemsContainer.appendChild(itemRow(item)));
 
   section_.querySelector('.add-item').addEventListener('click', () => {
-    itemsContainer.appendChild(itemRow({ name: '', description: '', price: null }));
+    itemsContainer.appendChild(itemRow({ name: '', description: '', price: null, image: null }));
   });
 
   section_.querySelector('.remove-category').addEventListener('click', () => {
@@ -63,15 +63,54 @@ function categoryBlock(section, name, note, items) {
 function itemRow(item) {
   const row = document.createElement('div');
   row.className = 'edit-item';
+  row.dataset.image = item.image || '';
   const priceValue = item.price != null ? Number(item.price).toFixed(2) : '';
   row.innerHTML = `
-    <input class="item-name" placeholder="Item name" value="${escapeAttr(item.name || '')}" />
-    <input class="item-desc" placeholder="Description" value="${escapeAttr(item.description || '')}" />
-    <input class="item-price" type="number" step="0.01" min="0" placeholder="No price" value="${priceValue}" />
-    <button type="button" class="remove-item secondary" aria-label="Remove item">&times;</button>
+    <div class="edit-item-photo">
+      <img class="item-thumb" src="${escapeAttr(item.image || '')}" ${item.image ? '' : 'hidden'} alt="" />
+      <label class="photo-upload-btn secondary">
+        Photo
+        <input type="file" class="item-image-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+      </label>
+      <p class="photo-status status"></p>
+    </div>
+    <div class="edit-item-fields">
+      <div class="edit-item-row-top">
+        <input class="item-name" placeholder="Item name" value="${escapeAttr(item.name || '')}" />
+        <input class="item-price" type="number" step="0.01" min="0" placeholder="No price" value="${priceValue}" />
+        <button type="button" class="remove-item secondary" aria-label="Remove item">&times;</button>
+      </div>
+      <input class="item-desc" placeholder="Description" value="${escapeAttr(item.description || '')}" />
+    </div>
   `;
   row.querySelector('.remove-item').addEventListener('click', () => row.remove());
+  row.querySelector('.item-image-input').addEventListener('change', (event) => uploadItemImage(row, event));
   return row;
+}
+
+async function uploadItemImage(row, event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const statusEl = row.querySelector('.photo-status');
+  const thumb = row.querySelector('.item-thumb');
+  setStatus(statusEl, 'Uploading...', false);
+
+  const formData = new FormData();
+  formData.append('image', file);
+
+  try {
+    const response = await fetch('/api/upload', { method: 'POST', body: formData });
+    if (!response.ok) {
+      throw new Error(`Upload failed (${response.status}).`);
+    }
+    const result = await response.json();
+    row.dataset.image = result.url;
+    thumb.src = result.url;
+    thumb.hidden = false;
+    setStatus(statusEl, 'Photo added.', false);
+  } catch (error) {
+    setStatus(statusEl, error.message, true);
+  }
 }
 
 function renderEditor(data) {
@@ -118,7 +157,8 @@ function collectMenuData() {
       const description = row.querySelector('.item-desc').value.trim() || null;
       const priceRaw = row.querySelector('.item-price').value.trim();
       const price = priceRaw === '' ? null : Number.parseFloat(priceRaw);
-      items.push({ name: itemName, description, price });
+      const image = row.dataset.image || null;
+      items.push({ name: itemName, description, price, image });
     }
 
     categories.push({ section, name, note, items });

@@ -4,6 +4,7 @@ struct MenuItem: Codable, Content {
     var name: String
     var description: String?
     var price: Double?
+    var image: String?
 }
 
 struct MenuCategory: Codable, Content {
