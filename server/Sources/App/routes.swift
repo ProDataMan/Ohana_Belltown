@@ -37,6 +37,8 @@ func routes(_ app: Application) throws {
         return try await req.fileio.asyncStreamFile(at: Uploads.directory + filename)
     }
 
+    registerPlacesPhotoRoutes(app)
+
     func serveStatic(_ req: Request, file: String) async throws -> Response {
         let path = req.application.directory.publicDirectory + file
         return try await req.fileio.asyncStreamFile(at: path)

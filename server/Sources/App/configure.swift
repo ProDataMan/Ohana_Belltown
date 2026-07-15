@@ -9,6 +9,7 @@ func configure(_ app: Application) throws {
     let dataDirectory = Environment.get("DATA_DIR") ?? app.directory.workingDirectory + "Data"
     MenuStore.shared.configure(dataDirectory: dataDirectory, resourcesDirectory: app.directory.resourcesDirectory)
     Uploads.configure(dataDirectory: dataDirectory)
+    PlacesPhotoCache.shared.configure(dataDirectory: dataDirectory)
 
     app.routes.defaultMaxBodySize = "10mb"
 
