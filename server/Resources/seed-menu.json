@@ -1,0 +1,687 @@
+{
+  "restaurant": "Ohana Belltown",
+  "lastUpdated": "2026-07-15",
+  "categories": [
+    {
+      "section": "menu",
+      "name": "PUPUS (Appetizers)",
+      "note": null,
+      "items": [
+        {
+          "name": "Hawaiian Style Poke",
+          "description": "Cubed fresh tuna and salmon, sliced onions tossed with sesame oil, soy sauce, red pepper flakes and green onions. Served with homemade taro chips.",
+          "price": null
+        },
+        {
+          "name": "BBQ Pork",
+          "description": "Chef Marco's homemade BBQ Pork, Chinese Style served with BBQ sauce and hot mustard.",
+          "price": null
+        },
+        {
+          "name": "Gyoza Yaki",
+          "description": "Tender crisp cabbage and pork dumplings, spiked with ginger, soy sauce & Mirin. Served with a chili oil and Shoyu Dipping sauce.",
+          "price": null
+        },
+        {
+          "name": "Robata (grilled skewers)",
+          "description": "Tender pieces of sirloin marinated in shoyu, brown sugar, and pineapple juice.",
+          "price": null
+        },
+        {
+          "name": "Tacos (Fish or Kalua Pork)",
+          "description": "Two tasty tacos filled with lightly fried Panko dusted seasonal fresh fish, or our homemade Kalua pork served in a grilled flour tortilla with homemade pico de gallo.",
+          "price": null
+        },
+        {
+          "name": "Agedashi Tofu",
+          "description": "Lightly breaded tofu served with bonito flakes and tempura sauce.",
+          "price": null
+        },
+        {
+          "name": "Spicy Fried Rice",
+          "description": "White rice fried with Portuguese sausage, peas, eggs, carrots, green onion, Sambal chili sauce, and BBQ Pork. ( Add fried egg for $1.50) Add bacon Bits",
+          "price": null
+        },
+        {
+          "name": "Oh So Ono Coconut Prawns",
+          "description": "4 Prawns, citrus marinated then dusted with sweet coconut flake & fried. Served with a Sweet Chili Sauce.",
+          "price": null
+        },
+        {
+          "name": "Ohana Sliders (Kalua or Spam)",
+          "description": "Your choice of homemade Kalua pork, or grilled spam on dinner rolls. Served with spicy coleslaw and a pesto mayo sauce, with fries.",
+          "price": null
+        },
+        {
+          "name": "Spam Musubi",
+          "description": "Grilled slices of original recipe SPAM on top of blocks of rice & wrapped with nori, lightly drizzled with an oyster plum sauce. (Add tamago (egg) for $2.00)",
+          "price": null
+        },
+        {
+          "name": "Tempura Sampler",
+          "description": "3 Traditional Japanese Tempura Prawns & Assorted vegetables. Served with Tempura Sauce.",
+          "price": null
+        },
+        {
+          "name": "Lumpia Shanghai",
+          "description": "Thin crisp Filipino-style egg rolls filled with shrimp and pork. Served with sweet chili dipping sauce.",
+          "price": null
+        },
+        {
+          "name": "Veggie Spring Rolls",
+          "description": "2 Rice Flour wraps filled with Somen noodles, carrots, cilantro, and lettuce. Served with a Thai Peanut Sauce.",
+          "price": null
+        }
+      ]
+    },
+    {
+      "section": "menu",
+      "name": "ENTREES",
+      "note": null,
+      "items": [
+        {
+          "name": "Loco Moco",
+          "description": "Da Braddah's favorite! A grilled beef patty topped with 2 fried eggs over rice, smothered with brown gravy & grilled onions. Served with potato/mac salad. Customize to your taste with fried rice, kalua pork, chicken katsu, spam, and bacon.",
+          "price": null
+        },
+        {
+          "name": "Big Kahuna Fish & Chips",
+          "description": "4 tender pieces of line caught true cod, Panko battered & fried. Served over fries with our homemade tartar sauce & spicy coleslaw.",
+          "price": null
+        },
+        {
+          "name": "Ginger Chicken Broccoli",
+          "description": "Strips of chicken stir fried with broccoli, onions, carrots and bell peppers in a ginger oyster sauce. Served with steamed rice.",
+          "price": null
+        },
+        {
+          "name": "Kalua Pork",
+          "description": "Hawaiian style roasted pork served with cabbage and rice & mac/potato salad.",
+          "price": null
+        },
+        {
+          "name": "Curry Rice",
+          "description": "Rich pork curry stew with onion, green peppers, celery, potatoes, and carrots. Served with pickled radish. Make it a Katsu Curry rice with chicken Katsu",
+          "price": null
+        },
+        {
+          "name": "Kalua Pork Sandwich",
+          "description": "Slow roasted lu’au style pork served with shredded cabbage and crispy fries or mini salad.",
+          "price": null
+        },
+        {
+          "name": "Island Style Baby Back Ribs",
+          "description": "Ribs rubbed with aromatic spices, grilled then brushed with a spicy tropical fruit BBQ sauce, and served with steamed rice.",
+          "price": null
+        },
+        {
+          "name": "Adobo",
+          "description": "Chicken drumettes slowly braised with garlic bay leaves, shoyu, coconut milk, and then grilled with a caramelized crust, served with steamed rice.",
+          "price": null
+        },
+        {
+          "name": "Chicken Katsu",
+          "description": "Tender fillets lightly battered then coated in Panko breadcrumbs and fried to a crisp. Served with rice and Spicy Coleslaw.",
+          "price": null
+        },
+        {
+          "name": "Ohana Cheeseburger",
+          "description": "1/3 pound lean handmade beef patty, pesto mayo, pineapple, and grilled onions. Served with crispy fries. (Add Bacon $3.50)",
+          "price": null
+        },
+        {
+          "name": "Yakisoba",
+          "description": "Fresh vegetables, tofu, and soba noodles sautéed in a homemade Yakisoba sauce. Your choice of Tofu or Chicken",
+          "price": null
+        },
+        {
+          "name": "Ohana Bento Box",
+          "description": "Served with Miso soup, rice, coleslaw, pickled radish, and Wakame salad",
+          "price": null
+        },
+        {
+          "name": "Shogun",
+          "description": "Chicken Katsu with your choice or chicken or beef teriyaki",
+          "price": null
+        },
+        {
+          "name": "Sumo",
+          "description": "Chicken Katsu & salmon teriyaki with your choice of chicken or beef teriyaki.",
+          "price": null
+        }
+      ]
+    },
+    {
+      "section": "menu",
+      "name": "Yosh's Teriyaki Ohana",
+      "note": "All Teriyaki Entrees come with miso soup, rice and broccoli.",
+      "items": [
+        {
+          "name": "Tofu Teriyaki",
+          "description": null,
+          "price": null
+        },
+        {
+          "name": "Chicken Teriyaki",
+          "description": null,
+          "price": null
+        },
+        {
+          "name": "Spicy Chicken",
+          "description": null,
+          "price": null
+        },
+        {
+          "name": "Beef Teriyaki",
+          "description": null,
+          "price": null
+        },
+        {
+          "name": "Salmon",
+          "description": null,
+          "price": null
+        },
+        {
+          "name": "Spicy Beef Teriyaki",
+          "description": null,
+          "price": null
+        }
+      ]
+    },
+    {
+      "section": "menu",
+      "name": "Greens & Soup",
+      "note": null,
+      "items": [
+        {
+          "name": "Edamame",
+          "description": "Boiled soybeans lightly seasoned with kosher salt",
+          "price": null
+        },
+        {
+          "name": "Nabeyaki Udon",
+          "description": "Udon noodles served traditional style with shitake mushrooms, spinach, fishcake, bbq pork, egg in a seafood broth. Served with a tempura prawn.",
+          "price": null
+        },
+        {
+          "name": "Ohana Salad",
+          "description": "Seasonal house lettuce blend, tossed in a miso peanut butter vinaigrette, topped with roasted peppers & rice crackers. (add chicken or salmon)",
+          "price": null
+        }
+      ]
+    },
+    {
+      "section": "menu",
+      "name": "Desserts",
+      "note": null,
+      "items": [
+        {
+          "name": "Banana Cream Pie",
+          "description": "Ohana’s own version of banana cream pie, Oreo cookie crust, fresh banana’s, vanilla pudding and whipped cream. Whole pies are available with 48-hour notice.",
+          "price": null
+        },
+        {
+          "name": "Chocolate Molten Lava Cake",
+          "description": "Rich chocolate pudding in a dark chocolate cake, served with a scoop of vanilla ice cream.",
+          "price": null
+        },
+        {
+          "name": "Ice Cream",
+          "description": "Locally made ice cream and sorbet. Your choice of Toasted Coconut and Vanilla. Green Tea and Rocky Road available in Issaquah.",
+          "price": null
+        },
+        {
+          "name": "Pele's Ice Cream",
+          "description": "Your choice of any of our ice cream flavors, wrapped in pound cake and tempura fried to a crisp.",
+          "price": null
+        }
+      ]
+    },
+    {
+      "section": "sushi",
+      "name": "Appetizers",
+      "note": null,
+      "items": [
+        {
+          "name": "Seaweed Salad",
+          "description": "wakame tossed with sesame oil and sesame seed.",
+          "price": null
+        },
+        {
+          "name": "Hamachi Jalapeno",
+          "description": "sliced yellowtail on white onions topped with a citrus yuzu sauce, jalapenos and masago",
+          "price": null
+        },
+        {
+          "name": "Ohana Tuna Poke",
+          "description": "Diced tuna and veggies mixed with a spicy shoyu sauce.",
+          "price": null
+        }
+      ]
+    },
+    {
+      "section": "sushi",
+      "name": "Nigiri and Sashimi",
+      "note": null,
+      "items": [
+        {
+          "name": "Saba",
+          "description": "Mackerel",
+          "price": null
+        },
+        {
+          "name": "Tamago",
+          "description": "Sweet egg omelet",
+          "price": null
+        },
+        {
+          "name": "Masago",
+          "description": "Smelt roe",
+          "price": null
+        },
+        {
+          "name": "Ebi",
+          "description": "Prawn",
+          "price": null
+        },
+        {
+          "name": "Shiro Maguro",
+          "description": "Albacore",
+          "price": null
+        },
+        {
+          "name": "Shiromi",
+          "description": "White Fish",
+          "price": null
+        },
+        {
+          "name": "Tobiko",
+          "description": "Flying Fish Roe",
+          "price": null
+        },
+        {
+          "name": "Tako",
+          "description": "Octopus",
+          "price": null
+        },
+        {
+          "name": "Sake",
+          "description": "Salmon",
+          "price": null
+        },
+        {
+          "name": "Hamachi",
+          "description": "Yellowtail",
+          "price": null
+        },
+        {
+          "name": "Maguro",
+          "description": "Tuna",
+          "price": null
+        },
+        {
+          "name": "Unagi",
+          "description": "Barbequed Eel",
+          "price": null
+        },
+        {
+          "name": "Hotate",
+          "description": "Scallop",
+          "price": null
+        },
+        {
+          "name": "Ikura",
+          "description": "Salmon Roe",
+          "price": null
+        },
+        {
+          "name": "Inari",
+          "description": "Sweet Tofu Pouch",
+          "price": null
+        }
+      ]
+    },
+    {
+      "section": "sushi",
+      "name": "Sushi Rolls",
+      "note": null,
+      "items": [
+        {
+          "name": "Avocado Roll",
+          "description": "fresh avocado wrapped in nori and sushi rice.",
+          "price": null
+        },
+        {
+          "name": "Cucumber Roll",
+          "description": "(Kappa Maki) – thinly sliced cucumbers wrapped in nori and sushi rice",
+          "price": null
+        },
+        {
+          "name": "Oshinko Roll",
+          "description": "takuan (pickled radish) wrapped in nori and sushi rice",
+          "price": null
+        },
+        {
+          "name": "Tuna or Salmon Roll (Tekka or Sake Maki)",
+          "description": "Fresh cut fish sliced and wrapped in nori and sushi rice.",
+          "price": null
+        },
+        {
+          "name": "Veggie Roll",
+          "description": "Yamagobo (pickled carrot), Kaiware (radish sprouts), avocado, cucumber, takuan (pickled radish) wrapped together in nori and sushi rice",
+          "price": null
+        },
+        {
+          "name": "California Roll",
+          "description": "Krab, avocado and cucumber wrapped in sushi rice and nori, sprinkled with sesame seeds.",
+          "price": null
+        },
+        {
+          "name": "Belltown Roll",
+          "description": "fresh salmon, cucumber and avocado wrapped in sushi rice and nori and topped with masago (smelt roe).",
+          "price": null
+        },
+        {
+          "name": "Creamy Crunchy Salmon",
+          "description": "fresh salmon, cream cheese, spicy mayo and crunchy tempura flakes",
+          "price": null
+        },
+        {
+          "name": "Spicy Tuna Roll",
+          "description": "Our Spicy tuna mixture, cucumber and kaiware (radish sprouts) wrapped in nori and sushi rice",
+          "price": null
+        },
+        {
+          "name": "Spicy Salmon Roll",
+          "description": "fresh sliced salmon with spicy mayo, cucumber and kaiware (radish sprouts) wrapped in nori and sushi rice",
+          "price": null
+        },
+        {
+          "name": "Aloha Roll",
+          "description": "Krab, scallops, avocado wrapped in sushi rice and nori and topped with masago (smelt roe)",
+          "price": null
+        },
+        {
+          "name": "Salmon Skin",
+          "description": "Crispy fried salmon skin, cucumber, yamagobo (burdock root), and kaiware wrapped in nori and sushi rice",
+          "price": null
+        },
+        {
+          "name": "Da Kine Roll",
+          "description": "Tempura shrimp and avocado wrapped in sushi rice and nori and topped with eel sauce.",
+          "price": null
+        },
+        {
+          "name": "Eel Roll",
+          "description": "Baked eel, cucumber, avocado wrapped in nori and sushi rice and topped with eel sauce.",
+          "price": null
+        },
+        {
+          "name": "Chizuko Roll",
+          "description": "Tempura shrimp, cucumber, avocado, kaiware (radish sprouts), and masago (smelt roe) wrapped in nori and sushi rice",
+          "price": null
+        },
+        {
+          "name": "King & I Roll",
+          "description": "Fresh salmon, avocado, eel, krab, cream cheese, crunchies wrapped in thinly sliced cucumber and topped with eel sauce",
+          "price": null
+        },
+        {
+          "name": "Spider Roll",
+          "description": "fried soft shell crab, cucumber, avocado, kaiware and masago wrapped in nori and sushi rice",
+          "price": null
+        },
+        {
+          "name": "Super Crunchy Roll",
+          "description": "your choice of spicy tuna or spicy salmon with tempura flakes wrapped in sushi rice and nori and topped with prawns",
+          "price": null
+        },
+        {
+          "name": "Sakura Roll",
+          "description": "Yellowtail, cilantro, jalapeno, kaiware and onion wrapped in sushi rice and nori and topped with albacore, avocado and tobiko (Flying Fish roe)",
+          "price": null
+        },
+        {
+          "name": "Crunchy Dynamite",
+          "description": "Shrimp tempura and krab rolled in sushi rice, nori, egg and coconut flakes then fried crispy brown. Topped with a honey mayo sauce",
+          "price": null
+        },
+        {
+          "name": "Dragon Roll",
+          "description": "our California roll topped with eel",
+          "price": null
+        },
+        {
+          "name": "Rainbow Roll",
+          "description": "California topped with an assortment of fish",
+          "price": null
+        },
+        {
+          "name": "Firecracker Roll",
+          "description": "krab, tuna, salmon, avocado, cream cheese and tobiko wrapped in nori and sushi rice, fried in tempura batter and served with a spicy peanut sauce and spicy mayo on the side. (15 min. Prep Time)",
+          "price": null
+        },
+        {
+          "name": "Half Baked",
+          "description": "California roll topped with assorted baked fish mixed with spicy mayo, eel sauce and green onions. (15 min. Prep time)",
+          "price": null
+        }
+      ]
+    },
+    {
+      "section": "sushi",
+      "name": "Chef’s Choice Dinner Plates with Miso Soup. (No Substitutions)",
+      "note": null,
+      "items": [
+        {
+          "name": "Sushi Combo",
+          "description": "8 pieces of chef’s choice assorted sushi and your choice of a California roll or Belltown roll",
+          "price": null
+        },
+        {
+          "name": "Sashimi Combo",
+          "description": "Assortment of 3 fresh sliced fish selected for you by our sushi chef’s",
+          "price": null
+        },
+        {
+          "name": "Sushi and Sashimi Combo",
+          "description": "6 pieces of chef’s choice assorted sushi and 6 pieces of sashimi with your choice of a California roll or a Belltown roll.",
+          "price": null
+        }
+      ]
+    },
+    {
+      "section": "drinks",
+      "name": "Cocktails",
+      "note": null,
+      "items": [
+        {
+          "name": "Blue Hawaiian",
+          "description": "Rum, Pineapple juice, sour mix and Blue Curacao served over ice. “ A Hawaiian Classic”",
+          "price": null
+        },
+        {
+          "name": "Big Island Ice Tea",
+          "description": "Vodka, House Gin, Rum, Triple Sec, Pass-O-Guava juice and lemon-lime soda and a dash of mango puree served over ice. “An Ohana twist on the classic Long Island!”",
+          "price": null
+        },
+        {
+          "name": "Mala Shake",
+          "description": "Coconut Rum and White Rum, Strawberry and Mango puree, fresh banana, pineapple juice, coconut milk and Pass-O- guava juice blended together. “Ohana’s tribute to Yosh’s dog Mala, thanks for guarding the door.”",
+          "price": null
+        },
+        {
+          "name": "KJ’s Pearl",
+          "description": "Peach vodka, Triple Sec, Lychee juice, lime juice, sour mix and coconut milk blended smooth.",
+          "price": null
+        },
+        {
+          "name": "Mango Madness",
+          "description": "Vodka, Pineapple juice, coconut milk and mango puree, blended to perfection.",
+          "price": null
+        },
+        {
+          "name": "Mahalo Mai Tai",
+          "description": "White Rum, Grenadine, Pineapple juice, orange juice and amaretto with a float of Dark rum",
+          "price": null
+        },
+        {
+          "name": "Lychee Martini",
+          "description": "Vodka, Lychee juice and lime juice shaken and served in a chilled martini glass.",
+          "price": null
+        },
+        {
+          "name": "Lava Flow",
+          "description": "White Rum, pineapple juice and coconut milk, blended smooth and swirled with strawberry puree. “Pele would be pleased”",
+          "price": null
+        },
+        {
+          "name": "Strawberry Guava Martini",
+          "description": "Vodka, Triple Sec, Strawberry Puree and Pass-o-Guava juice, shaken and served up.",
+          "price": null
+        },
+        {
+          "name": "Molokai Mule",
+          "description": "Choose between vodka, whiskey or spiced rum served with lime juice and ginger beer",
+          "price": null
+        },
+        {
+          "name": "Toshiro Old Fashion",
+          "description": "Iichiko Shochu, simple syrup and a dash of bitters over ice.",
+          "price": null
+        }
+      ]
+    },
+    {
+      "section": "happy_hour",
+      "name": "Drinks",
+      "note": "Happy Hour: Monday - Friday, 3-6pm. Beer, wine, sake & spirits.",
+      "items": [
+        {
+          "name": "Draft Beer",
+          "description": null,
+          "price": null
+        },
+        {
+          "name": "Rotating Hard Cider",
+          "description": null,
+          "price": null
+        },
+        {
+          "name": "House Red or White",
+          "description": "(Red - Cabernet or White-Chardonnay, Pinot Grigio)",
+          "price": null
+        },
+        {
+          "name": "House Wells",
+          "description": null,
+          "price": null
+        },
+        {
+          "name": "Hot or Cold Sake",
+          "description": null,
+          "price": null
+        },
+        {
+          "name": "Raspberry Lemondrop",
+          "description": "Raspberry vodka, Triple Sec, lemon juice, sweet & sour mix",
+          "price": null
+        },
+        {
+          "name": "Blue Hawaiian",
+          "description": "Rum, Blue Curacao, pineapple juice and sweet & sour mix",
+          "price": null
+        },
+        {
+          "name": "Gold Apple at Sea",
+          "description": "Spiced Rum, Sour Apple Liqueur and pineapple juice",
+          "price": null
+        },
+        {
+          "name": "Aloha Iced Tea",
+          "description": "Sweet Tea Vodka, lemonade and a splash of soda water",
+          "price": null
+        },
+        {
+          "name": "Strawberry Sake Margarita",
+          "description": "Sake, Triple Sec, strawberry puree and pineapple juice",
+          "price": null
+        }
+      ]
+    },
+    {
+      "section": "happy_hour",
+      "name": "From the Water",
+      "note": null,
+      "items": [
+        {
+          "name": "Rolls",
+          "description": "California Cucumber Salmon Salmon Skin Veggie Spicy Tuna Belltown Spicy California Spicy Crunchy Salmon Spicy Crunchy Tuna",
+          "price": null
+        }
+      ]
+    },
+    {
+      "section": "happy_hour",
+      "name": "From the Beach",
+      "note": null,
+      "items": [
+        {
+          "name": "Ohana Sliders",
+          "description": "(Set of 2) Your choice of Kalua pork or spam",
+          "price": null
+        },
+        {
+          "name": "Chicken Katsu Fillet",
+          "description": null,
+          "price": null
+        },
+        {
+          "name": "BBQ Pork",
+          "description": "with hot mustard and ketchup",
+          "price": null
+        },
+        {
+          "name": "Temaki Hand Rolls",
+          "description": "Crunchy Spicy Salmon Crunchy Spicy Tuna Crunchy Eel Belltown Shrimp Tempura Veggie",
+          "price": null
+        },
+        {
+          "name": "Gyoza",
+          "description": "(pork dumplings) choice of fried or traditional",
+          "price": null
+        },
+        {
+          "name": "Mini Ohana Salad",
+          "description": "with miso vinaigrette dressing",
+          "price": null
+        },
+        {
+          "name": "Spam Musubi",
+          "description": null,
+          "price": null
+        },
+        {
+          "name": "Agedashi Tofu",
+          "description": null,
+          "price": null
+        },
+        {
+          "name": "Sushi Special",
+          "description": "4 pieces of sushi (tuna, salmon, yellowtail, white fish) NO Substitutions",
+          "price": null
+        },
+        {
+          "name": "Sashimi Special",
+          "description": "5 slices of fresh sashimi (albacore, tuna, salmon, yellowtail, white fish) NO Substitutions",
+          "price": null
+        },
+        {
+          "name": "Hawaiian Style Poke",
+          "description": "Cubed fresh salmon and tuna, sliced onions tossed with sesame oil, shoyu, red pepper flakes and green onions. Served with homemade taro chips",
+          "price": null
+        }
+      ]
+    }
+  ]
+}

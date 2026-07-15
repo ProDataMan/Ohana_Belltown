@@ -1,6 +1,14 @@
+const SECTIONS = [
+  { key: 'menu', label: 'Food Menu' },
+  { key: 'sushi', label: 'Sushi' },
+  { key: 'drinks', label: 'Drinks' },
+  { key: 'happy_hour', label: 'Happy Hour' },
+];
+
 const statusEl = document.getElementById('status');
 const categoriesContainer = document.getElementById('categories');
 const addCategoryBtn = document.getElementById('add-category-btn');
+const addCategorySection = document.getElementById('add-category-section');
 const reloadBtn = document.getElementById('reload-btn');
 const saveBtn = document.getElementById('save-btn');
 const saveStatus = document.getElementById('save-status');
@@ -14,45 +22,52 @@ function setStatus(el, message, isError) {
 }
 
 function escapeAttr(value) {
-  return String(value).replaceAll('&', '&amp;').replaceAll('"', '&quot;');
+  return String(value ?? '').replaceAll('&', '&amp;').replaceAll('"', '&quot;');
 }
 
-function categoryBlock(name, items) {
-  const section = document.createElement('section');
-  section.className = 'edit-category';
+function sectionLabel(key) {
+  return SECTIONS.find((s) => s.key === key)?.label || key;
+}
 
-  section.innerHTML = `
+function categoryBlock(section, name, note, items) {
+  const section_ = document.createElement('section');
+  section_.className = 'edit-category';
+  section_.dataset.section = section;
+
+  section_.innerHTML = `
     <div class="edit-category-header">
       <input class="category-name" value="${escapeAttr(name)}" placeholder="Category name" />
       <button type="button" class="remove-category secondary">Remove category</button>
     </div>
+    <input class="category-note-input" placeholder="Optional note (e.g. served with miso soup)" value="${escapeAttr(note)}" />
     <div class="edit-items"></div>
     <button type="button" class="add-item secondary">+ Add item</button>
   `;
 
-  const itemsContainer = section.querySelector('.edit-items');
+  const itemsContainer = section_.querySelector('.edit-items');
   (items || []).forEach((item) => itemsContainer.appendChild(itemRow(item)));
 
-  section.querySelector('.add-item').addEventListener('click', () => {
-    itemsContainer.appendChild(itemRow({ name: '', description: '', price: 0 }));
+  section_.querySelector('.add-item').addEventListener('click', () => {
+    itemsContainer.appendChild(itemRow({ name: '', description: '', price: null }));
   });
 
-  section.querySelector('.remove-category').addEventListener('click', () => {
-    if (confirm(`Remove the "${section.querySelector('.category-name').value}" category?`)) {
-      section.remove();
+  section_.querySelector('.remove-category').addEventListener('click', () => {
+    if (confirm(`Remove the "${section_.querySelector('.category-name').value}" category?`)) {
+      section_.remove();
     }
   });
 
-  return section;
+  return section_;
 }
 
 function itemRow(item) {
   const row = document.createElement('div');
   row.className = 'edit-item';
+  const priceValue = item.price != null ? Number(item.price).toFixed(2) : '';
   row.innerHTML = `
     <input class="item-name" placeholder="Item name" value="${escapeAttr(item.name || '')}" />
     <input class="item-desc" placeholder="Description" value="${escapeAttr(item.description || '')}" />
-    <input class="item-price" type="number" step="0.01" min="0" value="${Number(item.price || 0).toFixed(2)}" />
+    <input class="item-price" type="number" step="0.01" min="0" placeholder="No price" value="${priceValue}" />
     <button type="button" class="remove-item secondary" aria-label="Remove item">&times;</button>
   `;
   row.querySelector('.remove-item').addEventListener('click', () => row.remove());
@@ -62,8 +77,17 @@ function itemRow(item) {
 function renderEditor(data) {
   restaurantName = data.restaurant || restaurantName;
   categoriesContainer.innerHTML = '';
-  (data.categories || []).forEach((category) => {
-    categoriesContainer.appendChild(categoryBlock(category.name, category.items));
+
+  SECTIONS.forEach(({ key, label }) => {
+    const cats = (data.categories || []).filter((c) => c.section === key);
+    if (!cats.length) return;
+    const heading = document.createElement('h3');
+    heading.className = 'section-heading';
+    heading.textContent = label;
+    categoriesContainer.appendChild(heading);
+    cats.forEach((category) => {
+      categoriesContainer.appendChild(categoryBlock(key, category.name, category.note, category.items));
+    });
   });
 }
 
@@ -73,26 +97,31 @@ function collectMenuData() {
   const blocks = categoriesContainer.querySelectorAll('.edit-category');
 
   for (const block of blocks) {
+    const section = block.dataset.section;
     const name = block.querySelector('.category-name').value.trim();
     if (!name) {
       throw new Error('Every category needs a name.');
     }
-    if (seenNames.has(name)) {
-      throw new Error(`Category "${name}" is listed more than once.`);
+    const dedupeKey = `${section}::${name}`;
+    if (seenNames.has(dedupeKey)) {
+      throw new Error(`Category "${name}" is listed more than once in the same section.`);
     }
-    seenNames.add(name);
+    seenNames.add(dedupeKey);
+
+    const note = block.querySelector('.category-note-input').value.trim() || null;
 
     const items = [];
     const rows = block.querySelectorAll('.edit-item');
     for (const row of rows) {
       const itemName = row.querySelector('.item-name').value.trim();
       if (!itemName) continue;
-      const description = row.querySelector('.item-desc').value.trim();
-      const price = Number.parseFloat(row.querySelector('.item-price').value) || 0;
+      const description = row.querySelector('.item-desc').value.trim() || null;
+      const priceRaw = row.querySelector('.item-price').value.trim();
+      const price = priceRaw === '' ? null : Number.parseFloat(priceRaw);
       items.push({ name: itemName, description, price });
     }
 
-    categories.push({ name, items });
+    categories.push({ section, name, note, items });
   }
 
   return {
@@ -145,7 +174,8 @@ async function saveMenu() {
 reloadBtn.addEventListener('click', () => loadMenu().catch((error) => setStatus(statusEl, error.message, true)));
 saveBtn.addEventListener('click', saveMenu);
 addCategoryBtn.addEventListener('click', () => {
-  categoriesContainer.appendChild(categoryBlock('New Category', []));
+  const section = addCategorySection.value;
+  categoriesContainer.appendChild(categoryBlock(section, 'New Category', '', []));
 });
 
 loadMenu().catch((error) => setStatus(statusEl, error.message, true));

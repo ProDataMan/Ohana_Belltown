@@ -19,7 +19,7 @@
           This page has no password. Anyone with this link can change menu prices, so
           don't share it outside the team.
         </p>
-        <p class="admin-link"><a href="./index.html">&larr; Back to menu</a></p>
+        <p class="admin-link"><a href="/menu">&larr; Back to menu</a></p>
       </header>
 
       <p id="status" class="status"></p>
@@ -32,7 +32,15 @@
           </div>
         </div>
         <div id="categories"></div>
-        <button id="add-category-btn" type="button" class="secondary">+ Add category</button>
+        <div class="cta-row">
+          <select id="add-category-section">
+            <option value="menu">Food Menu</option>
+            <option value="sushi">Sushi</option>
+            <option value="drinks">Drinks</option>
+            <option value="happy_hour">Happy Hour</option>
+          </select>
+          <button id="add-category-btn" type="button" class="secondary">+ Add category</button>
+        </div>
 
         <div class="save-row">
           <button id="save-btn" type="button">Save changes</button>

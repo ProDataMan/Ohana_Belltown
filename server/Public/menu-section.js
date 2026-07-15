@@ -10,25 +10,26 @@ function escapeHtml(value) {
 }
 
 function renderMenu(data) {
-  const categories = data.categories || [];
+  const categories = (data.categories || []).filter((c) => c.section === window.MENU_SECTION);
 
   if (!categories.length) {
-    menuContainer.innerHTML = '<p class="error">No menu categories were found.</p>';
+    menuContainer.innerHTML = '<p class="error">No menu items were found.</p>';
     return;
   }
 
   menuContainer.innerHTML = categories
     .map((category) => {
+      const noteMarkup = category.note ? `<p class="category-note">${escapeHtml(category.note)}</p>` : '';
       const itemMarkup = (category.items || [])
         .map((item) => {
-          const price = Number(item.price || 0).toFixed(2);
+          const priceMarkup = item.price != null ? `<div class="price">$${Number(item.price).toFixed(2)}</div>` : '';
           return `
             <article class="item">
               <div>
                 <h3>${escapeHtml(item.name)}</h3>
-                <p>${escapeHtml(item.description || '')}</p>
+                ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ''}
               </div>
-              <div class="price">$${price}</div>
+              ${priceMarkup}
             </article>
           `;
         })
@@ -37,6 +38,7 @@ function renderMenu(data) {
       return `
         <section class="category">
           <h2>${escapeHtml(category.name)}</h2>
+          ${noteMarkup}
           <div class="items">${itemMarkup}</div>
         </section>
       `;

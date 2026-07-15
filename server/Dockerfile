@@ -12,6 +12,7 @@ WORKDIR /app
 
 COPY --from=build /build/.build/release/App ./App
 COPY Public ./Public
+COPY Resources ./Resources
 
 RUN mkdir -p /app/Data
 

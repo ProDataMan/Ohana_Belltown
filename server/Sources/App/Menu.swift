@@ -2,12 +2,14 @@ import Vapor
 
 struct MenuItem: Codable, Content {
     var name: String
-    var description: String
-    var price: Double
+    var description: String?
+    var price: Double?
 }
 
 struct MenuCategory: Codable, Content {
+    var section: String
     var name: String
+    var note: String?
     var items: [MenuItem]
 }
 

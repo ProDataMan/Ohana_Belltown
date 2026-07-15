@@ -7,7 +7,7 @@ func configure(_ app: Application) throws {
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory, defaultFile: "index.html"))
 
     let dataDirectory = Environment.get("DATA_DIR") ?? app.directory.workingDirectory + "Data"
-    MenuStore.shared.configure(dataDirectory: dataDirectory)
+    MenuStore.shared.configure(dataDirectory: dataDirectory, resourcesDirectory: app.directory.resourcesDirectory)
 
     try routes(app)
 }

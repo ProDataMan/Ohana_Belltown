@@ -5,10 +5,11 @@ final class MenuStore: @unchecked Sendable {
 
     private let lock = NSLock()
     private var fileURL = URL(fileURLWithPath: "Data/menu.json")
-    private var menu = MenuStore.seedMenu()
+    private var seedURL = URL(fileURLWithPath: "Resources/seed-menu.json")
+    private var menu = Menu(restaurant: "Ohana Belltown", lastUpdated: "", categories: [])
     private var loaded = false
 
-    func configure(dataDirectory: String) {
+    func configure(dataDirectory: String, resourcesDirectory: String) {
         lock.lock()
         defer { lock.unlock() }
         let fileManager = FileManager.default
@@ -16,6 +17,7 @@ final class MenuStore: @unchecked Sendable {
             try? fileManager.createDirectory(atPath: dataDirectory, withIntermediateDirectories: true)
         }
         fileURL = URL(fileURLWithPath: dataDirectory).appendingPathComponent("menu.json")
+        seedURL = URL(fileURLWithPath: resourcesDirectory).appendingPathComponent("seed-menu.json")
     }
 
     func get() throws -> Menu {
@@ -42,6 +44,10 @@ final class MenuStore: @unchecked Sendable {
         if fileManager.fileExists(atPath: fileURL.path) {
             let data = try Data(contentsOf: fileURL)
             menu = try JSONDecoder().decode(Menu.self, from: data)
+        } else if fileManager.fileExists(atPath: seedURL.path) {
+            let data = try Data(contentsOf: seedURL)
+            menu = try JSONDecoder().decode(Menu.self, from: data)
+            try persist()
         } else {
             try persist()
         }
@@ -53,26 +59,5 @@ final class MenuStore: @unchecked Sendable {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(menu)
         try data.write(to: fileURL, options: .atomic)
-    }
-
-    private static func seedMenu() -> Menu {
-        Menu(
-            restaurant: "Ohana Belltown",
-            lastUpdated: "2026-07-12",
-            categories: [
-                MenuCategory(name: "Appetizers", items: [
-                    MenuItem(name: "Edamame", description: "Steamed soybeans with sea salt.", price: 6.5),
-                    MenuItem(name: "Spicy Tuna Tartare", description: "Tuna, avocado, cucumber, chili crisp.", price: 16.0),
-                ]),
-                MenuCategory(name: "Sushi Rolls", items: [
-                    MenuItem(name: "California Roll", description: "Crab, cucumber, avocado.", price: 12.0),
-                    MenuItem(name: "Spicy Tuna Roll", description: "Tuna, cucumber, spicy sauce.", price: 14.5),
-                ]),
-                MenuCategory(name: "Entrees", items: [
-                    MenuItem(name: "Teriyaki Chicken", description: "Grilled chicken with house sauce and rice.", price: 18.0),
-                    MenuItem(name: "Salmon Bowl", description: "Seared salmon, rice, cucumber, scallions.", price: 20.0),
-                ]),
-            ]
-        )
     }
 }
