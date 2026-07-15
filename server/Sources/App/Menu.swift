@@ -1,0 +1,18 @@
+import Vapor
+
+struct MenuItem: Codable, Content {
+    var name: String
+    var description: String
+    var price: Double
+}
+
+struct MenuCategory: Codable, Content {
+    var name: String
+    var items: [MenuItem]
+}
+
+struct Menu: Codable, Content {
+    var restaurant: String
+    var lastUpdated: String
+    var categories: [MenuCategory]
+}

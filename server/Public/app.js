@@ -1,5 +1,4 @@
 const menuContainer = document.getElementById('menu');
-const menuUrl = new URL('./menu.json', window.location.href);
 
 function escapeHtml(value) {
   return String(value)
@@ -11,7 +10,7 @@ function escapeHtml(value) {
 }
 
 function renderMenu(data) {
-  const categories = Object.entries(data.categories || {});
+  const categories = data.categories || [];
 
   if (!categories.length) {
     menuContainer.innerHTML = '<p class="error">No menu categories were found.</p>';
@@ -19,8 +18,8 @@ function renderMenu(data) {
   }
 
   menuContainer.innerHTML = categories
-    .map(([category, items]) => {
-      const itemMarkup = (items || [])
+    .map((category) => {
+      const itemMarkup = (category.items || [])
         .map((item) => {
           const price = Number(item.price || 0).toFixed(2);
           return `
@@ -37,7 +36,7 @@ function renderMenu(data) {
 
       return `
         <section class="category">
-          <h2>${escapeHtml(category)}</h2>
+          <h2>${escapeHtml(category.name)}</h2>
           <div class="items">${itemMarkup}</div>
         </section>
       `;
@@ -47,7 +46,7 @@ function renderMenu(data) {
 
 async function loadMenu() {
   try {
-    const response = await fetch(menuUrl);
+    const response = await fetch('/api/menu');
     if (!response.ok) {
       throw new Error('Unable to load the menu data.');
     }

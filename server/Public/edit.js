@@ -1,22 +1,11 @@
-const REPO_OWNER = 'ProDataMan';
-const REPO_NAME = 'Ohana_Belltown';
-const REPO_BRANCH = 'main';
-const FILE_PATH = 'docs/menu.json';
-const API_BASE = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`;
-
-// Fine-grained token scoped to only this repo's Contents (read/write). Intentionally
-// public: this page has no login, so anyone with the edit.html link can save changes.
-const GITHUB_TOKEN = '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';
-
-const tokenStatus = document.getElementById('token-status');
-const editorPanel = document.getElementById('editor-panel');
+const statusEl = document.getElementById('status');
 const categoriesContainer = document.getElementById('categories');
 const addCategoryBtn = document.getElementById('add-category-btn');
 const reloadBtn = document.getElementById('reload-btn');
 const saveBtn = document.getElementById('save-btn');
 const saveStatus = document.getElementById('save-status');
 
-let currentSha = null;
+let restaurantName = 'Ohana Belltown';
 
 function setStatus(el, message, isError) {
   el.textContent = message;
@@ -24,12 +13,8 @@ function setStatus(el, message, isError) {
   el.classList.toggle('status-ok', !isError && Boolean(message));
 }
 
-function utf8ToBase64(str) {
-  return btoa(unescape(encodeURIComponent(str)));
-}
-
-function base64ToUtf8(str) {
-  return decodeURIComponent(escape(atob(str)));
+function escapeAttr(value) {
+  return String(value).replaceAll('&', '&amp;').replaceAll('"', '&quot;');
 }
 
 function categoryBlock(name, items) {
@@ -74,20 +59,17 @@ function itemRow(item) {
   return row;
 }
 
-function escapeAttr(value) {
-  return String(value).replaceAll('&', '&amp;').replaceAll('"', '&quot;');
-}
-
 function renderEditor(data) {
+  restaurantName = data.restaurant || restaurantName;
   categoriesContainer.innerHTML = '';
-  const categories = Object.entries(data.categories || {});
-  categories.forEach(([name, items]) => {
-    categoriesContainer.appendChild(categoryBlock(name, items));
+  (data.categories || []).forEach((category) => {
+    categoriesContainer.appendChild(categoryBlock(category.name, category.items));
   });
 }
 
 function collectMenuData() {
-  const categories = {};
+  const seenNames = new Set();
+  const categories = [];
   const blocks = categoriesContainer.querySelectorAll('.edit-category');
 
   for (const block of blocks) {
@@ -95,9 +77,10 @@ function collectMenuData() {
     if (!name) {
       throw new Error('Every category needs a name.');
     }
-    if (categories[name]) {
+    if (seenNames.has(name)) {
       throw new Error(`Category "${name}" is listed more than once.`);
     }
+    seenNames.add(name);
 
     const items = [];
     const rows = block.querySelectorAll('.edit-item');
@@ -109,42 +92,25 @@ function collectMenuData() {
       items.push({ name: itemName, description, price });
     }
 
-    categories[name] = items;
+    categories.push({ name, items });
   }
 
   return {
-    restaurant: 'Ohana Belltown',
+    restaurant: restaurantName,
     lastUpdated: new Date().toISOString().slice(0, 10),
     categories,
   };
 }
 
-async function githubRequest(method, body) {
-  const response = await fetch(API_BASE + (method === 'GET' ? `?ref=${REPO_BRANCH}` : ''), {
-    method,
-    headers: {
-      Authorization: `Bearer ${GITHUB_TOKEN}`,
-      Accept: 'application/vnd.github+json',
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  if (!response.ok) {
-    const detail = await response.json().catch(() => ({}));
-    throw new Error(detail.message || `GitHub request failed (${response.status}).`);
-  }
-
-  return response.json();
-}
-
 async function loadMenu() {
-  setStatus(tokenStatus, 'Loading current menu...', false);
-  const file = await githubRequest('GET');
-  currentSha = file.sha;
-  const data = JSON.parse(base64ToUtf8(file.content));
+  setStatus(statusEl, 'Loading current menu...', false);
+  const response = await fetch('/api/menu');
+  if (!response.ok) {
+    throw new Error(`Unable to load the menu (${response.status}).`);
+  }
+  const data = await response.json();
   renderEditor(data);
-  setStatus(tokenStatus, '', false);
+  setStatus(statusEl, '', false);
 }
 
 async function saveMenu() {
@@ -160,30 +126,26 @@ async function saveMenu() {
   setStatus(saveStatus, 'Saving...', false);
 
   try {
-    const content = JSON.stringify(data, null, 2) + '\n';
-    const result = await githubRequest('PUT', {
-      message: `Update menu via editor (${data.lastUpdated})`,
-      content: utf8ToBase64(content),
-      sha: currentSha,
-      branch: REPO_BRANCH,
+    const response = await fetch('/api/menu', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
     });
-    currentSha = result.content.sha;
-    setStatus(saveStatus, 'Saved! The live site will update in a minute or two.', false);
-  } catch (error) {
-    if (/sha/i.test(error.message)) {
-      setStatus(saveStatus, 'Someone else updated the menu. Click "Reload latest" and re-apply your changes.', true);
-    } else {
-      setStatus(saveStatus, error.message, true);
+    if (!response.ok) {
+      throw new Error(`Save failed (${response.status}).`);
     }
+    setStatus(saveStatus, 'Saved! The live site is already up to date.', false);
+  } catch (error) {
+    setStatus(saveStatus, error.message, true);
   } finally {
     saveBtn.disabled = false;
   }
 }
 
-reloadBtn.addEventListener('click', () => loadMenu().catch((error) => setStatus(tokenStatus, error.message, true)));
+reloadBtn.addEventListener('click', () => loadMenu().catch((error) => setStatus(statusEl, error.message, true)));
 saveBtn.addEventListener('click', saveMenu);
 addCategoryBtn.addEventListener('click', () => {
   categoriesContainer.appendChild(categoryBlock('New Category', []));
 });
 
-loadMenu().catch((error) => setStatus(tokenStatus, error.message, true));
+loadMenu().catch((error) => setStatus(statusEl, error.message, true));
