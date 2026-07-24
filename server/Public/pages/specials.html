@@ -3,19 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Local | Ohana Belltown</title>
-    <meta name="description" content="Ohana Belltown is a family-owned restaurant committed to the Belltown community, with live Hawaiian and Reggae music and karaoke nights." />
+    <title>Specials &amp; Happy Hour | Ohana Belltown</title>
+    <meta name="description" content="Today's specials, Happy Hour (Mon-Fri 3-6pm), and tropical drinks at Ohana Belltown in Seattle." />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Ohana Belltown" />
-    <meta property="og:title" content="Local | Ohana Belltown" />
-    <meta property="og:description" content="Ohana Belltown is a family-owned restaurant committed to the Belltown community, with live Hawaiian and Reggae music and karaoke nights." />
-    <meta property="og:url" content="https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/local" />
-    <meta property="og:image" content="https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/images/hero-local.jpg" />
+    <meta property="og:title" content="Specials &amp; Happy Hour | Ohana Belltown" />
+    <meta property="og:description" content="Today's specials, Happy Hour (Mon-Fri 3-6pm), and tropical drinks at Ohana Belltown in Seattle." />
+    <meta property="og:url" content="https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/specials" />
+    <meta property="og:image" content="https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/images/hero-aloha.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Local | Ohana Belltown" />
-    <meta name="twitter:description" content="Ohana Belltown is a family-owned restaurant committed to the Belltown community, with live Hawaiian and Reggae music and karaoke nights." />
-    <meta name="twitter:image" content="https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/images/hero-local.jpg" />
-    <link rel="canonical" href="https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/local" />
+    <meta name="twitter:title" content="Specials &amp; Happy Hour | Ohana Belltown" />
+    <meta name="twitter:description" content="Today's specials, Happy Hour (Mon-Fri 3-6pm), and tropical drinks at Ohana Belltown in Seattle." />
+    <meta name="twitter:image" content="https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/images/hero-aloha.jpg" />
+    <link rel="canonical" href="https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/specials" />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
@@ -37,12 +37,11 @@
               <a href="/sushi">Sushi</a>
               <a href="/drinks">Drinks</a>
               <a href="/specials">Specials</a>
-        <a href="/happy-hour">Happy Hour</a>
+              <a href="/happy-hour">Happy Hour</a>
             </div>
           </div>
-          <a href="/local" class="active">Local</a>
+          <a href="/local">Local</a>
           <a href="/about">About</a>
-          <a href="/catering">Catering</a>
           <a href="/contact">Contact</a>
           <a href="/rewards">Rewards</a>
           <a href="/account-login">Log In</a>
@@ -51,45 +50,46 @@
       </div>
     </header>
 
-    <section class="hero-banner" style="background-image: url('/images/hero-local.jpg');">
+    <section class="hero-banner" style="background-image: url('/images/hero-aloha.jpg');">
       <div class="hero-banner-inner">
-        <p class="eyebrow">Community</p>
-        <h1>We Love Local.</h1>
+        <p class="eyebrow">Ohana Belltown</p>
+        <h1>Specials &amp; Happy Hour</h1>
+        <p>Everything worth knowing about before you visit &mdash; today's specials, Happy Hour, and our drink menu.</p>
+      </div>
+    </section>
+
+    <section class="content-section" id="specials-section">
+      <div class="panel">
+        <h2>&#9733; Today's Specials</h2>
+        <div class="items" id="specials-list"></div>
+        <p id="no-specials-message" class="hint" hidden>Nothing marked as a special today &mdash; check out the full <a href="/menu">menu</a> instead.</p>
       </div>
     </section>
 
     <section class="content-section">
       <div class="content-grid">
         <div>
-          <p>As a family-owned restaurant, Ohana is committed to serving the community.</p>
-          <p>From live Hawaiian and Reggae inspired music, to karaoke nights, there's something for everyone to enjoy.</p>
+          <p class="eyebrow">Monday &ndash; Friday, 3-6pm</p>
+          <h2>Happy Hour</h2>
+          <p>
+            Discounted pupus and drinks every weekday afternoon &mdash; the best-kept secret
+            in Belltown.
+          </p>
           <div class="cta-row">
-            <a class="cta-button secondary" href="https://www.instagram.com/ohanabelltown" target="_blank" rel="noopener">Instagram</a>
-            <a class="cta-button secondary" href="https://www.facebook.com/ohanabelltown" target="_blank" rel="noopener">Facebook</a>
+            <a class="cta-button" href="/happy-hour">See Happy Hour Menu</a>
           </div>
         </div>
-        <img src="/uploads/39F19F8F-2FB9-4333-8E9B-12AD61A34AA9.jpg" alt="Inside Ohana Belltown's tiki bar dining room" />
+        <img src="/images/food-spread.jpg" alt="A spread of Ohana sushi rolls, gyoza, and miso soup" />
       </div>
     </section>
 
     <section class="content-section">
-      <div class="content-grid">
-        <img src="/uploads/394168DB-657D-4985-BB6B-890E37D16C1E.jpg" alt="Aloha, please wait to be seated sign at Ohana Belltown" />
-        <div>
-          <p class="eyebrow">Walk-Ins Welcome</p>
-          <h2>Come As You Are</h2>
-          <p>
-            No reservation, no problem &mdash; grab a seat at the bar or wait a few minutes for
-            a table. We'll take care of you.
-          </p>
+      <div class="panel" style="text-align: center;">
+        <h2>Tropical Drinks</h2>
+        <p>Tiki cocktails, sake, beer, and more &mdash; see the full drinks list.</p>
+        <div class="cta-row" style="justify-content: center;">
+          <a class="cta-button secondary" href="/drinks">View Drinks Menu</a>
         </div>
-      </div>
-    </section>
-
-    <section class="content-section">
-      <div class="panel">
-        <h2>What's Happening</h2>
-        <div id="events-list"></div>
       </div>
     </section>
 
@@ -116,6 +116,6 @@
       <p class="footer-copyright">&copy; 2026 Ohana Belltown. All rights reserved.</p>
     </footer>
     <script src="/nav.js"></script>
-    <script src="/events.js"></script>
+    <script src="/specials-page.js"></script>
   </body>
 </html>

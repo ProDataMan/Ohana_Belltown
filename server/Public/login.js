@@ -9,6 +9,16 @@ function nextUrl() {
   return params.get('next') || '/edit.html';
 }
 
+const OAUTH_ERROR_MESSAGES = {
+  oauth_failed: 'Sign-in was interrupted. Please try again.',
+  not_linked: "No staff account is linked to that account yet. Log in with your username and password, then link it from My Account.",
+};
+
+const oauthError = new URLSearchParams(window.location.search).get('error');
+if (oauthError && OAUTH_ERROR_MESSAGES[oauthError]) {
+  setLoginStatus(document.getElementById('login-status'), OAUTH_ERROR_MESSAGES[oauthError], true);
+}
+
 async function checkSetupNeeded() {
   try {
     const response = await fetch('/api/auth/setup-needed');

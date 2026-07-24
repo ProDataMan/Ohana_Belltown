@@ -4,6 +4,11 @@ function setAccountLoginStatus(el, message, isError) {
   el.classList.toggle('status-ok', !isError && Boolean(message));
 }
 
+const oauthError = new URLSearchParams(window.location.search).get('error');
+if (oauthError === 'oauth_failed') {
+  setAccountLoginStatus(document.getElementById('login-status'), 'Sign-in was interrupted. Please try again.', true);
+}
+
 document.getElementById('login-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const statusEl = document.getElementById('login-status');

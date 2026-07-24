@@ -10,6 +10,8 @@ struct StaffUser: Codable {
     var username: String
     var displayName: String
     var passwordHash: String
+    var googleId: String?
+    var appleId: String?
     var role: UserRole
     var mustChangePassword: Bool
     var createdAt: String
@@ -22,6 +24,8 @@ struct StaffUserPublic: Content {
     var displayName: String
     var role: UserRole
     var mustChangePassword: Bool
+    var googleLinked: Bool
+    var appleLinked: Bool
 
     init(_ user: StaffUser) {
         id = user.id
@@ -29,6 +33,8 @@ struct StaffUserPublic: Content {
         displayName = user.displayName
         role = user.role
         mustChangePassword = user.mustChangePassword
+        googleLinked = user.googleId != nil
+        appleLinked = user.appleId != nil
     }
 }
 
@@ -38,14 +44,16 @@ enum UserError: Error {
     case notFound
     case alreadyBootstrapped
     case wrongCurrentPassword
+    case oauthNotLinked
+    case oauthAlreadyLinkedElsewhere
 }
 
 extension UserError: AbortError {
     var status: HTTPResponseStatus {
         switch self {
-        case .usernameTaken: return .conflict
+        case .usernameTaken, .oauthAlreadyLinkedElsewhere: return .conflict
         case .invalidCredentials, .wrongCurrentPassword: return .unauthorized
-        case .notFound: return .notFound
+        case .notFound, .oauthNotLinked: return .notFound
         case .alreadyBootstrapped: return .forbidden
         }
     }
@@ -57,6 +65,8 @@ extension UserError: AbortError {
         case .notFound: return "User not found."
         case .alreadyBootstrapped: return "Setup has already been completed."
         case .wrongCurrentPassword: return "Current password is incorrect."
+        case .oauthNotLinked: return "No staff account is linked to that account yet. Log in with your username and password first, then link it from My Account."
+        case .oauthAlreadyLinkedElsewhere: return "That account is already linked to a different staff login."
         }
     }
 }
@@ -94,6 +104,8 @@ final class UserStore: @unchecked Sendable {
             username: Self.normalizeUsername(username),
             displayName: displayName,
             passwordHash: try Bcrypt.hash(password),
+            googleId: nil,
+            appleId: nil,
             role: .admin,
             mustChangePassword: false,
             createdAt: timestamp,
@@ -119,6 +131,8 @@ final class UserStore: @unchecked Sendable {
             username: normalized,
             displayName: displayName,
             passwordHash: try Bcrypt.hash(password),
+            googleId: nil,
+            appleId: nil,
             role: role,
             mustChangePassword: mustChangePassword,
             createdAt: timestamp,
@@ -186,6 +200,33 @@ final class UserStore: @unchecked Sendable {
         }
         users[idx].passwordHash = try Bcrypt.hash(newPassword)
         users[idx].mustChangePassword = true
+        users[idx].updatedAt = now()
+        try persist()
+        return StaffUserPublic(users[idx])
+    }
+
+    func findByOAuth(provider: OAuthProvider, providerId: String) throws -> StaffUser {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard let user = users.first(where: { provider.id(of: $0) == providerId }) else {
+            throw UserError.oauthNotLinked
+        }
+        return user
+    }
+
+    @discardableResult
+    func linkOAuth(id: String, provider: OAuthProvider, providerId: String) throws -> StaffUserPublic {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        if let existingIdx = users.firstIndex(where: { provider.id(of: $0) == providerId }), users[existingIdx].id != id {
+            throw UserError.oauthAlreadyLinkedElsewhere
+        }
+        guard let idx = users.firstIndex(where: { $0.id == id }) else {
+            throw UserError.notFound
+        }
+        provider.setId(providerId, on: &users[idx])
         users[idx].updatedAt = now()
         try persist()
         return StaffUserPublic(users[idx])

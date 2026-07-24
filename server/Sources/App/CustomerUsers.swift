@@ -4,7 +4,9 @@ struct CustomerUser: Codable {
     var id: String
     var email: String
     var displayName: String
-    var passwordHash: String
+    var passwordHash: String?
+    var googleId: String?
+    var appleId: String?
     var verified: Bool
     var verificationToken: String?
     var resetToken: String?
@@ -18,18 +20,25 @@ struct CustomerUserPublic: Content {
     var email: String
     var displayName: String
     var verified: Bool
+    var hasPassword: Bool
+    var googleLinked: Bool
+    var appleLinked: Bool
 
     init(_ user: CustomerUser) {
         id = user.id
         email = user.email
         displayName = user.displayName
         verified = user.verified
+        hasPassword = user.passwordHash != nil
+        googleLinked = user.googleId != nil
+        appleLinked = user.appleId != nil
     }
 }
 
 enum CustomerUserError: Error {
     case emailTaken
     case invalidCredentials
+    case noPasswordSet
     case notFound
     case invalidOrExpiredToken
     case wrongCurrentPassword
@@ -39,7 +48,7 @@ extension CustomerUserError: AbortError {
     var status: HTTPResponseStatus {
         switch self {
         case .emailTaken: return .conflict
-        case .invalidCredentials, .wrongCurrentPassword: return .unauthorized
+        case .invalidCredentials, .wrongCurrentPassword, .noPasswordSet: return .unauthorized
         case .notFound: return .notFound
         case .invalidOrExpiredToken: return .badRequest
         }
@@ -49,6 +58,7 @@ extension CustomerUserError: AbortError {
         switch self {
         case .emailTaken: return "An account with that email already exists."
         case .invalidCredentials: return "Incorrect email or password."
+        case .noPasswordSet: return "This account signs in with Google or Apple — use that instead, or reset your password to set one."
         case .notFound: return "Account not found."
         case .invalidOrExpiredToken: return "That link is invalid or has expired."
         case .wrongCurrentPassword: return "Current password is incorrect."
@@ -93,6 +103,8 @@ final class CustomerUserStore: @unchecked Sendable {
             email: normalized,
             displayName: displayName,
             passwordHash: try Bcrypt.hash(password),
+            googleId: nil,
+            appleId: nil,
             verified: false,
             verificationToken: token,
             resetToken: nil,
@@ -125,11 +137,58 @@ final class CustomerUserStore: @unchecked Sendable {
         defer { lock.unlock() }
         try loadIfNeeded()
         let normalized = Self.normalizeEmail(email)
-        guard let user = users.first(where: { $0.email == normalized }),
-              try Bcrypt.verify(password, created: user.passwordHash) else {
+        guard let user = users.first(where: { $0.email == normalized }) else {
+            throw CustomerUserError.invalidCredentials
+        }
+        guard let hash = user.passwordHash else {
+            throw CustomerUserError.noPasswordSet
+        }
+        guard try Bcrypt.verify(password, created: hash) else {
             throw CustomerUserError.invalidCredentials
         }
         return user
+    }
+
+    /// Finds the account linked to this OAuth identity, links it to an existing
+    /// account with a matching verified email, or creates a new account.
+    @discardableResult
+    func findOrCreateFromOAuth(provider: OAuthProvider, providerId: String, email: String, displayName: String) throws -> CustomerUserPublic {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        let normalized = Self.normalizeEmail(email)
+        let timestamp = nowString()
+
+        if let idx = users.firstIndex(where: { provider.id(of: $0) == providerId }) {
+            return CustomerUserPublic(users[idx])
+        }
+
+        if let idx = users.firstIndex(where: { $0.email == normalized }) {
+            provider.setId(providerId, on: &users[idx])
+            users[idx].verified = true
+            users[idx].updatedAt = timestamp
+            try persist()
+            return CustomerUserPublic(users[idx])
+        }
+
+        var user = CustomerUser(
+            id: UUID().uuidString,
+            email: normalized,
+            displayName: displayName,
+            passwordHash: nil,
+            googleId: nil,
+            appleId: nil,
+            verified: true,
+            verificationToken: nil,
+            resetToken: nil,
+            resetTokenExpiresAt: nil,
+            createdAt: timestamp,
+            updatedAt: timestamp
+        )
+        provider.setId(providerId, on: &user)
+        users.append(user)
+        try persist()
+        return CustomerUserPublic(user)
     }
 
     func find(id: String) throws -> CustomerUser {
@@ -187,8 +246,10 @@ final class CustomerUserStore: @unchecked Sendable {
         guard let idx = users.firstIndex(where: { $0.id == id }) else {
             throw CustomerUserError.notFound
         }
-        guard try Bcrypt.verify(currentPassword, created: users[idx].passwordHash) else {
-            throw CustomerUserError.wrongCurrentPassword
+        if let hash = users[idx].passwordHash {
+            guard try Bcrypt.verify(currentPassword, created: hash) else {
+                throw CustomerUserError.wrongCurrentPassword
+            }
         }
         users[idx].passwordHash = try Bcrypt.hash(newPassword)
         users[idx].updatedAt = nowString()

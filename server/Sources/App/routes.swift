@@ -18,6 +18,7 @@ struct BonusReviewRequest: Content {
 func routes(_ app: Application) throws {
     try registerAuthRoutes(app)
     try registerCustomerAuthRoutes(app)
+    try registerOAuthRoutes(app)
 
     app.get("healthz") { _ in "ok" }
 
@@ -127,6 +128,7 @@ func routes(_ app: Application) throws {
         ("catering", "pages/catering.html"),
         ("contact", "pages/contact.html"),
         ("rewards", "pages/rewards.html"),
+        ("specials", "pages/specials.html"),
     ]
     for (route, file) in cleanPages {
         app.get(PathComponent(stringLiteral: route)) { req in
