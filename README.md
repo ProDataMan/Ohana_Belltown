@@ -60,7 +60,10 @@ now historical background rather than the current plan.
 | `/events-admin.html` | Staff: edit the events/specials shown on `/local`. **Admin only.** |
 | `/create-account.html`, `/manage-users.html` | Admin: create staff accounts, change roles, reset passwords. **Admin only.** |
 | `/table-card.html` | Printable QR-code table tents linking to `/menu` |
-| `/api/menu`, `/api/events`, `/api/loyalty/*`, `/api/auth/*`, `/api/users/*`, `/api/account/*` | JSON API backing all of the above |
+| `/signup`, `/account-login` | Customer registration and login (separate from staff accounts) |
+| `/my-account.html` | Customer's own account page — profile, password change |
+| `/forgot-password.html`, `/reset-password.html` | Customer self-service password reset |
+| `/api/menu`, `/api/events`, `/api/loyalty/*`, `/api/auth/*`, `/api/users/*`, `/api/account/*`, `/api/customer/*` | JSON API backing all of the above |
 
 ## What's shipped
 
@@ -93,6 +96,11 @@ now historical background rather than the current plan.
 - Anyone can change their own password (`/change-password.html`); new/reset accounts must change their password on next login
 - Real audit trail by design — actions are tied to a named account, not a shared PIN
 
+**Customer accounts**
+- Separate from staff accounts — email/password identity only, no `admin`/`employee` role, no order history yet
+- Self-service registration (`/signup`), login (`/account-login`), password change and reset (`/forgot-password.html` → `/reset-password.html`, 1-hour expiring token)
+- Email verification link on signup — **not actually delivered yet** (see gaps below), logged server-side instead
+
 **SEO & technical**
 - Per-page Open Graph / Twitter Card tags
 - schema.org `Restaurant` JSON-LD on the homepage
@@ -116,7 +124,7 @@ actually shipped as of this README. Not in priority order.
 
 **Engagement & retention**
 - Email/SMS signup for specials
-- Customer accounts (in progress — see below), order history, "reorder your last meal" (the punch card still uses phone number only, not an account)
+- Order history, "reorder your last meal", and linking a customer account to the phone-based punch card (customer accounts exist now but are pure identity — no order data yet)
 - Native delivery radius checking (delivery relies entirely on ChowNow's partners)
 
 **Technical**
@@ -127,24 +135,16 @@ actually shipped as of this README. Not in priority order.
 - Automated test suite (no `AppTests` target currently — testing has been manual via curl + local `swift run`)
 
 **Admin & operations**
-- Password reset is admin-only (an admin resets it for you) — no self-service "forgot password" email flow for staff yet, since that needs the same email infrastructure as customer accounts below
-- Account deactivation/removal isn't built — an admin can change someone's role but not disable/delete an account
+- Password reset is admin-only for staff (an admin resets it for you) — no self-service "forgot password" email flow for staff (customers have one; see the email caveat below for why it's not fully live yet)
+- Account deactivation/removal isn't built for staff or customer accounts — roles/passwords can be changed but accounts can't be disabled or deleted
 - ChowNow menu photo import — investigated, blocked by Cloudflare bot protection on ChowNow's API; not pursued further (see git history for details)
 
 **Known deliberate tradeoffs (not bugs)**
-- Sessions use Vapor's in-memory driver — a deploy or restart logs everyone out. Fine for a ~9-person team; would need a persistent session store (e.g. file- or Redis-backed) to survive restarts.
+- **No real email delivery yet.** `EmailSenderFactory` (`server/Sources/App/EmailSender.swift`) currently returns a placeholder that logs the email server-side instead of sending it — so customer email verification and password-reset links don't reach anyone's inbox right now. Swapping in a real provider (Resend, SendGrid, etc. — still deciding, was going to be GoDaddy but that isn't a transactional-email API provider in the usual sense) is a single-file change once an API key is available. Until then, self-service password reset for customers is not actually functional end-to-end.
+- Sessions use Vapor's in-memory driver — a deploy or restart logs everyone out. Fine for a ~9-person staff team and low-stakes customer accounts; would need a persistent session store (e.g. file- or Redis-backed) to survive restarts.
 - Every new/reset staff account gets a caller-chosen temporary password and must change it on next login — there's no forced password-strength policy beyond that.
 - Bonus punch claims (photo/social shares) are staff-reviewed, not auto-verified — there's no reliable API to check a social tag automatically.
 - Google Places photos are capped at 10 per API call (a hard Google limit, not a bug) and matched to menu items manually.
-
-## Customer accounts (in progress)
-
-Basic email+password customer accounts are being added on top of the staff
-login system above (separate `CustomerUser` model — customers don't get
-`admin`/`employee` roles). This needs an email service to send verification
-and password-reset links, which the project didn't have before. Status:
-finding the right provider — see git history for the current placeholder
-approach in the meantime.
 
 ## Local development
 
@@ -165,6 +165,11 @@ set, the Google Photos carousel and picker will just come back empty.
 Visiting `/login` on a fresh `DATA_DIR` (no `users.json` yet) shows a one-time
 setup form instead of the login form — use it to create your first local admin
 account, since staff pages all require login now.
+
+Customer verification and password-reset links aren't emailed (see the email
+caveat above) — after registering at `/signup` or requesting a reset at
+`/forgot-password.html`, grab the link from the server's console output
+(`EMAIL (not sent — no provider configured) ...`) to complete the flow locally.
 
 ## Other docs in this repo
 
