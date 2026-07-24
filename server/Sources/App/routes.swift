@@ -17,6 +17,7 @@ struct BonusReviewRequest: Content {
 
 func routes(_ app: Application) throws {
     try registerAuthRoutes(app)
+    try registerCustomerAuthRoutes(app)
 
     app.get("healthz") { _ in "ok" }
 

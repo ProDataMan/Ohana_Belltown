@@ -16,6 +16,7 @@ func configure(_ app: Application) throws {
     EventsStore.shared.configure(dataDirectory: dataDirectory)
     LoyaltyStore.shared.configure(dataDirectory: dataDirectory)
     UserStore.shared.configure(dataDirectory: dataDirectory)
+    CustomerUserStore.shared.configure(dataDirectory: dataDirectory)
 
     app.routes.defaultMaxBodySize = "10mb"
 
