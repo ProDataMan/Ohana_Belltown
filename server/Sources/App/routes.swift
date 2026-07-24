@@ -15,16 +15,9 @@ struct BonusReviewRequest: Content {
     var approve: Bool
 }
 
-func requireStaffPin(_ req: Request) throws {
-    guard let expected = Environment.get("STAFF_PIN"), !expected.isEmpty else {
-        throw Abort(.internalServerError, reason: "Staff PIN is not configured on this server.")
-    }
-    guard let provided = req.headers.first(name: "X-Staff-Pin"), provided == expected else {
-        throw Abort(.unauthorized, reason: "Staff PIN required.")
-    }
-}
-
 func routes(_ app: Application) throws {
+    try registerAuthRoutes(app)
+
     app.get("healthz") { _ in "ok" }
 
     app.get("api", "menu") { _ throws -> Menu in
@@ -32,6 +25,7 @@ func routes(_ app: Application) throws {
     }
 
     app.put("api", "menu") { req throws -> Menu in
+        try requireLogin(req)
         let incoming = try req.content.decode(Menu.self)
         return try MenuStore.shared.save(incoming)
     }
@@ -68,7 +62,7 @@ func routes(_ app: Application) throws {
     }
 
     app.put("api", "events") { req throws -> EventsList in
-        try requireStaffPin(req)
+        try requireAdmin(req)
         let incoming = try req.content.decode(EventsList.self)
         return try EventsStore.shared.save(incoming)
     }
@@ -89,29 +83,29 @@ func routes(_ app: Application) throws {
     }
 
     app.post("api", "loyalty", "punch") { req throws -> LoyaltyStatus in
-        try requireStaffPin(req)
+        try requireLogin(req)
         let body = try req.content.decode(PhoneRequest.self)
         return try LoyaltyStore.shared.addPunch(phone: body.phone)
     }
 
     app.post("api", "loyalty", "redeem") { req throws -> LoyaltyStatus in
-        try requireStaffPin(req)
+        try requireLogin(req)
         let body = try req.content.decode(PhoneRequest.self)
         return try LoyaltyStore.shared.redeem(phone: body.phone)
     }
 
     app.get("api", "loyalty", "customers") { req throws -> [LoyaltyCustomer] in
-        try requireStaffPin(req)
+        try requireLogin(req)
         return try LoyaltyStore.shared.allCustomers()
     }
 
     app.get("api", "loyalty", "bonus-requests") { req throws -> [BonusRequest] in
-        try requireStaffPin(req)
+        try requireLogin(req)
         return try LoyaltyStore.shared.allBonusRequests()
     }
 
     app.post("api", "loyalty", "bonus-requests", ":id", "review") { req throws -> BonusRequest in
-        try requireStaffPin(req)
+        try requireLogin(req)
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
         let body = try req.content.decode(BonusReviewRequest.self)
         return try LoyaltyStore.shared.reviewBonusRequest(id: id, approve: body.approve)
@@ -136,6 +130,21 @@ func routes(_ app: Application) throws {
     for (route, file) in cleanPages {
         app.get(PathComponent(stringLiteral: route)) { req in
             try await serveStatic(req, file: file)
+        }
+    }
+
+    let staffPages: [(String, String, Bool)] = [
+        ("edit.html", "staff/edit.html", false),
+        ("loyalty-admin.html", "staff/loyalty-admin.html", false),
+        ("events-admin.html", "staff/events-admin.html", true),
+        ("account.html", "staff/account.html", false),
+        ("change-password.html", "staff/change-password.html", false),
+        ("create-account.html", "staff/create-account.html", true),
+        ("manage-users.html", "staff/manage-users.html", true),
+    ]
+    for (route, file, adminOnly) in staffPages {
+        app.get(PathComponent(stringLiteral: route)) { req in
+            try await serveStaffPage(req, file: file, adminOnly: adminOnly)
         }
     }
 

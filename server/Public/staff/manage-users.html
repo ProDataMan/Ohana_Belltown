@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Manage Users — Ohana Belltown</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <p class="eyebrow">Ohana Belltown — Staff</p>
+        <h1>Manage Users</h1>
+        <p class="admin-link"><a href="/menu">&larr; Back to menu</a></p>
+        <div class="staff-tools-nav">
+          <a href="/edit.html">Menu Editor</a>
+          <a href="/loyalty-admin.html">Loyalty</a>
+          <a href="/events-admin.html">Events</a>
+          <a href="/table-card.html">Table Cards</a>
+          <a href="/account.html">My Account</a>
+          <a href="/manage-users.html" class="active">Manage Users</a>
+        </div>
+      </header>
+
+      <section class="panel">
+        <div class="editor-toolbar">
+          <h2>Staff Accounts</h2>
+          <div class="toolbar-actions">
+            <a class="cta-button secondary" href="/create-account.html">+ New Account</a>
+            <button id="reload-btn" type="button" class="secondary">Reload</button>
+          </div>
+        </div>
+        <div id="users-list"></div>
+      </section>
+    </main>
+
+    <script src="./staff-auth.js"></script>
+    <script src="./manage-users.js"></script>
+  </body>
+</html>

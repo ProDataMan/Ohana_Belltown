@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Create Account — Ohana Belltown</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="page" style="max-width: 480px;">
+      <header class="hero">
+        <p class="eyebrow">Ohana Belltown — Staff</p>
+        <h1>Create Account</h1>
+        <p class="admin-link"><a href="/manage-users.html">&larr; Back to manage users</a></p>
+      </header>
+
+      <section class="panel">
+        <form id="create-account-form">
+          <label>Full name
+            <input type="text" id="display-name-input" required />
+          </label>
+          <label>Username
+            <input type="text" id="username-input" required />
+          </label>
+          <label>Temporary password
+            <input type="text" id="password-input" required minlength="5" />
+          </label>
+          <p class="hint">The new employee will be required to change this password the first time they log in.</p>
+          <fieldset class="bonus-type-fieldset">
+            <legend>Role</legend>
+            <label><input type="radio" name="role" value="employee" checked /> Employee</label>
+            <label><input type="radio" name="role" value="admin" /> Admin</label>
+          </fieldset>
+          <button type="submit">Create Account</button>
+          <p id="create-account-status" class="status"></p>
+        </form>
+      </section>
+    </main>
+
+    <script src="./staff-auth.js"></script>
+    <script src="./create-account.js"></script>
+  </body>
+</html>

@@ -356,7 +356,7 @@ async function saveMenu() {
   setStatus(saveStatus, 'Saving...', false);
 
   try {
-    const response = await fetch('/api/menu', {
+    const response = await staffFetch('/api/menu', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),

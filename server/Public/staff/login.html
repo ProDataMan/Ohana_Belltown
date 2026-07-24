@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Staff Log In — Ohana Belltown</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="page" style="max-width: 420px;">
+      <header class="hero">
+        <p class="eyebrow">Ohana Belltown — Staff</p>
+        <h1>Log In</h1>
+      </header>
+
+      <section id="login-panel" class="panel">
+        <form id="login-form">
+          <label>Username
+            <input type="text" id="username-input" autocomplete="username" required />
+          </label>
+          <label>Password
+            <input type="password" id="password-input" autocomplete="current-password" required />
+          </label>
+          <button type="submit">Log In</button>
+          <p id="login-status" class="status"></p>
+        </form>
+      </section>
+
+      <section id="setup-panel" class="panel" hidden>
+        <h2>First-Time Setup</h2>
+        <p class="hint">No staff accounts exist yet. Create the first admin account below.</p>
+        <form id="setup-form">
+          <label>Your name
+            <input type="text" id="setup-name-input" required />
+          </label>
+          <label>Username
+            <input type="text" id="setup-username-input" required />
+          </label>
+          <label>Password
+            <input type="password" id="setup-password-input" autocomplete="new-password" required minlength="5" />
+          </label>
+          <button type="submit">Create Admin Account</button>
+          <p id="setup-status" class="status"></p>
+        </form>
+      </section>
+    </main>
+
+    <script src="./login.js"></script>
+  </body>
+</html>
