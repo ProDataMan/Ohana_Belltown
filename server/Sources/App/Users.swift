@@ -14,8 +14,46 @@ struct StaffUser: Codable {
     var appleId: String?
     var role: UserRole
     var mustChangePassword: Bool
+    var active: Bool
     var createdAt: String
     var updatedAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, username, displayName, passwordHash, googleId, appleId, role, mustChangePassword, active, createdAt, updatedAt
+    }
+
+    init(
+        id: String, username: String, displayName: String, passwordHash: String,
+        googleId: String?, appleId: String?, role: UserRole, mustChangePassword: Bool,
+        active: Bool = true, createdAt: String, updatedAt: String
+    ) {
+        self.id = id
+        self.username = username
+        self.displayName = displayName
+        self.passwordHash = passwordHash
+        self.googleId = googleId
+        self.appleId = appleId
+        self.role = role
+        self.mustChangePassword = mustChangePassword
+        self.active = active
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        username = try container.decode(String.self, forKey: .username)
+        displayName = try container.decode(String.self, forKey: .displayName)
+        passwordHash = try container.decode(String.self, forKey: .passwordHash)
+        googleId = try container.decodeIfPresent(String.self, forKey: .googleId)
+        appleId = try container.decodeIfPresent(String.self, forKey: .appleId)
+        role = try container.decode(UserRole.self, forKey: .role)
+        mustChangePassword = try container.decode(Bool.self, forKey: .mustChangePassword)
+        active = try container.decodeIfPresent(Bool.self, forKey: .active) ?? true
+        createdAt = try container.decode(String.self, forKey: .createdAt)
+        updatedAt = try container.decode(String.self, forKey: .updatedAt)
+    }
 }
 
 struct StaffUserPublic: Content {
@@ -26,6 +64,7 @@ struct StaffUserPublic: Content {
     var mustChangePassword: Bool
     var googleLinked: Bool
     var appleLinked: Bool
+    var active: Bool
 
     init(_ user: StaffUser) {
         id = user.id
@@ -35,26 +74,30 @@ struct StaffUserPublic: Content {
         mustChangePassword = user.mustChangePassword
         googleLinked = user.googleId != nil
         appleLinked = user.appleId != nil
+        active = user.active
     }
 }
 
 enum UserError: Error {
     case usernameTaken
     case invalidCredentials
+    case accountDeactivated
     case notFound
     case alreadyBootstrapped
     case wrongCurrentPassword
     case oauthNotLinked
     case oauthAlreadyLinkedElsewhere
+    case cannotDeactivateSelf
+    case cannotDeactivateLastAdmin
 }
 
 extension UserError: AbortError {
     var status: HTTPResponseStatus {
         switch self {
         case .usernameTaken, .oauthAlreadyLinkedElsewhere: return .conflict
-        case .invalidCredentials, .wrongCurrentPassword: return .unauthorized
+        case .invalidCredentials, .wrongCurrentPassword, .accountDeactivated: return .unauthorized
         case .notFound, .oauthNotLinked: return .notFound
-        case .alreadyBootstrapped: return .forbidden
+        case .alreadyBootstrapped, .cannotDeactivateSelf, .cannotDeactivateLastAdmin: return .forbidden
         }
     }
 
@@ -62,11 +105,14 @@ extension UserError: AbortError {
         switch self {
         case .usernameTaken: return "That username is already taken."
         case .invalidCredentials: return "Incorrect username or password."
+        case .accountDeactivated: return "This account has been deactivated."
         case .notFound: return "User not found."
         case .alreadyBootstrapped: return "Setup has already been completed."
         case .wrongCurrentPassword: return "Current password is incorrect."
         case .oauthNotLinked: return "No staff account is linked to that account yet. Log in with your username and password first, then link it from My Account."
         case .oauthAlreadyLinkedElsewhere: return "That account is already linked to a different staff login."
+        case .cannotDeactivateSelf: return "You can't deactivate your own account."
+        case .cannotDeactivateLastAdmin: return "Can't deactivate the last active admin."
         }
     }
 }
@@ -152,15 +198,24 @@ final class UserStore: @unchecked Sendable {
               try Bcrypt.verify(password, created: user.passwordHash) else {
             throw UserError.invalidCredentials
         }
+        guard user.active else {
+            throw UserError.accountDeactivated
+        }
         return user
     }
 
+    /// Returns the user only if their account is still active — used to back
+    /// session lookups, so a deactivation takes effect immediately even for an
+    /// already-open session.
     func find(id: String) throws -> StaffUser {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
         guard let user = users.first(where: { $0.id == id }) else {
             throw UserError.notFound
+        }
+        guard user.active else {
+            throw UserError.accountDeactivated
         }
         return user
     }
@@ -212,6 +267,9 @@ final class UserStore: @unchecked Sendable {
         guard let user = users.first(where: { provider.id(of: $0) == providerId }) else {
             throw UserError.oauthNotLinked
         }
+        guard user.active else {
+            throw UserError.accountDeactivated
+        }
         return user
     }
 
@@ -227,6 +285,43 @@ final class UserStore: @unchecked Sendable {
             throw UserError.notFound
         }
         provider.setId(providerId, on: &users[idx])
+        users[idx].updatedAt = now()
+        try persist()
+        return StaffUserPublic(users[idx])
+    }
+
+    @discardableResult
+    func deactivate(id: String, requestedBy: String) throws -> StaffUserPublic {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard let idx = users.firstIndex(where: { $0.id == id }) else {
+            throw UserError.notFound
+        }
+        guard users[idx].id != requestedBy else {
+            throw UserError.cannotDeactivateSelf
+        }
+        if users[idx].role == .admin {
+            let activeAdminCount = users.filter { $0.role == .admin && $0.active }.count
+            guard activeAdminCount > 1 else {
+                throw UserError.cannotDeactivateLastAdmin
+            }
+        }
+        users[idx].active = false
+        users[idx].updatedAt = now()
+        try persist()
+        return StaffUserPublic(users[idx])
+    }
+
+    @discardableResult
+    func reactivate(id: String) throws -> StaffUserPublic {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard let idx = users.firstIndex(where: { $0.id == id }) else {
+            throw UserError.notFound
+        }
+        users[idx].active = true
         users[idx].updatedAt = now()
         try persist()
         return StaffUserPublic(users[idx])

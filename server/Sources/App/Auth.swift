@@ -141,4 +141,16 @@ func registerAuthRoutes(_ app: Application) throws {
         let body = try req.content.decode(UpdateRoleRequest.self)
         return try UserStore.shared.updateRole(id: id, role: body.role)
     }
+
+    app.post("api", "users", ":id", "deactivate") { req throws -> StaffUserPublic in
+        let admin = try requireAdmin(req)
+        guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
+        return try UserStore.shared.deactivate(id: id, requestedBy: admin.id)
+    }
+
+    app.post("api", "users", ":id", "reactivate") { req throws -> StaffUserPublic in
+        try requireAdmin(req)
+        guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
+        return try UserStore.shared.reactivate(id: id)
+    }
 }
