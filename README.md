@@ -99,7 +99,8 @@ now historical background rather than the current plan.
 **Staff accounts**
 - Named username/password logins (bcrypt-hashed) with two roles: `admin` and `employee`
 - First-run bootstrap creates the first admin when zero accounts exist, then permanently disables itself
-- Admins manage the roster (`/manage-users.html`, `/create-account.html`): create accounts, change roles, force-reset a forgotten password
+- Admins manage the roster (`/manage-users.html`, `/create-account.html`): create accounts, change roles, force-reset a forgotten password, deactivate/reactivate an account
+- Deactivation takes effect immediately — even an already-open session gets logged out, not just blocked on the next login attempt. An admin can't deactivate their own account.
 - Anyone can change their own password (`/change-password.html`); new/reset accounts must change their password on next login
 - Real audit trail by design — actions are tied to a named account, not a shared PIN
 
@@ -148,7 +149,7 @@ actually shipped as of this README. Not in priority order.
 
 **Admin & operations**
 - Password reset is admin-only for staff (an admin resets it for you) — no self-service "forgot password" email flow for staff (customers have one; see the email caveat below for why it's not fully live yet)
-- Account deactivation/removal isn't built for staff or customer accounts — roles/passwords can be changed but accounts can't be disabled or deleted
+- Staff accounts can be deactivated/reactivated (see above), but not deleted outright. Customer accounts still can't be deactivated or deleted at all.
 - ChowNow menu photo import — investigated, blocked by Cloudflare bot protection on ChowNow's API; not pursued further (see git history for details)
 
 **Known deliberate tradeoffs (not bugs)**
