@@ -13,17 +13,21 @@ now historical background rather than the current plan.
 ## Live site
 
 - **Site:** https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io
-- **Staff menu editor:** `/edit.html` (no login — see [Known gaps](#known-gaps--not-yet-implemented))
-- **Staff loyalty admin:** `/loyalty-admin.html` (requires the staff PIN)
-- **Staff events admin:** `/events-admin.html` (requires the staff PIN)
+- **Staff login:** `/login`
+- **Staff menu editor:** `/edit.html` (any logged-in employee)
+- **Staff loyalty admin:** `/loyalty-admin.html` (any logged-in employee)
+- **Staff events admin:** `/events-admin.html` (admin only)
+- **Manage users:** `/manage-users.html` (admin only)
 - **Printable table QR cards:** `/table-card.html`
 
 ## Architecture
 
 - **Server:** Swift 6 / [Vapor](https://vapor.codes), single executable target (`server/Sources/App`)
 - **Persistence:** plain JSON files on an Azure Files–backed volume (no database) —
-  `menu.json`, `events.json`, `loyalty.json`, plus an `uploads/` directory for photos.
+  `menu.json`, `events.json`, `loyalty.json`, `users.json`, plus an `uploads/` directory for photos.
   Falls back to `Resources/seed-menu.json` on first boot if no persisted data exists yet.
+- **Auth:** Vapor's built-in `Bcrypt` (password hashing) and `SessionsMiddleware` (`.memory` driver —
+  sessions don't survive a restart, so a deploy logs everyone out; acceptable for a small internal team)
 - **Hosting:** Azure Container Apps (Consumption plan), resource group `Ohana`, app `ohana-belltown-server`
 - **Images:** [ghcr.io/prodataman/ohana-belltown-server](https://ghcr.io/prodataman/ohana-belltown-server) (GitHub Container Registry, public)
 - **CI/CD:** `.github/workflows/deploy-server.yml` — on push to `main`, builds and pushes the
@@ -38,7 +42,8 @@ now historical background rather than the current plan.
 | `PORT` | Server port (Container Apps sets this) |
 | `GOOGLE_PLACES_API_KEY` | Server-side only, proxies Google Business photos |
 | `GOOGLE_PLACE_ID` | Ohana Belltown's Google Place ID |
-| `STAFF_PIN` | Shared PIN gating loyalty/events **writes** (punch, redeem, approve, edit events). Not set in source — fails closed (500) if missing. |
+
+`STAFF_PIN` is no longer used — it was retired in favor of real per-user login (see below) and can be removed from the Container App if still set.
 
 ## Pages & routes
 
@@ -47,11 +52,15 @@ now historical background rather than the current plan.
 | `/`, `/about`, `/local`, `/contact`, `/catering` | Marketing pages |
 | `/menu`, `/sushi`, `/drinks`, `/happy-hour` | Menu sections (216 items total) — search box + allergen/dietary filter chips |
 | `/rewards` | Customer-facing sushi punch card: check a card by phone, submit a photo/social bonus claim |
-| `/edit.html` | Staff menu editor — prices, descriptions, photos, tags, featured/sold-out toggles. **No login.** |
-| `/loyalty-admin.html` | Staff: punch a card, redeem a reward, approve/deny bonus claims. **PIN-gated.** |
-| `/events-admin.html` | Staff: edit the events/specials shown on `/local`. **PIN-gated.** |
+| `/login` | Staff login. First run (zero accounts) shows a one-time "create the first admin" form instead. |
+| `/account.html` | Self-service: view own profile, log out |
+| `/change-password.html` | Self-service password change (requires current password) |
+| `/edit.html` | Staff menu editor — prices, descriptions, photos, tags, featured/sold-out toggles. **Any logged-in employee.** |
+| `/loyalty-admin.html` | Staff: punch a card, redeem a reward, approve/deny bonus claims. **Any logged-in employee.** |
+| `/events-admin.html` | Staff: edit the events/specials shown on `/local`. **Admin only.** |
+| `/create-account.html`, `/manage-users.html` | Admin: create staff accounts, change roles, reset passwords. **Admin only.** |
 | `/table-card.html` | Printable QR-code table tents linking to `/menu` |
-| `/api/menu`, `/api/events`, `/api/loyalty/*` | JSON API backing all of the above |
+| `/api/menu`, `/api/events`, `/api/loyalty/*`, `/api/auth/*`, `/api/users/*`, `/api/account/*` | JSON API backing all of the above |
 
 ## What's shipped
 
@@ -67,7 +76,7 @@ now historical background rather than the current plan.
 - Photo lightbox + per-item detail modal with a photo gallery (multiple photos per item, rotates in Google Places photos where matched)
 - Daily specials / featured-item toggle, surfaced on the homepage
 - Per-item sold-out ("86'd") toggle — item stays visible on the public menu, grayed out with a "Sold Out Today" badge, instead of disappearing or requiring deletion
-- Staff editor (`/edit.html`) — prices, descriptions, multi-photo galleries (manual upload or pick from Google Places), tags, featured toggle, sold-out toggle. Saves directly to the live site, no login.
+- Staff editor (`/edit.html`) — prices, descriptions, multi-photo galleries (manual upload or pick from Google Places), tags, featured toggle, sold-out toggle. Requires login (any employee); saves directly to the live site.
 
 **Loyalty & engagement**
 - Digital sushi punch card (`/rewards` + `/loyalty-admin.html`) — phone-number identity, 1 punch per sushi order,
@@ -76,6 +85,13 @@ now historical background rather than the current plan.
 - Printable QR-code table tents linking straight to `/menu`
 - Google/Yelp review buttons link directly to Ohana's actual listings (not a generic search)
 - Call/text-to-reserve CTA on the homepage and Contact page (deliberately not a paid platform like OpenTable/Resy — see [Known gaps](#known-gaps--not-yet-implemented))
+
+**Staff accounts**
+- Named username/password logins (bcrypt-hashed) with two roles: `admin` and `employee`
+- First-run bootstrap creates the first admin when zero accounts exist, then permanently disables itself
+- Admins manage the roster (`/manage-users.html`, `/create-account.html`): create accounts, change roles, force-reset a forgotten password
+- Anyone can change their own password (`/change-password.html`); new/reset accounts must change their password on next login
+- Real audit trail by design — actions are tied to a named account, not a shared PIN
 
 **SEO & technical**
 - Per-page Open Graph / Twitter Card tags
@@ -100,7 +116,7 @@ actually shipped as of this README. Not in priority order.
 
 **Engagement & retention**
 - Email/SMS signup for specials
-- User accounts / order history / "reorder your last meal" (no auth system — the punch card uses phone number only, not a full account)
+- Customer accounts (in progress — see below), order history, "reorder your last meal" (the punch card still uses phone number only, not an account)
 - Native delivery radius checking (delivery relies entirely on ChowNow's partners)
 
 **Technical**
@@ -111,15 +127,24 @@ actually shipped as of this README. Not in priority order.
 - Automated test suite (no `AppTests` target currently — testing has been manual via curl + local `swift run`)
 
 **Admin & operations**
-- Multi-staff login accounts — `/edit.html` still has no auth at all (deliberate tradeoff, see below);
-  `/loyalty-admin.html` and `/events-admin.html` use one shared PIN, not named per-staff logins
+- Password reset is admin-only (an admin resets it for you) — no self-service "forgot password" email flow for staff yet, since that needs the same email infrastructure as customer accounts below
+- Account deactivation/removal isn't built — an admin can change someone's role but not disable/delete an account
 - ChowNow menu photo import — investigated, blocked by Cloudflare bot protection on ChowNow's API; not pursued further (see git history for details)
 
 **Known deliberate tradeoffs (not bugs)**
-- `/edit.html` (menu editing) has no authentication by design — anyone with the link can edit menu prices/content.
-  Loyalty and events writes got a lightweight shared-PIN gate instead, since those control real free-food payouts.
+- Sessions use Vapor's in-memory driver — a deploy or restart logs everyone out. Fine for a ~9-person team; would need a persistent session store (e.g. file- or Redis-backed) to survive restarts.
+- Every new/reset staff account gets a caller-chosen temporary password and must change it on next login — there's no forced password-strength policy beyond that.
 - Bonus punch claims (photo/social shares) are staff-reviewed, not auto-verified — there's no reliable API to check a social tag automatically.
 - Google Places photos are capped at 10 per API call (a hard Google limit, not a bug) and matched to menu items manually.
+
+## Customer accounts (in progress)
+
+Basic email+password customer accounts are being added on top of the staff
+login system above (separate `CustomerUser` model — customers don't get
+`admin`/`employee` roles). This needs an email service to send verification
+and password-reset links, which the project didn't have before. Status:
+finding the right provider — see git history for the current placeholder
+approach in the meantime.
 
 ## Local development
 
@@ -135,8 +160,11 @@ DATA_DIR=./Data swift run App
 ```
 
 Then open `http://localhost:8080`. Without `GOOGLE_PLACES_API_KEY`/`GOOGLE_PLACE_ID`
-set, the Google Photos carousel and picker will just come back empty. Without
-`STAFF_PIN` set, loyalty/events write endpoints return 500 (fails closed, not open).
+set, the Google Photos carousel and picker will just come back empty.
+
+Visiting `/login` on a fresh `DATA_DIR` (no `users.json` yet) shows a one-time
+setup form instead of the login form — use it to create your first local admin
+account, since staff pages all require login now.
 
 ## Other docs in this repo
 
