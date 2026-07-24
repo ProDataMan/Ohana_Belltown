@@ -63,7 +63,7 @@ function categoryBlock(section, name, note, items) {
   (items || []).forEach((item) => itemsContainer.appendChild(itemRow(item)));
 
   section_.querySelector('.add-item').addEventListener('click', () => {
-    itemsContainer.appendChild(itemRow({ name: '', description: '', price: null, images: [], tags: [], featured: false }));
+    itemsContainer.appendChild(itemRow({ name: '', description: '', price: null, images: [], tags: [], featured: false, available: true }));
   });
 
   section_.querySelector('.remove-category').addEventListener('click', () => {
@@ -103,6 +103,10 @@ function itemRow(item) {
       <label class="featured-toggle">
         <input type="checkbox" class="item-featured" ${item.featured ? 'checked' : ''} />
         &#9733; Today's special (shows on homepage)
+      </label>
+      <label class="featured-toggle sold-out-toggle">
+        <input type="checkbox" class="item-sold-out" ${item.available === false ? 'checked' : ''} />
+        86'd / sold out today
       </label>
       <details class="tags-details">
         <summary>Dietary &amp; allergen tags${(item.tags || []).length ? ` (${item.tags.length} set)` : ''}</summary>
@@ -313,8 +317,9 @@ function collectMenuData() {
       const price = priceRaw === '' ? null : Number.parseFloat(priceRaw);
       const images = getRowImages(row);
       const featured = row.querySelector('.item-featured').checked;
+      const available = !row.querySelector('.item-sold-out').checked;
       const tags = Array.from(row.querySelectorAll('.item-tag:checked')).map((cb) => cb.value);
-      items.push({ name: itemName, description, price, images, tags, featured });
+      items.push({ name: itemName, description, price, images, tags, featured, available });
     }
 
     categories.push({ section, name, note, items });

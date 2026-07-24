@@ -1066,6 +1066,31 @@ select {
   display: none;
 }
 
+.sold-out-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: var(--ink-soft);
+  color: #fff;
+  margin-bottom: 0.35rem;
+  margin-right: 0.35rem;
+  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+}
+
+.item-modal-sold-out[hidden] {
+  display: none;
+}
+
+.item.item-sold-out {
+  opacity: 0.55;
+}
+
+.item.item-sold-out .item-photo {
+  filter: grayscale(0.6);
+}
+
 /* ---- Places photo carousel ---- */
 
 .places-photos {

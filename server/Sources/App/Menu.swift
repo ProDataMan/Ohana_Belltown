@@ -7,9 +7,10 @@ struct MenuItem: Codable, Content {
     var images: [String]
     var tags: [String]
     var featured: Bool
+    var available: Bool
 
     enum CodingKeys: String, CodingKey {
-        case name, description, price, images, image, tags, featured
+        case name, description, price, images, image, tags, featured, available
     }
 
     init(
@@ -18,7 +19,8 @@ struct MenuItem: Codable, Content {
         price: Double? = nil,
         images: [String] = [],
         tags: [String] = [],
-        featured: Bool = false
+        featured: Bool = false,
+        available: Bool = true
     ) {
         self.name = name
         self.description = description
@@ -26,6 +28,7 @@ struct MenuItem: Codable, Content {
         self.images = images
         self.tags = tags
         self.featured = featured
+        self.available = available
     }
 
     init(from decoder: Decoder) throws {
@@ -42,6 +45,7 @@ struct MenuItem: Codable, Content {
         }
         tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
         featured = try container.decodeIfPresent(Bool.self, forKey: .featured) ?? false
+        available = try container.decodeIfPresent(Bool.self, forKey: .available) ?? true
     }
 
     func encode(to encoder: Encoder) throws {
@@ -52,6 +56,7 @@ struct MenuItem: Codable, Content {
         try container.encode(images, forKey: .images)
         try container.encode(tags, forKey: .tags)
         try container.encode(featured, forKey: .featured)
+        try container.encode(available, forKey: .available)
     }
 }
 

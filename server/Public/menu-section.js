@@ -175,11 +175,13 @@ function renderMenu(data) {
             ? `<div class="item-tags">${tags.map((t) => `<span class="item-tag-badge">${escapeHtml(TAG_LABELS[t] || t)}</span>`).join('')}</div>`
             : '';
           const specialBadge = item.featured ? '<span class="special-badge">&#9733; Today\'s Special</span>' : '';
+          const soldOut = item.available === false;
+          const soldOutBadge = soldOut ? '<span class="sold-out-badge">Sold Out Today</span>' : '';
           return `
-            <article class="item" data-search="${escapeHtml(searchText)}" data-index="${index}" data-tags="${escapeHtml(tags.join(','))}">
+            <article class="item${soldOut ? ' item-sold-out' : ''}" data-search="${escapeHtml(searchText)}" data-index="${index}" data-tags="${escapeHtml(tags.join(','))}">
               ${imageMarkup}
               <div class="item-body">
-                ${specialBadge}
+                ${soldOutBadge}${specialBadge}
                 <h3>${escapeHtml(item.name)}</h3>
                 ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ''}
                 ${tagsMarkup}
@@ -217,6 +219,7 @@ function ensureItemModal() {
       <button type="button" class="item-modal-close" aria-label="Close">&times;</button>
       <div class="item-modal-gallery" hidden></div>
       <p class="item-modal-category"></p>
+      <span class="sold-out-badge item-modal-sold-out" hidden>Sold Out Today</span>
       <h3 class="item-modal-name"></h3>
       <div class="item-modal-price"></div>
       <p class="item-modal-desc"></p>
@@ -269,6 +272,7 @@ async function openItemModal(index) {
   const modal = ensureItemModal();
 
   modal.querySelector('.item-modal-category').textContent = categoryName;
+  modal.querySelector('.item-modal-sold-out').hidden = item.available !== false;
   modal.querySelector('.item-modal-name').textContent = item.name;
   modal.querySelector('.item-modal-desc').textContent = item.description || '';
 

@@ -20,7 +20,7 @@ async function loadSpecials() {
     const featured = [];
     (data.categories || []).forEach((category) => {
       (category.items || []).forEach((item) => {
-        if (item.featured) featured.push(item);
+        if (item.featured && item.available !== false) featured.push(item);
       });
     });
 
