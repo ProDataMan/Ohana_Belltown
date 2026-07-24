@@ -27,7 +27,9 @@ now historical background rather than the current plan.
   `menu.json`, `events.json`, `loyalty.json`, `users.json`, plus an `uploads/` directory for photos.
   Falls back to `Resources/seed-menu.json` on first boot if no persisted data exists yet.
 - **Auth:** Vapor's built-in `Bcrypt` (password hashing) and `SessionsMiddleware` (`.memory` driver —
-  sessions don't survive a restart, so a deploy logs everyone out; acceptable for a small internal team)
+  sessions don't survive a restart, so a deploy logs everyone out; acceptable for a small internal team).
+  Google/Apple OAuth on top of that (see [Setting up Google/Apple Sign-In](#setting-up-googleapple-sign-in)),
+  using `swift-crypto`'s `P256.Signing` directly for Apple's required client-secret JWT signing.
 - **Hosting:** Azure Container Apps (Consumption plan), resource group `Ohana`, app `ohana-belltown-server`
 - **Images:** [ghcr.io/prodataman/ohana-belltown-server](https://ghcr.io/prodataman/ohana-belltown-server) (GitHub Container Registry, public)
 - **CI/CD:** `.github/workflows/deploy-server.yml` — on push to `main`, builds and pushes the
@@ -42,6 +44,9 @@ now historical background rather than the current plan.
 | `PORT` | Server port (Container Apps sets this) |
 | `GOOGLE_PLACES_API_KEY` | Server-side only, proxies Google Business photos |
 | `GOOGLE_PLACE_ID` | Ohana Belltown's Google Place ID |
+| `PUBLIC_BASE_URL` | The site's own public HTTPS origin, used to build OAuth redirect URIs. Defaults to the production URL above if unset — only needs overriding for local dev (`http://localhost:8080`). |
+| `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` | Google Sign-In. Not set yet — see [Setting up Google/Apple Sign-In](#setting-up-googleapple-sign-in). |
+| `APPLE_OAUTH_CLIENT_ID`, `APPLE_OAUTH_TEAM_ID`, `APPLE_OAUTH_KEY_ID`, `APPLE_OAUTH_PRIVATE_KEY` | Sign in with Apple. Not set yet — needs a paid Apple Developer Program enrollment first. See below. |
 
 `STAFF_PIN` is no longer used — it was retired in favor of real per-user login (see below) and can be removed from the Container App if still set.
 
@@ -51,6 +56,7 @@ now historical background rather than the current plan.
 |---|---|
 | `/`, `/about`, `/local`, `/contact`, `/catering` | Marketing pages |
 | `/menu`, `/sushi`, `/drinks`, `/happy-hour` | Menu sections (216 items total) — search box + allergen/dietary filter chips |
+| `/specials` | Stable landing page (today's specials, Happy Hour hours, drinks teaser) for linking from social media/bio links |
 | `/rewards` | Customer-facing sushi punch card: check a card by phone, submit a photo/social bonus claim |
 | `/login` | Staff login. First run (zero accounts) shows a one-time "create the first admin" form instead. |
 | `/account.html` | Self-service: view own profile, log out |
@@ -88,6 +94,7 @@ now historical background rather than the current plan.
 - Printable QR-code table tents linking straight to `/menu`
 - Google/Yelp review buttons link directly to Ohana's actual listings (not a generic search)
 - Call/text-to-reserve CTA on the homepage and Contact page (deliberately not a paid platform like OpenTable/Resy — see [Known gaps](#known-gaps--not-yet-implemented))
+- `/specials` — a stable page for social bio links / post links, so a marketing link doesn't have to point at the homepage or bounce between three different pages
 
 **Staff accounts**
 - Named username/password logins (bcrypt-hashed) with two roles: `admin` and `employee`
@@ -100,6 +107,11 @@ now historical background rather than the current plan.
 - Separate from staff accounts — email/password identity only, no `admin`/`employee` role, no order history yet
 - Self-service registration (`/signup`), login (`/account-login`), password change and reset (`/forgot-password.html` → `/reset-password.html`, 1-hour expiring token)
 - Email verification link on signup — **not actually delivered yet** (see gaps below), logged server-side instead
+
+**OAuth sign-in (Google + Apple)**
+- Customers: "Continue with Google/Apple" on `/signup` and `/account-login` — self-serve, first sign-in creates an account (or links to an existing email/password account with a matching verified email)
+- Staff: link-only, not self-serve — an employee must already have a username/password account, log in, then link Google/Apple from `/account.html`. Only after linking does "Sign in with Google/Apple" work on `/login`. (Prevents anyone with a Google account from getting staff access.)
+- **Neither provider is actually configured yet** — see [Setting up Google/Apple Sign-In](#setting-up-googleapple-sign-in). The buttons are live in the UI but return a clear 503 until real credentials are set.
 
 **SEO & technical**
 - Per-page Open Graph / Twitter Card tags
@@ -145,6 +157,30 @@ actually shipped as of this README. Not in priority order.
 - Every new/reset staff account gets a caller-chosen temporary password and must change it on next login — there's no forced password-strength policy beyond that.
 - Bonus punch claims (photo/social shares) are staff-reviewed, not auto-verified — there's no reliable API to check a social tag automatically.
 - Google Places photos are capped at 10 per API call (a hard Google limit, not a bug) and matched to menu items manually.
+- Sign in with Apple needs a client-secret JWT that's re-signed on every token exchange (Apple doesn't accept a static secret like Google does) — implemented with `swift-crypto`'s `P256.Signing` rather than pulling in a full JWT library, since that's the only cryptographic operation needed.
+
+## Setting up Google/Apple Sign-In
+
+Both are built and live in the UI (buttons on `/signup`, `/account-login`,
+`/login`, `/account.html`) but return a `503` until real credentials are set
+as Container App secrets/env vars.
+
+**Google** (free, ~10 minutes):
+1. In [Google Cloud Console](https://console.cloud.google.com/), create (or reuse) a project → **APIs & Services → Credentials**.
+2. Configure the OAuth consent screen if you haven't already (External, basic app info — no verification needed for a small user base).
+3. Create an **OAuth client ID** of type "Web application."
+4. Add these to **Authorized redirect URIs**:
+   - `https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/auth/google/customer/callback`
+   - `https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/auth/google/staff/callback`
+   - (optionally) `http://localhost:8080/auth/google/customer/callback` and `.../staff/callback` for local dev
+5. Set `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` on the Container App.
+
+**Apple** (has a real cost — $99/year Apple Developer Program):
+1. Enroll at [developer.apple.com/programs](https://developer.apple.com/programs/) if you haven't already.
+2. **Certificates, IDs & Profiles → Identifiers**: register an App ID (if you don't have one) with "Sign in with Apple" enabled, then register a **Services ID** (e.g. `com.ohanabelltown.web`) — this is your `APPLE_OAUTH_CLIENT_ID`. Configure it with the same redirect URIs as the Google step above (`/auth/apple/customer/callback`, `/auth/apple/staff/callback`), and register the site domain.
+3. **Keys**: create a new key with "Sign in with Apple" enabled, associated with that Services ID. Download the `.p8` file **immediately** — Apple only lets you download it once. Note the Key ID shown on screen.
+4. You'll also need your **Team ID** (top-right of the developer portal, or Membership page).
+5. Set on the Container App: `APPLE_OAUTH_CLIENT_ID` (the Services ID), `APPLE_OAUTH_TEAM_ID`, `APPLE_OAUTH_KEY_ID`, and `APPLE_OAUTH_PRIVATE_KEY` (the full contents of the `.p8` file, including the `-----BEGIN/END PRIVATE KEY-----` lines).
 
 ## Local development
 
