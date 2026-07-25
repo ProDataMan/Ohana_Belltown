@@ -126,6 +126,7 @@ now historical background rather than the current plan.
 - `sitemap.xml` and `robots.txt`
 - Cache-Control revalidation on every response (avoids stale-cache bugs after a deploy)
 - Automated test suite (`server/Tests/AppTests`, 42 tests) — loyalty punch/redeem math, staff and customer auth (including deactivation and OAuth linking), menu backward-compat decoding, and route-level permission boundaries. Run with `swift test` from `server/`.
+- Self-hosted analytics (`/analytics.html`, admin only) — pageview counts by page and by day, no cookies or third-party tracking script. Server-side only, bounded to 120 days of aggregated (not raw per-visit) data.
 - Uploaded photos (menu editor, customer bonus-claim photos) are auto-resized (1600px long-edge cap) and re-compressed via ImageMagick, run off the event loop so it doesn't stall other requests. Fails closed — if optimization fails for any reason, the original upload is kept as-is rather than blocking the upload.
 
 ## Known gaps / not yet implemented
@@ -148,7 +149,6 @@ actually shipped as of this README. Not in priority order.
 - Native delivery radius checking (delivery relies entirely on ChowNow's partners)
 
 **Technical**
-- Analytics (no Plausible/GA4 or equivalent)
 - Uptime/error monitoring/alerting
 - Formal Lighthouse performance pass
 
