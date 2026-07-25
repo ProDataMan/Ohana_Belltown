@@ -148,11 +148,18 @@ func routes(_ app: Application) throws {
         ("change-password.html", "staff/change-password.html", false),
         ("create-account.html", "staff/create-account.html", true),
         ("manage-users.html", "staff/manage-users.html", true),
+        ("analytics.html", "staff/analytics.html", true),
     ]
     for (route, file, adminOnly) in staffPages {
         app.get(PathComponent(stringLiteral: route)) { req in
             try await serveStaffPage(req, file: file, adminOnly: adminOnly)
         }
+    }
+
+    app.get("api", "analytics", "summary") { req throws -> AnalyticsSummary in
+        try requireAdmin(req)
+        let days = req.query[Int.self, at: "days"] ?? 30
+        return try AnalyticsStore.shared.summary(days: days)
     }
 
     let legacyRedirects: [(String, String)] = [

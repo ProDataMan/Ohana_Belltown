@@ -5,6 +5,7 @@ func configure(_ app: Application) throws {
     app.http.server.configuration.port = Environment.get("PORT").flatMap(Int.init) ?? 8080
 
     app.middleware.use(NoCacheMiddleware())
+    app.middleware.use(AnalyticsMiddleware())
     app.sessions.use(.memory)
     app.middleware.use(app.sessions.middleware)
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory, defaultFile: "index.html"))
@@ -17,6 +18,7 @@ func configure(_ app: Application) throws {
     LoyaltyStore.shared.configure(dataDirectory: dataDirectory)
     UserStore.shared.configure(dataDirectory: dataDirectory)
     CustomerUserStore.shared.configure(dataDirectory: dataDirectory)
+    AnalyticsStore.shared.configure(dataDirectory: dataDirectory)
 
     app.routes.defaultMaxBodySize = "10mb"
 
