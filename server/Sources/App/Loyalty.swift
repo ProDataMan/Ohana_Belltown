@@ -68,6 +68,7 @@ final class LoyaltyStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         fileURL = URL(fileURLWithPath: dataDirectory).appendingPathComponent("loyalty.json")
+        loaded = false
     }
 
     static func normalizePhone(_ raw: String) -> String {

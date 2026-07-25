@@ -32,6 +32,7 @@ final class EventsStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         fileURL = URL(fileURLWithPath: dataDirectory).appendingPathComponent("events.json")
+        loaded = false
     }
 
     func get() throws -> EventsList {

@@ -35,7 +35,7 @@ struct CustomerUserPublic: Content {
     }
 }
 
-enum CustomerUserError: Error {
+enum CustomerUserError: Error, Equatable {
     case emailTaken
     case invalidCredentials
     case noPasswordSet
@@ -78,6 +78,7 @@ final class CustomerUserStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         fileURL = URL(fileURLWithPath: dataDirectory).appendingPathComponent("customers.json")
+        loaded = false
     }
 
     private func now() -> Date { Date() }

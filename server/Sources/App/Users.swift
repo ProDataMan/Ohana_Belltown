@@ -78,7 +78,7 @@ struct StaffUserPublic: Content {
     }
 }
 
-enum UserError: Error {
+enum UserError: Error, Equatable {
     case usernameTaken
     case invalidCredentials
     case accountDeactivated
@@ -129,6 +129,7 @@ final class UserStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         fileURL = URL(fileURLWithPath: dataDirectory).appendingPathComponent("users.json")
+        loaded = false
     }
 
     private func now() -> String {
