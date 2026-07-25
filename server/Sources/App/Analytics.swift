@@ -1,5 +1,6 @@
 import Vapor
 
+/// Aggregated per-day, per-path view counts (not raw per-visit events).
 struct DailyPageviews: Codable {
     var date: String
     var counts: [String: Int]
