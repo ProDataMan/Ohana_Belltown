@@ -126,6 +126,7 @@ now historical background rather than the current plan.
 - schema.org `Restaurant` JSON-LD on the homepage
 - `sitemap.xml` and `robots.txt`
 - Cache-Control revalidation on every response (avoids stale-cache bugs after a deploy)
+- Accessibility pass — fixed real WCAG AA contrast failures (brand pink/gold read ~3:1 as text on light backgrounds; added darker `--pink-text`/`--gold-text` variants used only for text, keeping the brighter originals for backgrounds/borders), a focus state that was fully removed without a visible replacement, and a heading-hierarchy skip on the Contact page. Alt text was already solid site-wide.
 - Automated test suite (`server/Tests/AppTests`, 42 tests) — loyalty punch/redeem math, staff and customer auth (including deactivation and OAuth linking), menu backward-compat decoding, and route-level permission boundaries. Run with `swift test` from `server/`.
 - Self-hosted analytics (`/analytics.html`, admin only) — pageview counts by page and by day, no cookies or third-party tracking script. Server-side only, bounded to 120 days of aggregated (not raw per-visit) data.
 - Uploaded photos (menu editor, customer bonus-claim photos) are auto-resized (1600px long-edge cap) and re-compressed via ImageMagick, run off the event loop so it doesn't stall other requests. Fails closed — if optimization fails for any reason, the original upload is kept as-is rather than blocking the upload.
@@ -136,7 +137,6 @@ Pulled from `docs/feature-roadmap.md`'s original audit, updated for what's
 actually shipped as of this README. Not in priority order.
 
 **Trust & findability**
-- Accessibility pass — alt text coverage, focus states, and contrast haven't been formally audited
 - Reviews are linked, not embedded (no live Google/Yelp rating widget on-site)
 
 **Discovery & conversion**
@@ -150,7 +150,7 @@ actually shipped as of this README. Not in priority order.
 
 **Technical**
 - Uptime/error monitoring/alerting
-- Formal Lighthouse performance pass
+- Formal Lighthouse performance pass — no Node.js in this dev environment to run the actual CLI. Manually reviewed the usual Lighthouse-audited factors (image sizing/lazy-loading, render-blocking resources, cache headers) and found nothing actionable beyond what's already in place; a real run would still be worth doing from a machine with Node/Chrome.
 
 **Admin & operations**
 - Password reset is admin-only for staff (an admin resets it for you) — no self-service "forgot password" email flow for staff (customers have one; see the email caveat below for why it's not fully live yet)
