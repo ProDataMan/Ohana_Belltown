@@ -113,6 +113,7 @@ now historical background rather than the current plan.
 - Separate from staff accounts — email/password identity only, no `admin`/`employee` role, no order history yet
 - Self-service registration (`/signup`), login (`/account-login`), password change and reset (`/forgot-password.html` → `/reset-password.html`, 1-hour expiring token)
 - Email verification link on signup — **not actually delivered yet** (see gaps below), logged server-side instead
+- Self-service account deactivation (`/my-account.html`) — immediately ends the session and blocks future login (password or OAuth)
 
 **OAuth sign-in (Google + Apple)**
 - Customers: "Continue with Google/Apple" on `/signup` and `/account-login` — self-serve, first sign-in creates an account (or links to an existing email/password account with a matching verified email)
@@ -153,7 +154,7 @@ actually shipped as of this README. Not in priority order.
 
 **Admin & operations**
 - Password reset is admin-only for staff (an admin resets it for you) — no self-service "forgot password" email flow for staff (customers have one; see the email caveat below for why it's not fully live yet)
-- Staff accounts can be deactivated/reactivated (see above), but not deleted outright. Customer accounts still can't be deactivated or deleted at all.
+- Staff accounts can be deactivated/reactivated (see above), but not deleted outright. Customers can self-deactivate their own account (`/my-account.html`), but reactivation isn't self-service (contact the restaurant) — and there's still no staff-facing UI to manage/browse customer accounts.
 - ChowNow menu photo import — investigated, blocked by Cloudflare bot protection on ChowNow's API; not pursued further (see git history for details)
 
 **Known deliberate tradeoffs (not bugs)**
