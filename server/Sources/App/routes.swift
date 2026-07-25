@@ -32,7 +32,7 @@ func routes(_ app: Application) throws {
         return try MenuStore.shared.save(incoming)
     }
 
-    app.on(.POST, "api", "upload", body: .collect(maxSize: "8mb")) { req throws -> UploadResponse in
+    app.on(.POST, "api", "upload", body: .collect(maxSize: "8mb")) { req async throws -> UploadResponse in
         let upload = try req.content.decode(ImageUpload.self)
         let allowedExtensions = ["jpg", "jpeg", "png", "webp", "gif"]
         let ext = (upload.image.extension ?? "").lowercased()
@@ -46,7 +46,11 @@ func routes(_ app: Application) throws {
             throw Abort(.badRequest)
         }
         let filename = UUID().uuidString + "." + ext
-        try data.write(to: URL(fileURLWithPath: Uploads.directory + filename))
+        let path = Uploads.directory + filename
+        try data.write(to: URL(fileURLWithPath: path))
+        if ImageOptimizer.optimizableExtensions.contains(ext) {
+            try await ImageOptimizer.optimize(at: path, on: req.application)
+        }
         return UploadResponse(url: "/uploads/\(filename)")
     }
 

@@ -11,6 +11,9 @@ RUN swift build -c release --product App
 FROM swift:6.0-jammy-slim
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends imagemagick \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /build/.build/release/App ./App
 COPY Public ./Public
 COPY Resources ./Resources
