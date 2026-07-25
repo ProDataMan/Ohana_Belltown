@@ -1,25 +1,34 @@
+@import url('https://fonts.googleapis.com/css2?family=Bungee&family=Nunito+Sans:wght@400;600;700;800;900&display=swap');
+
 :root {
-  --pink: #ff2f8f;
-  --violet: #8b5cf6;
+  --pink: #ff2f7a;
+  --ocean: #0f6d6e;
+  --ocean-bright: #1c9d9e;
+  --palm: #2a6b4a;
   --gold: #d9860f;
   --gold-bright: #f2a93c;
-  --ink: #120e18;
+  --ink: #14101c;
   --ink-soft: #4a3f56;
-  --paper: #faf6f3;
+  --paper: #fbf6ee;
   --panel: #ffffff;
-  --panel-border: #ece1e6;
+  --panel-border: #ece1d3;
   --text: #241b2e;
   --text-muted: #6b5f75;
-  --gradient-brand: linear-gradient(92deg, var(--pink), var(--violet));
+  --gradient-brand: linear-gradient(92deg, var(--pink), var(--ocean-bright));
   /* Darkened variants of --pink/--gold for use as text on light backgrounds —
      the brand colors above read at ~3:1 against white/paper, which fails
      WCAG AA for text (4.5:1). Keep using --pink/--gold for backgrounds,
-     gradients, and borders, where this contrast concern doesn't apply. */
-  --pink-text: #dc0066;
+     gradients, and borders, where this contrast concern doesn't apply.
+     --ocean and --palm already clear 4.5:1 as-is, so they need no separate
+     text variant. */
+  --pink-text: #e20051;
   --gold-text: #a0630b;
 
+  --font-display: 'Bungee', -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  --font-ui: 'Nunito Sans', -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+
   color-scheme: light;
-  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font-family: var(--font-ui);
   line-height: 1.6;
   font-weight: 400;
   color: var(--text);
@@ -36,13 +45,22 @@ body {
   color: var(--text);
 }
 
-h1, h2, h3, h4,
-.brand-name, .footer-brand,
+h2, h3, h4,
+.footer-brand,
 button, .cta-button, .nav-order-btn,
 .site-nav > a, .nav-dropdown-toggle,
 .category-name, .item-name,
 .eyebrow, .section-heading, .badge-like {
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
+}
+
+h1, .brand-name {
+  font-family: var(--font-display);
+}
+
+.brand-name {
+  font-weight: 400;
+  letter-spacing: 0.01em;
 }
 
 .page {
@@ -66,9 +84,10 @@ button, .cta-button, .nav-order-btn,
 
 h1 {
   margin: 0 0 0.5rem;
-  font-size: clamp(2rem, 4vw, 2.75rem);
-  font-weight: 800;
-  letter-spacing: -0.01em;
+  font-size: clamp(1.85rem, 4vw, 2.6rem);
+  font-weight: 400;
+  letter-spacing: 0.005em;
+  line-height: 1.15;
 }
 
 .hero p {
@@ -142,7 +161,7 @@ h1 {
   font-weight: 800;
   white-space: nowrap;
   color: var(--gold-text);
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
 }
 
 .error {
@@ -171,7 +190,7 @@ h1 {
   color: var(--pink-text);
   font-weight: 600;
   text-decoration: none;
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
 }
 
 .admin-link a:hover {
@@ -193,7 +212,7 @@ h1 {
   text-decoration: none;
   font-size: 0.85rem;
   font-weight: 600;
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
 }
 
 .staff-tools-nav a:hover,
@@ -297,7 +316,7 @@ button.secondary:hover {
   font-weight: 600;
   font-size: 0.9rem;
   text-decoration: none;
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
   transition: filter 0.15s ease;
 }
 
@@ -453,7 +472,7 @@ button.secondary:hover {
   border: 1px solid #d9cdd3;
   border-radius: 8px;
   font-size: 0.9rem;
-  font-family: Georgia, serif;
+  font-family: var(--font-ui);
 }
 
 .edit-item-photo {
@@ -534,7 +553,7 @@ button.secondary:hover {
   border: 1px solid var(--pink);
   border-radius: 8px;
   font-weight: 600;
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
 }
 
 .photo-upload-btn:hover,
@@ -596,7 +615,7 @@ button.secondary:hover {
   gap: 0.4rem;
   font-size: 0.85rem;
   color: var(--text-muted);
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
 }
 
 .tags-details summary {
@@ -604,7 +623,7 @@ button.secondary:hover {
   font-size: 0.85rem;
   color: var(--pink-text);
   font-weight: 600;
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
 }
 
 .tags-grid {
@@ -628,7 +647,7 @@ select {
   border-radius: 8px;
   font-size: 0.9rem;
   background: #fff;
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
 }
 
 .section-heading {
@@ -652,7 +671,7 @@ select {
   font-size: 0.85rem;
   margin-bottom: 0.75rem;
   color: var(--text-muted);
-  font-family: Georgia, serif;
+  font-family: var(--font-ui);
 }
 
 .edit-item-row-top .item-price {
@@ -883,10 +902,11 @@ select {
 .hero-banner {
   background-size: cover;
   background-position: center;
-  padding: 4.5rem 1.25rem;
+  padding: 4.5rem 1.25rem 5.5rem;
   color: #fff;
   text-align: center;
   position: relative;
+  overflow: hidden;
 }
 
 .hero-banner::before {
@@ -894,7 +914,23 @@ select {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(0deg, rgba(18, 14, 24, 0.94) 5%, rgba(139, 92, 246, 0.28) 55%, rgba(255, 47, 143, 0.16) 100%);
+    linear-gradient(0deg, rgba(20, 16, 28, 0.94) 5%, rgba(15, 109, 110, 0.32) 55%, rgba(255, 47, 122, 0.16) 100%);
+}
+
+.hero-banner::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 46px;
+  background: var(--paper);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 60' preserveAspectRatio='none'%3E%3Cpath d='M0,30 C150,60 350,0 600,28 C850,56 1050,4 1200,26 L1200,60 L0,60 Z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 60' preserveAspectRatio='none'%3E%3Cpath d='M0,30 C150,60 350,0 600,28 C850,56 1050,4 1200,26 L1200,60 L0,60 Z'/%3E%3C/svg%3E");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
 }
 
 .hero-banner-inner {
@@ -909,14 +945,14 @@ select {
 
 .hero-banner h1 {
   margin-bottom: 0.75rem;
-  background: linear-gradient(92deg, #ff8ec8, #ffd0ea 35%, #d5bbff 65%, #a685ff);
+  background: linear-gradient(92deg, #ff8fb8, #ffd7a8 45%, #7fe0d9 75%, #4ec3c4);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
 .hero-banner p {
-  color: #ede4f5;
+  color: #e9f2ef;
   max-width: 100%;
 }
 
@@ -1019,7 +1055,7 @@ select {
   padding: 0.7rem 1.25rem;
   border-radius: 999px;
   font-weight: 700;
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
   transition: filter 0.15s ease;
 }
 
@@ -1059,7 +1095,7 @@ select {
   text-decoration: none;
   font-weight: 600;
   font-size: 0.9rem;
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
 }
 
 .section-tabs a.active {
@@ -1099,7 +1135,7 @@ select {
   border: 1px solid var(--panel-border);
   border-radius: 999px;
   font-size: 1rem;
-  font-family: Georgia, serif;
+  font-family: var(--font-ui);
   background: var(--panel);
   box-shadow: 0 4px 16px rgba(36, 20, 45, 0.05);
 }
@@ -1126,7 +1162,7 @@ select {
   text-decoration: none;
   font-size: 0.82rem;
   font-weight: 600;
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
 }
 
 .menu-jump a:hover {
@@ -1149,13 +1185,13 @@ select {
   color: var(--text-muted);
   font-size: 0.78rem;
   font-weight: 600;
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
   cursor: pointer;
 }
 
 .tag-chip:hover {
-  border-color: var(--violet);
-  color: var(--violet);
+  border-color: var(--ocean);
+  color: var(--ocean);
 }
 
 .tag-chip.active {
@@ -1178,7 +1214,7 @@ select {
   border-radius: 999px;
   background: #f3ecee;
   color: var(--text-muted);
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
 }
 
 .special-badge {
@@ -1190,7 +1226,7 @@ select {
   background: var(--gold-bright);
   color: #1c1626;
   margin-bottom: 0.35rem;
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
 }
 
 .item.item-hidden,
@@ -1208,7 +1244,7 @@ select {
   color: #fff;
   margin-bottom: 0.35rem;
   margin-right: 0.35rem;
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
 }
 
 .item-modal-sold-out[hidden] {
@@ -1263,7 +1299,7 @@ select {
   background: linear-gradient(0deg, rgba(18, 14, 24, 0.75), transparent);
   color: #f3ecf7;
   font-size: 0.72rem;
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
 }
 
 .places-photo-slide figcaption a {
@@ -1307,7 +1343,7 @@ select {
 .lightbox-caption {
   color: #f3ecf7;
   margin-top: 1rem;
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-size: 0.9rem;
 }
 
@@ -1409,7 +1445,7 @@ select {
   letter-spacing: 0.1em;
   font-size: 0.72rem;
   font-weight: 700;
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
   margin: 0 0 0.3rem;
 }
 
@@ -1417,7 +1453,7 @@ select {
   font-size: 1.4rem;
   font-weight: 800;
   margin: 0 0 0.5rem;
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
 }
 
 .item-modal-price {
@@ -1426,7 +1462,7 @@ select {
   font-weight: 800;
   font-size: 1.15rem;
   margin-bottom: 0.75rem;
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
 }
 
 .item-modal-price[hidden] {
@@ -1475,7 +1511,7 @@ label {
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--ink);
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
   margin-bottom: 0.9rem;
 }
 
@@ -1488,7 +1524,7 @@ textarea {
   border-radius: 8px;
   font-size: 0.95rem;
   font-weight: 400;
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
   color: var(--text);
   background: #fff;
 }
@@ -1530,7 +1566,7 @@ fieldset legend {
   color: var(--ink-soft);
   font-size: 0.85rem;
   font-weight: 700;
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
 }
 
 .pill-approved {
@@ -1574,7 +1610,7 @@ fieldset legend {
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
 }
 
 .data-table td .approve-btn,
