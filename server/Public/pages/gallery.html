@@ -3,19 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sushi | Ohana Belltown</title>
-    <meta name="description" content="Ohana Belltown's sushi menu: nigiri, sashimi, sushi rolls, and chef's choice dinner plates." />
+    <title>Photo Gallery | Ohana Belltown</title>
+    <meta name="description" content="Photos of Ohana Belltown's food, drinks, and atmosphere in Seattle." />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Ohana Belltown" />
-    <meta property="og:title" content="Sushi | Ohana Belltown" />
-    <meta property="og:description" content="Ohana Belltown's sushi menu: nigiri, sashimi, sushi rolls, and chef's choice dinner plates." />
-    <meta property="og:url" content="https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/sushi" />
+    <meta property="og:title" content="Photo Gallery | Ohana Belltown" />
+    <meta property="og:description" content="Photos of Ohana Belltown's food, drinks, and atmosphere in Seattle." />
+    <meta property="og:url" content="https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/gallery" />
     <meta property="og:image" content="https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/images/hero-aloha.jpg" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Sushi | Ohana Belltown" />
-    <meta name="twitter:description" content="Ohana Belltown's sushi menu: nigiri, sashimi, sushi rolls, and chef's choice dinner plates." />
-    <meta name="twitter:image" content="https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/images/hero-aloha.jpg" />
-    <link rel="canonical" href="https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/sushi" />
+    <link rel="canonical" href="https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/gallery" />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
@@ -30,20 +26,19 @@
         </button>
         <nav class="site-nav" id="site-nav">
           <a href="/">Home</a>
-          <div class="nav-dropdown open">
+          <div class="nav-dropdown">
             <button class="nav-dropdown-toggle" type="button">Menu &#9662;</button>
             <div class="nav-dropdown-menu">
               <a href="/menu">Food Menu</a>
-              <a href="/sushi" class="active">Sushi</a>
+              <a href="/sushi">Sushi</a>
               <a href="/drinks">Drinks</a>
               <a href="/specials">Specials</a>
-        <a href="/happy-hour">Happy Hour</a>
+              <a href="/happy-hour">Happy Hour</a>
             </div>
           </div>
           <a href="/local">Local</a>
           <a href="/about">About</a>
-          <a href="/gallery">Gallery</a>
-          <a href="/catering">Catering</a>
+          <a href="/gallery" class="active">Gallery</a>
           <a href="/contact">Contact</a>
           <a href="/rewards">Rewards</a>
           <a href="/account-login">Log In</a>
@@ -52,24 +47,20 @@
       </div>
     </header>
 
-    <section class="hero-banner" style="background-image: url('/uploads/AB8C71EA-3B7A-4D5C-AFB6-E4C01A9EA96D.jpg');">
+    <section class="hero-banner" style="background-image: url('/images/hero-aloha.jpg');">
       <div class="hero-banner-inner">
         <p class="eyebrow">Ohana Belltown</p>
-        <h1>Sushi</h1>
+        <h1>Photo Gallery</h1>
+        <p>Food, drinks, and the tiki bar itself &mdash; some from us, some from guests on Google.</p>
       </div>
     </section>
 
-    <main class="page">
-      <div class="section-tabs">
-        <a href="/menu">Food Menu</a>
-        <a href="/sushi" class="active">Sushi</a>
-        <a href="/drinks">Drinks</a>
-        <a href="/specials">Specials</a>
-        <a href="/happy-hour">Happy Hour</a>
+    <section class="content-section">
+      <div class="panel">
+        <div id="gallery-status" class="hint">Loading photos...</div>
+        <div id="gallery-grid" class="gallery-grid"></div>
       </div>
-      <p class="admin-link"><a href="/edit.html">Staff: edit menu &rarr;</a></p>
-      <section id="menu" class="menu" aria-live="polite"></section>
-    </main>
+    </section>
 
     <footer class="site-footer">
       <div class="site-footer-inner">
@@ -95,7 +86,6 @@
     </footer>
     <script src="/nav.js"></script>
     <script src="/lightbox.js"></script>
-    <script>window.MENU_SECTION = 'sushi';</script>
-    <script src="/menu-section.js"></script>
+    <script src="/gallery.js"></script>
   </body>
 </html>
