@@ -33,7 +33,11 @@ now historical background rather than the current plan.
 - **Hosting:** Azure Container Apps (Consumption plan), resource group `Ohana`, app `ohana-belltown-server`
 - **Images:** [ghcr.io/prodataman/ohana-belltown-server](https://ghcr.io/prodataman/ohana-belltown-server) (GitHub Container Registry, public)
 - **CI/CD:** `.github/workflows/deploy-server.yml` — on push to `main`, builds and pushes the
-  Docker image, then runs `az containerapp update` via OIDC federation (no stored Azure secrets)
+  Docker image, then runs `az containerapp update` via OIDC federation (no stored Azure secrets).
+  The Dockerfile copies both `Sources/` and `Tests/` into the build stage (SPM needs the test
+  target's directory to exist even though the release image only builds `--product App`) —
+  if you ever add another target, it needs the same treatment or you'll hit a confusing
+  "overlapping sources" error.
 - **Third-party integrations:** Google Places API (business photos), ChowNow (online ordering, linked out — not embedded)
 
 ### Required environment / secrets on the Container App
@@ -119,6 +123,7 @@ now historical background rather than the current plan.
 - schema.org `Restaurant` JSON-LD on the homepage
 - `sitemap.xml` and `robots.txt`
 - Cache-Control revalidation on every response (avoids stale-cache bugs after a deploy)
+- Automated test suite (`server/Tests/AppTests`, 42 tests) — loyalty punch/redeem math, staff and customer auth (including deactivation and OAuth linking), menu backward-compat decoding, and route-level permission boundaries. Run with `swift test` from `server/`.
 
 ## Known gaps / not yet implemented
 
@@ -145,7 +150,6 @@ actually shipped as of this README. Not in priority order.
 - Analytics (no Plausible/GA4 or equivalent)
 - Uptime/error monitoring/alerting
 - Formal Lighthouse performance pass
-- Automated test suite (no `AppTests` target currently — testing has been manual via curl + local `swift run`)
 
 **Admin & operations**
 - Password reset is admin-only for staff (an admin resets it for you) — no self-service "forgot password" email flow for staff (customers have one; see the email caveat below for why it's not fully live yet)
@@ -194,6 +198,9 @@ export LIBRARY_PATH="/usr/lib/gcc/x86_64-linux-gnu/11"
 
 swift build
 DATA_DIR=./Data swift run App
+
+# Run the test suite:
+swift test
 ```
 
 Then open `http://localhost:8080`. Without `GOOGLE_PLACES_API_KEY`/`GOOGLE_PLACE_ID`
