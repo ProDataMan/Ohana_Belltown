@@ -97,6 +97,7 @@ now historical background rather than the current plan.
 - Events & specials calendar (`/events-admin.html` + public display on `/local`)
 - Printable QR-code table tents linking straight to `/menu`
 - Google/Yelp review buttons link directly to Ohana's actual listings (not a generic search)
+- Embedded map on the Contact page (no API key/billing needed — uses the classic `maps.google.com/maps?...&output=embed` URL)
 - Call/text-to-reserve CTA on the homepage and Contact page (deliberately not a paid platform like OpenTable/Resy — see [Known gaps](#known-gaps--not-yet-implemented))
 - `/specials` — a stable page for social bio links / post links, so a marketing link doesn't have to point at the homepage or bounce between three different pages
 
@@ -132,7 +133,6 @@ Pulled from `docs/feature-roadmap.md`'s original audit, updated for what's
 actually shipped as of this README. Not in priority order.
 
 **Trust & findability**
-- Embedded map on the Contact page (currently just a "Get Directions" link out to Google Maps)
 - Accessibility pass — alt text coverage, focus states, and contrast haven't been formally audited
 - Reviews are linked, not embedded (no live Google/Yelp rating widget on-site)
 
