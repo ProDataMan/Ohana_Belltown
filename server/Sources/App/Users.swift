@@ -10,6 +10,7 @@ struct StaffUser: Codable {
     var username: String
     var displayName: String
     var passwordHash: String
+    var email: String?
     var googleId: String?
     var appleId: String?
     var role: UserRole
@@ -19,18 +20,19 @@ struct StaffUser: Codable {
     var updatedAt: String
 
     enum CodingKeys: String, CodingKey {
-        case id, username, displayName, passwordHash, googleId, appleId, role, mustChangePassword, active, createdAt, updatedAt
+        case id, username, displayName, passwordHash, email, googleId, appleId, role, mustChangePassword, active, createdAt, updatedAt
     }
 
     init(
         id: String, username: String, displayName: String, passwordHash: String,
         googleId: String?, appleId: String?, role: UserRole, mustChangePassword: Bool,
-        active: Bool = true, createdAt: String, updatedAt: String
+        active: Bool = true, createdAt: String, updatedAt: String, email: String? = nil
     ) {
         self.id = id
         self.username = username
         self.displayName = displayName
         self.passwordHash = passwordHash
+        self.email = email
         self.googleId = googleId
         self.appleId = appleId
         self.role = role
@@ -46,6 +48,7 @@ struct StaffUser: Codable {
         username = try container.decode(String.self, forKey: .username)
         displayName = try container.decode(String.self, forKey: .displayName)
         passwordHash = try container.decode(String.self, forKey: .passwordHash)
+        email = try container.decodeIfPresent(String.self, forKey: .email)
         googleId = try container.decodeIfPresent(String.self, forKey: .googleId)
         appleId = try container.decodeIfPresent(String.self, forKey: .appleId)
         role = try container.decode(UserRole.self, forKey: .role)
@@ -60,6 +63,7 @@ struct StaffUserPublic: Content {
     var id: String
     var username: String
     var displayName: String
+    var email: String?
     var role: UserRole
     var mustChangePassword: Bool
     var googleLinked: Bool
@@ -70,6 +74,7 @@ struct StaffUserPublic: Content {
         id = user.id
         username = user.username
         displayName = user.displayName
+        email = user.email
         role = user.role
         mustChangePassword = user.mustChangePassword
         googleLinked = user.googleId != nil
@@ -89,12 +94,13 @@ enum UserError: Error, Equatable {
     case oauthAlreadyLinkedElsewhere
     case cannotDeactivateSelf
     case cannotDeactivateLastAdmin
+    case emailTaken
 }
 
 extension UserError: AbortError {
     var status: HTTPResponseStatus {
         switch self {
-        case .usernameTaken, .oauthAlreadyLinkedElsewhere: return .conflict
+        case .usernameTaken, .oauthAlreadyLinkedElsewhere, .emailTaken: return .conflict
         case .invalidCredentials, .wrongCurrentPassword, .accountDeactivated: return .unauthorized
         case .notFound, .oauthNotLinked: return .notFound
         case .alreadyBootstrapped, .cannotDeactivateSelf, .cannotDeactivateLastAdmin: return .forbidden
@@ -113,6 +119,7 @@ extension UserError: AbortError {
         case .oauthAlreadyLinkedElsewhere: return "That account is already linked to a different staff login."
         case .cannotDeactivateSelf: return "You can't deactivate your own account."
         case .cannotDeactivateLastAdmin: return "Can't deactivate the last active admin."
+        case .emailTaken: return "That email is already in use by another account."
         }
     }
 }
@@ -136,7 +143,7 @@ final class UserStore: @unchecked Sendable {
         ISO8601DateFormatter().string(from: Date())
     }
 
-    private static func normalizeUsername(_ raw: String) -> String {
+    private static func normalizeIdentifier(_ raw: String) -> String {
         raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
@@ -148,7 +155,7 @@ final class UserStore: @unchecked Sendable {
         let timestamp = now()
         let user = StaffUser(
             id: UUID().uuidString,
-            username: Self.normalizeUsername(username),
+            username: Self.normalizeIdentifier(username),
             displayName: displayName,
             passwordHash: try Bcrypt.hash(password),
             googleId: nil,
@@ -168,7 +175,7 @@ final class UserStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
-        let normalized = Self.normalizeUsername(username)
+        let normalized = Self.normalizeIdentifier(username)
         guard !users.contains(where: { $0.username == normalized }) else {
             throw UserError.usernameTaken
         }
@@ -190,12 +197,14 @@ final class UserStore: @unchecked Sendable {
         return StaffUserPublic(user)
     }
 
+    /// `username` may be either the account's username or its email —
+    /// staff sign in with either.
     func authenticate(username: String, password: String) throws -> StaffUser {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
-        let normalized = Self.normalizeUsername(username)
-        guard let user = users.first(where: { $0.username == normalized }),
+        let normalized = Self.normalizeIdentifier(username)
+        guard let user = users.first(where: { $0.username == normalized || $0.email == normalized }),
               try Bcrypt.verify(password, created: user.passwordHash) else {
             throw UserError.invalidCredentials
         }
@@ -241,6 +250,26 @@ final class UserStore: @unchecked Sendable {
         }
         users[idx].passwordHash = try Bcrypt.hash(newPassword)
         users[idx].mustChangePassword = false
+        users[idx].updatedAt = now()
+        try persist()
+        return StaffUserPublic(users[idx])
+    }
+
+    /// Self-service, optional — pass `nil` or an empty string to clear it.
+    @discardableResult
+    func updateEmail(id: String, email: String?) throws -> StaffUserPublic {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard let idx = users.firstIndex(where: { $0.id == id }) else {
+            throw UserError.notFound
+        }
+        let trimmed = email.map { Self.normalizeIdentifier($0) } ?? ""
+        let normalized: String? = trimmed.isEmpty ? nil : trimmed
+        if let normalized, users.contains(where: { $0.id != id && $0.email == normalized }) {
+            throw UserError.emailTaken
+        }
+        users[idx].email = normalized
         users[idx].updatedAt = now()
         try persist()
         return StaffUserPublic(users[idx])

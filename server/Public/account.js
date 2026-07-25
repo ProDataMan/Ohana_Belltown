@@ -18,6 +18,10 @@ async function loadProfile() {
       <p><strong>${escapeHtmlAccount(user.displayName)}</strong> (@${escapeHtmlAccount(user.username)})</p>
       <p>Role: <span class="pill ${user.role === 'admin' ? 'pill-approved' : ''}">${escapeHtmlAccount(user.role)}</span></p>
     `;
+    const emailInput = document.getElementById('email-input');
+    if (emailInput) {
+      emailInput.value = user.email || '';
+    }
     if (oauthEl) {
       oauthEl.innerHTML = `
         ${user.googleLinked
@@ -36,6 +40,30 @@ async function loadProfile() {
 document.getElementById('logout-btn').addEventListener('click', async () => {
   await fetch('/api/auth/logout', { method: 'POST' });
   window.location.href = '/login';
+});
+
+document.getElementById('email-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const statusEl = document.getElementById('email-status');
+  const email = document.getElementById('email-input').value.trim();
+  statusEl.textContent = 'Saving...';
+  statusEl.classList.remove('status-error', 'status-ok');
+  try {
+    const response = await staffFetch('/api/account/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email || null }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.reason || 'Unable to save email.');
+    }
+    statusEl.textContent = 'Saved!';
+    statusEl.classList.add('status-ok');
+  } catch (error) {
+    statusEl.textContent = error.message;
+    statusEl.classList.add('status-error');
+  }
 });
 
 loadProfile();

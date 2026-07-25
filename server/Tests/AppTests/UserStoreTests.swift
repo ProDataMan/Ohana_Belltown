@@ -131,4 +131,40 @@ final class UserStoreTests: XCTestCase {
             XCTAssertEqual(userError, .oauthNotLinked)
         }
     }
+
+    func testCanAuthenticateWithEmailAfterSettingIt() throws {
+        let admin = try bootstrapAdmin()
+        try UserStore.shared.updateEmail(id: admin.id, email: "  Admin1@Example.com  ")
+
+        let user = try UserStore.shared.authenticate(username: "admin1@example.com", password: "adminpass")
+        XCTAssertEqual(user.id, admin.id)
+    }
+
+    func testUsernameStillWorksAfterEmailIsSet() throws {
+        let admin = try bootstrapAdmin()
+        try UserStore.shared.updateEmail(id: admin.id, email: "admin1@example.com")
+
+        let user = try UserStore.shared.authenticate(username: "admin1", password: "adminpass")
+        XCTAssertEqual(user.id, admin.id)
+    }
+
+    func testEmailIsOptionalAndCanBeCleared() throws {
+        let admin = try bootstrapAdmin()
+        try UserStore.shared.updateEmail(id: admin.id, email: "admin1@example.com")
+        let cleared = try UserStore.shared.updateEmail(id: admin.id, email: "")
+        XCTAssertNil(cleared.email)
+    }
+
+    func testDuplicateEmailAcrossAccountsFails() throws {
+        let admin = try bootstrapAdmin()
+        let tim = try UserStore.shared.create(
+            username: "tim", displayName: "Tim", password: "12345", role: .employee, mustChangePassword: false
+        )
+        try UserStore.shared.updateEmail(id: admin.id, email: "shared@example.com")
+
+        XCTAssertThrowsError(try UserStore.shared.updateEmail(id: tim.id, email: "shared@example.com")) { error in
+            guard let userError = error as? UserError else { return XCTFail("wrong error type") }
+            XCTAssertEqual(userError, .emailTaken)
+        }
+    }
 }

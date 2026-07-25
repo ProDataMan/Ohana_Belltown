@@ -34,6 +34,18 @@
       </section>
 
       <section class="panel">
+        <h2>Email</h2>
+        <p class="hint">Optional — lets you log in with your email instead of your username, and is where we'd send account notifications. Not required.</p>
+        <form id="email-form">
+          <label>Email
+            <input type="email" id="email-input" autocomplete="email" placeholder="you@example.com" />
+          </label>
+          <button type="submit">Save Email</button>
+          <p id="email-status" class="status"></p>
+        </form>
+      </section>
+
+      <section class="panel">
         <h2>Linked Sign-In</h2>
         <p class="hint">Link a Google or Apple account to sign in without your password.</p>
         <div id="oauth-links" class="oauth-buttons"></div>

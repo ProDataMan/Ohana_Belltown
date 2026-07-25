@@ -109,6 +109,8 @@ now historical background rather than the current plan.
 - Deactivation takes effect immediately — even an already-open session gets logged out, not just blocked on the next login attempt. An admin can't deactivate their own account.
 - Anyone can change their own password (`/change-password.html`); new/reset accounts must change their password on next login
 - Real audit trail by design — actions are tied to a named account, not a shared PIN
+- Optional email per staff account, set from `/account.html` — not required, and not currently used for anything but sign-in (no notifications are actually sent yet). Once set, it works as an alternate login identifier alongside the username
+- Log in with either your username or your email (`/login`) — same password, whichever's easier to remember
 
 **Customer accounts**
 - Separate from staff accounts — email/password identity only, no `admin`/`employee` role, no order history yet

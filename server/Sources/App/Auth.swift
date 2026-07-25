@@ -27,6 +27,10 @@ struct ResetPasswordRequest: Content {
     var newPassword: String
 }
 
+struct UpdateEmailRequest: Content {
+    var email: String?
+}
+
 struct UpdateRoleRequest: Content {
     var role: UserRole
 }
@@ -112,6 +116,12 @@ func registerAuthRoutes(_ app: Application) throws {
         return try UserStore.shared.changePassword(
             id: user.id, currentPassword: body.currentPassword, newPassword: body.newPassword
         )
+    }
+
+    app.post("api", "account", "email") { req throws -> StaffUserPublic in
+        let user = try requireLogin(req)
+        let body = try req.content.decode(UpdateEmailRequest.self)
+        return try UserStore.shared.updateEmail(id: user.id, email: body.email)
     }
 
     app.get("api", "users") { req throws -> [StaffUserPublic] in
