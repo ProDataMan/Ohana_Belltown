@@ -58,7 +58,7 @@ now historical background rather than the current plan.
 
 | Path | What it is |
 |---|---|
-| `/`, `/about`, `/local`, `/contact`, `/catering` | Marketing pages |
+| `/`, `/about`, `/local`, `/contact`, `/catering`, `/gallery` | Marketing pages |
 | `/menu`, `/sushi`, `/drinks`, `/happy-hour` | Menu sections (216 items total) — search box + allergen/dietary filter chips |
 | `/specials` | Stable landing page (today's specials, Happy Hour hours, drinks teaser) for linking from social media/bio links |
 | `/rewards` | Customer-facing sushi punch card: check a card by phone, submit a photo/social bonus claim |
@@ -98,6 +98,7 @@ now historical background rather than the current plan.
 - Printable QR-code table tents linking straight to `/menu`
 - Google/Yelp review buttons link directly to Ohana's actual listings (not a generic search)
 - Embedded map on the Contact page (no API key/billing needed — uses the classic `maps.google.com/maps?...&output=embed` URL)
+- `/gallery` — aggregates all distinct menu item photos and the rotating Google Places photos into one browsable page
 - Call/text-to-reserve CTA on the homepage and Contact page (deliberately not a paid platform like OpenTable/Resy — see [Known gaps](#known-gaps--not-yet-implemented))
 - `/specials` — a stable page for social bio links / post links, so a marketing link doesn't have to point at the homepage or bounce between three different pages
 
@@ -141,7 +142,6 @@ actually shipped as of this README. Not in priority order.
 **Discovery & conversion**
 - Self-serve/live reservation booking — deliberately not built. Evaluated OpenTable ($149–499/mo + $1–1.50/cover on network bookings), Resy ($0–399/mo flat, no per-cover fee on direct bookings), and Tock (merging into Resy); none are worth the cost against Ohana's walk-in-friendly positioning without a concrete signal (e.g. regularly turning away walk-in groups) that it's needed. Shipped the free call/text CTA instead — revisit if that signal shows up.
 - Online gift card purchase (still "call us and we'll mail one")
-- General photo gallery page (ambiance/event photos exist but aren't collected into one gallery)
 
 **Engagement & retention**
 - Email/SMS signup for specials
