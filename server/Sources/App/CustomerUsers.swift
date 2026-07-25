@@ -8,11 +8,55 @@ struct CustomerUser: Codable {
     var googleId: String?
     var appleId: String?
     var verified: Bool
+    var active: Bool
     var verificationToken: String?
     var resetToken: String?
     var resetTokenExpiresAt: String?
     var createdAt: String
     var updatedAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, email, displayName, passwordHash, googleId, appleId, verified, active
+        case verificationToken, resetToken, resetTokenExpiresAt, createdAt, updatedAt
+    }
+
+    init(
+        id: String, email: String, displayName: String, passwordHash: String?,
+        googleId: String?, appleId: String?, verified: Bool, active: Bool = true,
+        verificationToken: String?, resetToken: String?, resetTokenExpiresAt: String?,
+        createdAt: String, updatedAt: String
+    ) {
+        self.id = id
+        self.email = email
+        self.displayName = displayName
+        self.passwordHash = passwordHash
+        self.googleId = googleId
+        self.appleId = appleId
+        self.verified = verified
+        self.active = active
+        self.verificationToken = verificationToken
+        self.resetToken = resetToken
+        self.resetTokenExpiresAt = resetTokenExpiresAt
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        email = try container.decode(String.self, forKey: .email)
+        displayName = try container.decode(String.self, forKey: .displayName)
+        passwordHash = try container.decodeIfPresent(String.self, forKey: .passwordHash)
+        googleId = try container.decodeIfPresent(String.self, forKey: .googleId)
+        appleId = try container.decodeIfPresent(String.self, forKey: .appleId)
+        verified = try container.decode(Bool.self, forKey: .verified)
+        active = try container.decodeIfPresent(Bool.self, forKey: .active) ?? true
+        verificationToken = try container.decodeIfPresent(String.self, forKey: .verificationToken)
+        resetToken = try container.decodeIfPresent(String.self, forKey: .resetToken)
+        resetTokenExpiresAt = try container.decodeIfPresent(String.self, forKey: .resetTokenExpiresAt)
+        createdAt = try container.decode(String.self, forKey: .createdAt)
+        updatedAt = try container.decode(String.self, forKey: .updatedAt)
+    }
 }
 
 struct CustomerUserPublic: Content {
@@ -39,6 +83,7 @@ enum CustomerUserError: Error, Equatable {
     case emailTaken
     case invalidCredentials
     case noPasswordSet
+    case accountDeactivated
     case notFound
     case invalidOrExpiredToken
     case wrongCurrentPassword
@@ -48,7 +93,7 @@ extension CustomerUserError: AbortError {
     var status: HTTPResponseStatus {
         switch self {
         case .emailTaken: return .conflict
-        case .invalidCredentials, .wrongCurrentPassword, .noPasswordSet: return .unauthorized
+        case .invalidCredentials, .wrongCurrentPassword, .noPasswordSet, .accountDeactivated: return .unauthorized
         case .notFound: return .notFound
         case .invalidOrExpiredToken: return .badRequest
         }
@@ -59,6 +104,7 @@ extension CustomerUserError: AbortError {
         case .emailTaken: return "An account with that email already exists."
         case .invalidCredentials: return "Incorrect email or password."
         case .noPasswordSet: return "This account signs in with Google or Apple — use that instead, or reset your password to set one."
+        case .accountDeactivated: return "This account has been deactivated. Contact us if you'd like it restored."
         case .notFound: return "Account not found."
         case .invalidOrExpiredToken: return "That link is invalid or has expired."
         case .wrongCurrentPassword: return "Current password is incorrect."
@@ -147,7 +193,27 @@ final class CustomerUserStore: @unchecked Sendable {
         guard try Bcrypt.verify(password, created: hash) else {
             throw CustomerUserError.invalidCredentials
         }
+        guard user.active else {
+            throw CustomerUserError.accountDeactivated
+        }
         return user
+    }
+
+    /// Deactivates the caller's own account (self-service only — there's no
+    /// staff-facing customer management UI). Takes effect immediately since
+    /// find(id:) backs session lookups and also rejects inactive accounts.
+    @discardableResult
+    func deactivate(id: String) throws -> CustomerUserPublic {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard let idx = users.firstIndex(where: { $0.id == id }) else {
+            throw CustomerUserError.notFound
+        }
+        users[idx].active = false
+        users[idx].updatedAt = nowString()
+        try persist()
+        return CustomerUserPublic(users[idx])
     }
 
     /// Finds the account linked to this OAuth identity, links it to an existing
@@ -161,10 +227,16 @@ final class CustomerUserStore: @unchecked Sendable {
         let timestamp = nowString()
 
         if let idx = users.firstIndex(where: { provider.id(of: $0) == providerId }) {
+            guard users[idx].active else {
+                throw CustomerUserError.accountDeactivated
+            }
             return CustomerUserPublic(users[idx])
         }
 
         if let idx = users.firstIndex(where: { $0.email == normalized }) {
+            guard users[idx].active else {
+                throw CustomerUserError.accountDeactivated
+            }
             provider.setId(providerId, on: &users[idx])
             users[idx].verified = true
             users[idx].updatedAt = timestamp
@@ -192,12 +264,17 @@ final class CustomerUserStore: @unchecked Sendable {
         return CustomerUserPublic(user)
     }
 
+    /// Returns the user only if their account is still active — backs session
+    /// lookups, so a self-deactivation ends the current session immediately.
     func find(id: String) throws -> CustomerUser {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
         guard let user = users.first(where: { $0.id == id }) else {
             throw CustomerUserError.notFound
+        }
+        guard user.active else {
+            throw CustomerUserError.accountDeactivated
         }
         return user
     }

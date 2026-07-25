@@ -94,6 +94,43 @@ final class CustomerUserStoreTests: XCTestCase {
         XCTAssertNil(token)
     }
 
+    func testDeactivatedAccountCannotAuthenticate() throws {
+        let (customer, _) = try CustomerUserStore.shared.register(
+            email: "guest@example.com", displayName: "Guest", password: "guestpass1"
+        )
+        try CustomerUserStore.shared.deactivate(id: customer.id)
+
+        XCTAssertThrowsError(try CustomerUserStore.shared.authenticate(email: "guest@example.com", password: "guestpass1")) { error in
+            guard let customerError = error as? CustomerUserError else { return XCTFail("wrong error type") }
+            XCTAssertEqual(customerError, .accountDeactivated)
+        }
+    }
+
+    func testDeactivatedAccountSessionLookupFails() throws {
+        let (customer, _) = try CustomerUserStore.shared.register(
+            email: "guest@example.com", displayName: "Guest", password: "guestpass1"
+        )
+        XCTAssertNoThrow(try CustomerUserStore.shared.find(id: customer.id))
+        try CustomerUserStore.shared.deactivate(id: customer.id)
+        XCTAssertThrowsError(try CustomerUserStore.shared.find(id: customer.id))
+    }
+
+    func testDeactivatedAccountCannotSignInViaOAuth() throws {
+        let customer = try CustomerUserStore.shared.findOrCreateFromOAuth(
+            provider: .google, providerId: "google-1", email: "oauth@example.com", displayName: "OAuth User"
+        )
+        try CustomerUserStore.shared.deactivate(id: customer.id)
+
+        XCTAssertThrowsError(
+            try CustomerUserStore.shared.findOrCreateFromOAuth(
+                provider: .google, providerId: "google-1", email: "oauth@example.com", displayName: "OAuth User"
+            )
+        ) { error in
+            guard let customerError = error as? CustomerUserError else { return XCTFail("wrong error type") }
+            XCTAssertEqual(customerError, .accountDeactivated)
+        }
+    }
+
     func testChangePasswordOnOAuthOnlyAccountSetsFirstPassword() throws {
         let customer = try CustomerUserStore.shared.findOrCreateFromOAuth(
             provider: .google, providerId: "google-1", email: "oauth@example.com", displayName: "OAuth User"

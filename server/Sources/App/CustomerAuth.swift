@@ -134,4 +134,11 @@ func registerCustomerAuthRoutes(_ app: Application) throws {
             id: customer.id, currentPassword: body.currentPassword, newPassword: body.newPassword
         )
     }
+
+    app.post("api", "customer", "deactivate") { req throws -> CustomerUserPublic in
+        let customer = try requireCustomerLogin(req)
+        let result = try CustomerUserStore.shared.deactivate(id: customer.id)
+        req.session.data["customerId"] = nil
+        return result
+    }
 }

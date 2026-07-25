@@ -66,4 +66,22 @@ document.getElementById('change-password-form').addEventListener('submit', async
   }
 });
 
+document.getElementById('deactivate-btn').addEventListener('click', async () => {
+  const statusEl = document.getElementById('deactivate-status');
+  if (!window.confirm('Deactivate your account? You will be signed out and unable to log in until we restore it.')) {
+    return;
+  }
+  setMyAccountStatus(statusEl, 'Deactivating...', false);
+  try {
+    const response = await fetch('/api/customer/deactivate', { method: 'POST' });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.reason || `Failed (${response.status}).`);
+    }
+    window.location.href = '/';
+  } catch (error) {
+    setMyAccountStatus(statusEl, error.message, true);
+  }
+});
+
 loadProfile();
