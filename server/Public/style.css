@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Bungee&family=Nunito+Sans:wght@400;600;700;800;900&display=swap');
 
 :root {
-  --pink: #ff2f7a;
+  --pink: #ff2f8f;
   --purple: #4b2e83;
   --purple-bright: #8f5fd6;
   --gold: #d9860f;
@@ -21,7 +21,7 @@
      --pink/--gold for backgrounds, gradients, and borders, where this
      contrast concern doesn't apply. --purple already clears 4.5:1 as-is,
      so it needs no separate text variant. */
-  --pink-text: #e20051;
+  --pink-text: #dc0066;
   --gold-text: #a0630b;
 
   --font-display: 'Bungee', -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
