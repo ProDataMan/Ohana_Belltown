@@ -2,9 +2,8 @@
 
 :root {
   --pink: #ff2f7a;
-  --ocean: #0f6d6e;
-  --ocean-bright: #1c9d9e;
-  --palm: #2a6b4a;
+  --purple: #4b2e83;
+  --purple-bright: #8f5fd6;
   --gold: #d9860f;
   --gold-bright: #f2a93c;
   --ink: #14101c;
@@ -14,13 +13,14 @@
   --panel-border: #ece1d3;
   --text: #241b2e;
   --text-muted: #6b5f75;
-  --gradient-brand: linear-gradient(92deg, var(--pink), var(--ocean-bright));
-  /* Darkened variants of --pink/--gold for use as text on light backgrounds —
-     the brand colors above read at ~3:1 against white/paper, which fails
-     WCAG AA for text (4.5:1). Keep using --pink/--gold for backgrounds,
-     gradients, and borders, where this contrast concern doesn't apply.
-     --ocean and --palm already clear 4.5:1 as-is, so they need no separate
-     text variant. */
+  --gradient-brand: linear-gradient(92deg, var(--pink), var(--purple));
+  /* --purple is the University of Washington's official purple — a nod to
+     Yosh, a UW grad. Darkened variants of --pink/--gold below are for use
+     as text on light backgrounds — the brand colors read at ~3:1 against
+     white/paper, which fails WCAG AA for text (4.5:1). Keep using
+     --pink/--gold for backgrounds, gradients, and borders, where this
+     contrast concern doesn't apply. --purple already clears 4.5:1 as-is,
+     so it needs no separate text variant. */
   --pink-text: #e20051;
   --gold-text: #a0630b;
 
@@ -914,7 +914,7 @@ select {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(0deg, rgba(20, 16, 28, 0.94) 5%, rgba(15, 109, 110, 0.32) 55%, rgba(255, 47, 122, 0.16) 100%);
+    linear-gradient(0deg, rgba(20, 16, 28, 0.94) 5%, rgba(75, 46, 131, 0.32) 55%, rgba(255, 47, 122, 0.16) 100%);
 }
 
 .hero-banner::after {
@@ -945,7 +945,7 @@ select {
 
 .hero-banner h1 {
   margin-bottom: 0.75rem;
-  background: linear-gradient(92deg, #ff8fb8, #ffd7a8 45%, #7fe0d9 75%, #4ec3c4);
+  background: linear-gradient(92deg, #ff8fb8, #ffd7a8 40%, #c9a6ee 70%, var(--purple-bright));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -1190,8 +1190,8 @@ select {
 }
 
 .tag-chip:hover {
-  border-color: var(--ocean);
-  color: var(--ocean);
+  border-color: var(--purple);
+  color: var(--purple);
 }
 
 .tag-chip.active {
