@@ -5,7 +5,8 @@ COPY Package.swift ./
 RUN swift package resolve
 
 COPY Sources ./Sources
-RUN swift build -c release
+COPY Tests ./Tests
+RUN swift build -c release --product App
 
 FROM swift:6.0-jammy-slim
 WORKDIR /app
