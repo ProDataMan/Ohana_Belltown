@@ -11,6 +11,12 @@
   --text: #241b2e;
   --text-muted: #6b5f75;
   --gradient-brand: linear-gradient(92deg, var(--pink), var(--violet));
+  /* Darkened variants of --pink/--gold for use as text on light backgrounds —
+     the brand colors above read at ~3:1 against white/paper, which fails
+     WCAG AA for text (4.5:1). Keep using --pink/--gold for backgrounds,
+     gradients, and borders, where this contrast concern doesn't apply. */
+  --pink-text: #dc0066;
+  --gold-text: #a0630b;
 
   color-scheme: light;
   font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
@@ -53,7 +59,7 @@ button, .cta-button, .nav-order-btn,
   margin: 0 0 0.25rem;
   text-transform: uppercase;
   letter-spacing: 0.16em;
-  color: var(--pink);
+  color: var(--pink-text);
   font-size: 0.78rem;
   font-weight: 700;
 }
@@ -135,7 +141,7 @@ h1 {
 .price {
   font-weight: 800;
   white-space: nowrap;
-  color: var(--gold);
+  color: var(--gold-text);
   font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
 }
 
@@ -162,7 +168,7 @@ h1 {
 }
 
 .admin-link a {
-  color: var(--pink);
+  color: var(--pink-text);
   font-weight: 600;
   text-decoration: none;
   font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
@@ -193,7 +199,7 @@ h1 {
 .staff-tools-nav a:hover,
 .staff-tools-nav a.active {
   border-color: var(--pink);
-  color: var(--pink);
+  color: var(--pink-text);
 }
 
 .panel {
@@ -247,7 +253,7 @@ button:disabled {
 
 button.secondary {
   background: #ffffff;
-  color: var(--pink);
+  color: var(--pink-text);
   border: 1px solid var(--pink);
 }
 
@@ -508,7 +514,7 @@ button.secondary:hover {
   top: -6px;
   right: -6px;
   background: #fff;
-  color: var(--pink);
+  color: var(--pink-text);
 }
 
 .photo-actions {
@@ -524,7 +530,7 @@ button.secondary:hover {
   padding: 0.35rem 0.5rem;
   cursor: pointer;
   background: #ffffff;
-  color: var(--pink);
+  color: var(--pink-text);
   border: 1px solid var(--pink);
   border-radius: 8px;
   font-weight: 600;
@@ -596,7 +602,7 @@ button.secondary:hover {
 .tags-details summary {
   cursor: pointer;
   font-size: 0.85rem;
-  color: var(--pink);
+  color: var(--pink-text);
   font-weight: 600;
   font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
 }
@@ -827,7 +833,7 @@ select {
 .nav-dropdown-menu a:hover,
 .nav-dropdown-menu a.active {
   background: #fdf1f6;
-  color: var(--pink);
+  color: var(--pink-text);
 }
 
 @media (max-width: 860px) {
@@ -1023,7 +1029,7 @@ select {
 
 .cta-button.secondary {
   background: #ffffff;
-  color: var(--pink);
+  color: var(--pink-text);
   border: 1px solid var(--pink);
 }
 
@@ -1049,7 +1055,7 @@ select {
   padding: 0.5rem 1rem;
   border-radius: 999px;
   border: 1px solid var(--pink);
-  color: var(--pink);
+  color: var(--pink-text);
   text-decoration: none;
   font-weight: 600;
   font-size: 0.9rem;
@@ -1077,7 +1083,7 @@ select {
   box-shadow: 0 10px 30px rgba(36, 20, 45, 0.06);
 }
 
-.location-card h3 {
+.location-card h2 {
   margin-top: 0;
 }
 
@@ -1098,9 +1104,10 @@ select {
   box-shadow: 0 4px 16px rgba(36, 20, 45, 0.05);
 }
 
-.menu-search:focus {
+.menu-search:focus-visible {
   outline: none;
   border-color: var(--pink);
+  box-shadow: 0 0 0 3px rgba(255, 47, 143, 0.35);
 }
 
 .menu-jump {
@@ -1124,7 +1131,7 @@ select {
 
 .menu-jump a:hover {
   border-color: var(--pink);
-  color: var(--pink);
+  color: var(--pink-text);
 }
 
 .tag-filter-chips {
@@ -1397,7 +1404,7 @@ select {
 }
 
 .item-modal-category {
-  color: var(--pink);
+  color: var(--pink-text);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   font-size: 0.72rem;
@@ -1415,7 +1422,7 @@ select {
 
 .item-modal-price {
   display: inline-block;
-  color: var(--gold);
+  color: var(--gold-text);
   font-weight: 800;
   font-size: 1.15rem;
   margin-bottom: 0.75rem;
