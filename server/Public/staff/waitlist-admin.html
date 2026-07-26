@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Analytics — Ohana Belltown</title>
+    <title>Waitlist — Ohana Belltown</title>
     <meta name="robots" content="noindex, nofollow" />
     <link rel="stylesheet" href="./style.css" />
   </head>
@@ -11,47 +11,37 @@
     <main class="page">
       <header class="hero">
         <p class="eyebrow">Ohana Belltown — Staff</p>
-        <h1>Analytics</h1>
-        <p>Self-hosted, privacy-friendly pageview counts. No cookies, no third-party tracking — just which pages get visited.</p>
+        <h1>Waitlist</h1>
+        <p>
+          Guests who joined the waitlist from their phone, oldest first. "Text" opens your own
+          phone's messaging app with their number and a ready-made message — nothing is sent
+          automatically. Entries older than 4 hours drop off automatically.
+        </p>
         <p class="admin-link"><a href="/menu">&larr; Back to menu</a></p>
         <div class="staff-tools-nav">
           <a href="/edit.html">Menu Editor</a>
           <a href="/loyalty-admin.html">Loyalty</a>
-          <a href="/waitlist-admin.html">Waitlist</a>
+          <a href="/waitlist-admin.html" class="active">Waitlist</a>
           <a href="/events-admin.html">Events</a>
           <a href="/table-card.html">Table Cards</a>
           <a href="/account.html">My Account</a>
           <a href="/manage-users.html">Manage Users</a>
-          <a href="/analytics.html" class="active">Analytics</a>
+          <a href="/analytics.html">Analytics</a>
         </div>
       </header>
 
       <section class="panel">
         <div class="editor-toolbar">
-          <h2>Overview</h2>
+          <h2>Current Waitlist</h2>
           <div class="toolbar-actions">
-            <select id="range-select">
-              <option value="7">Last 7 days</option>
-              <option value="30" selected>Last 30 days</option>
-              <option value="90">Last 90 days</option>
-            </select>
+            <button id="reload-waitlist-btn" type="button" class="secondary">Reload</button>
           </div>
         </div>
-        <div id="overview" class="hint">Loading...</div>
-      </section>
-
-      <section class="panel">
-        <h2>Views by Day</h2>
-        <div id="daily-chart"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Top Pages</h2>
-        <div id="top-pages"></div>
+        <div id="waitlist-list"></div>
       </section>
     </main>
 
     <script src="./staff-auth.js"></script>
-    <script src="./analytics.js"></script>
+    <script src="./waitlist-admin.js"></script>
   </body>
 </html>

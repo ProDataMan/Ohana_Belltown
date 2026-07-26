@@ -63,6 +63,8 @@ now historical background rather than the current plan.
 | `/menu`, `/sushi`, `/drinks`, `/happy-hour` | Menu sections (216 items total) — search box + allergen/dietary filter chips |
 | `/specials` | Stable landing page (today's specials, Happy Hour hours, drinks teaser) for linking from social media/bio links |
 | `/rewards` | Customer-facing sushi punch card: check a card by phone, submit a photo/social bonus claim |
+| `/waitlist` | Join the walk-in waitlist from your phone before arriving |
+| `/waitlist-admin.html` | Staff: view the live waitlist queue, text a guest their table's ready, remove entries. **Any logged-in employee.** |
 | `/login` | Staff login. First run (zero accounts) shows a one-time "create the first admin" form instead. |
 | `/account.html` | Self-service: view own profile, log out |
 | `/change-password.html` | Self-service password change (requires current password) |
@@ -105,6 +107,7 @@ now historical background rather than the current plan.
 - `/gallery` — aggregates all distinct menu item photos and the rotating Google Places photos into one browsable page
 - Call/text-to-reserve CTA on the homepage and Contact page (deliberately not a paid platform like OpenTable/Resy — see [Known gaps](#known-gaps--not-yet-implemented))
 - Persistent Call / Order / Directions bar pinned to the bottom of the screen on mobile (every public page) — the "Order Online" button previously lived inside the collapsed hamburger menu, taking two taps on the device most visitors actually use
+- Text-based waitlist (`/waitlist` + `/waitlist-admin.html`) — not a reservation, just lets a walk-in put their name in before arriving. Staff's "Text they're ready" button opens the staff member's own phone's messaging app with the number and a ready-made message pre-filled (no SMS gateway/automated texting — nothing is sent without a staff member hitting send themselves). Entries older than 4 hours drop off the live queue automatically.
 - `/specials` — a stable page for social bio links / post links, so a marketing link doesn't have to point at the homepage or bounce between three different pages
 
 **Staff accounts**
@@ -138,7 +141,7 @@ now historical background rather than the current plan.
 - `sitemap.xml` and `robots.txt`
 - Cache-Control revalidation on every response (avoids stale-cache bugs after a deploy)
 - Accessibility pass — fixed real WCAG AA contrast failures (brand pink/gold read ~3:1 as text on light backgrounds; added darker `--pink-text`/`--gold-text` variants used only for text, keeping the brighter originals for backgrounds/borders), a focus state that was fully removed without a visible replacement, and a heading-hierarchy skip on the Contact page. Alt text was already solid site-wide.
-- Automated test suite (`server/Tests/AppTests`, 51 tests) — loyalty punch/redeem math, staff and customer auth (including deactivation and OAuth linking), menu backward-compat decoding, and route-level permission boundaries. Run with `swift test` from `server/`.
+- Automated test suite (`server/Tests/AppTests`, 57 tests) — loyalty punch/redeem math, waitlist queue behavior, staff and customer auth (including deactivation and OAuth linking), menu backward-compat decoding, and route-level permission boundaries. Run with `swift test` from `server/`.
 - Self-hosted analytics (`/analytics.html`, admin only) — pageview counts by page and by day, no cookies or third-party tracking script. Server-side only, bounded to 120 days of aggregated (not raw per-visit) data.
 - Uploaded photos (menu editor, customer bonus-claim photos) are auto-resized (1600px long-edge cap) and re-compressed via ImageMagick, run off the event loop so it doesn't stall other requests. Fails closed — if optimization fails for any reason, the original upload is kept as-is rather than blocking the upload.
 

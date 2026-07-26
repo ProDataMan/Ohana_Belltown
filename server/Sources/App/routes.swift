@@ -15,6 +15,13 @@ struct BonusReviewRequest: Content {
     var approve: Bool
 }
 
+struct WaitlistJoinRequest: Content {
+    var name: String
+    var phone: String
+    var partySize: Int
+    var note: String?
+}
+
 func routes(_ app: Application) throws {
     try registerAuthRoutes(app)
     try registerCustomerAuthRoutes(app)
@@ -117,6 +124,33 @@ func routes(_ app: Application) throws {
         return try LoyaltyStore.shared.reviewBonusRequest(id: id, approve: body.approve)
     }
 
+    app.post("api", "waitlist", "join") { req throws -> WaitlistEntry in
+        let body = try req.content.decode(WaitlistJoinRequest.self)
+        guard body.partySize > 0 else {
+            throw Abort(.badRequest, reason: "Party size must be at least 1.")
+        }
+        return try WaitlistStore.shared.join(
+            name: body.name, phone: body.phone, partySize: body.partySize, note: body.note
+        )
+    }
+
+    app.get("api", "waitlist") { req throws -> [WaitlistEntry] in
+        try requireLogin(req)
+        return try WaitlistStore.shared.active()
+    }
+
+    app.post("api", "waitlist", ":id", "notify") { req throws -> WaitlistEntry in
+        try requireLogin(req)
+        guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
+        return try WaitlistStore.shared.markNotified(id: id)
+    }
+
+    app.post("api", "waitlist", ":id", "remove") { req throws -> WaitlistEntry in
+        try requireLogin(req)
+        guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
+        return try WaitlistStore.shared.remove(id: id)
+    }
+
     func serveStatic(_ req: Request, file: String) async throws -> Response {
         let path = req.application.directory.publicDirectory + file
         return try await req.fileio.asyncStreamFile(at: path)
@@ -136,6 +170,7 @@ func routes(_ app: Application) throws {
         ("gallery", "pages/gallery.html"),
         ("privacy", "pages/privacy.html"),
         ("terms", "pages/terms.html"),
+        ("waitlist", "pages/waitlist.html"),
     ]
     for (route, file) in cleanPages {
         app.get(PathComponent(stringLiteral: route)) { req in
@@ -146,6 +181,7 @@ func routes(_ app: Application) throws {
     let staffPages: [(String, String, Bool)] = [
         ("edit.html", "staff/edit.html", false),
         ("loyalty-admin.html", "staff/loyalty-admin.html", false),
+        ("waitlist-admin.html", "staff/waitlist-admin.html", false),
         ("events-admin.html", "staff/events-admin.html", true),
         ("account.html", "staff/account.html", false),
         ("change-password.html", "staff/change-password.html", false),
