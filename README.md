@@ -104,6 +104,7 @@ now historical background rather than the current plan.
 - Embedded map on the Contact page (no API key/billing needed — uses the classic `maps.google.com/maps?...&output=embed` URL)
 - `/gallery` — aggregates all distinct menu item photos and the rotating Google Places photos into one browsable page
 - Call/text-to-reserve CTA on the homepage and Contact page (deliberately not a paid platform like OpenTable/Resy — see [Known gaps](#known-gaps--not-yet-implemented))
+- Persistent Call / Order / Directions bar pinned to the bottom of the screen on mobile (every public page) — the "Order Online" button previously lived inside the collapsed hamburger menu, taking two taps on the device most visitors actually use
 - `/specials` — a stable page for social bio links / post links, so a marketing link doesn't have to point at the homepage or bounce between three different pages
 
 **Staff accounts**
