@@ -49,8 +49,8 @@ now historical background rather than the current plan.
 | `GOOGLE_PLACES_API_KEY` | Server-side only, proxies Google Business photos |
 | `GOOGLE_PLACE_ID` | Ohana Belltown's Google Place ID |
 | `PUBLIC_BASE_URL` | The site's own public HTTPS origin, used to build OAuth redirect URIs. Defaults to the production URL above if unset — only needs overriding for local dev (`http://localhost:8080`). |
-| `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` | Google Sign-In. Not set yet — see [Setting up Google/Apple Sign-In](#setting-up-googleapple-sign-in). |
-| `APPLE_OAUTH_CLIENT_ID`, `APPLE_OAUTH_TEAM_ID`, `APPLE_OAUTH_KEY_ID`, `APPLE_OAUTH_PRIVATE_KEY` | Sign in with Apple. Not set yet — needs a paid Apple Developer Program enrollment first. See below. |
+| `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` | Google Sign-In. Not set yet — see [`docs/oauth-setup.md`](docs/oauth-setup.md). |
+| `APPLE_OAUTH_CLIENT_ID`, `APPLE_OAUTH_TEAM_ID`, `APPLE_OAUTH_KEY_ID`, `APPLE_OAUTH_PRIVATE_KEY` | Sign in with Apple. Not set yet — needs a paid Apple Developer Program enrollment first. See [`docs/oauth-setup.md`](docs/oauth-setup.md). |
 
 `STAFF_PIN` is no longer used — it was retired in favor of real per-user login (see below) and can be removed from the Container App if still set.
 
@@ -177,24 +177,9 @@ actually shipped as of this README. Not in priority order.
 
 Both are built and live in the UI (buttons on `/signup`, `/account-login`,
 `/login`, `/account.html`) but return a `503` until real credentials are set
-as Container App secrets/env vars.
-
-**Google** (free, ~10 minutes):
-1. In [Google Cloud Console](https://console.cloud.google.com/), create (or reuse) a project → **APIs & Services → Credentials**.
-2. Configure the OAuth consent screen if you haven't already (External, basic app info — no verification needed for a small user base).
-3. Create an **OAuth client ID** of type "Web application."
-4. Add these to **Authorized redirect URIs**:
-   - `https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/auth/google/customer/callback`
-   - `https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/auth/google/staff/callback`
-   - (optionally) `http://localhost:8080/auth/google/customer/callback` and `.../staff/callback` for local dev
-5. Set `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` on the Container App.
-
-**Apple** (has a real cost — $99/year Apple Developer Program):
-1. Enroll at [developer.apple.com/programs](https://developer.apple.com/programs/) if you haven't already.
-2. **Certificates, IDs & Profiles → Identifiers**: register an App ID (if you don't have one) with "Sign in with Apple" enabled, then register a **Services ID** (e.g. `com.ohanabelltown.web`) — this is your `APPLE_OAUTH_CLIENT_ID`. Configure it with the same redirect URIs as the Google step above (`/auth/apple/customer/callback`, `/auth/apple/staff/callback`), and register the site domain.
-3. **Keys**: create a new key with "Sign in with Apple" enabled, associated with that Services ID. Download the `.p8` file **immediately** — Apple only lets you download it once. Note the Key ID shown on screen.
-4. You'll also need your **Team ID** (top-right of the developer portal, or Membership page).
-5. Set on the Container App: `APPLE_OAUTH_CLIENT_ID` (the Services ID), `APPLE_OAUTH_TEAM_ID`, `APPLE_OAUTH_KEY_ID`, and `APPLE_OAUTH_PRIVATE_KEY` (the full contents of the `.p8` file, including the `-----BEGIN/END PRIVATE KEY-----` lines).
+as Container App secrets/env vars. Full step-by-step instructions for both
+providers, including exact links and where to paste each value, are in
+[`docs/oauth-setup.md`](docs/oauth-setup.md).
 
 ## Local development
 
@@ -228,5 +213,6 @@ caveat above) — after registering at `/signup` or requesting a reset at
 
 - `docs/feature-roadmap.md` — original feature audit and phased plan (predates most of what's now shipped; see the gaps list above for current state)
 - `docs/visual-design-direction.md` — the palette/type direction used for the visual refresh
+- `docs/oauth-setup.md` — step-by-step Google/Apple Sign-In credential setup
 - `docs/page-inventory.md`, `docs/migration-plan.md`, `docs/ohana-project-plan.md` — early planning docs from the static-site-capture phase, kept for history
 - `reference-site/` — the original Weebly site mirror this project was migrated from
