@@ -44,10 +44,13 @@ function sectionLabel(key) {
   return SECTIONS.find((s) => s.key === key)?.label || key;
 }
 
+let categoryBlockCounter = 0;
+
 function categoryBlock(section, name, note, items) {
   const section_ = document.createElement('section');
   section_.className = 'edit-category';
   section_.dataset.section = section;
+  section_.id = `category-${categoryBlockCounter++}`;
 
   section_.innerHTML = `
     <div class="edit-category-header">
@@ -75,9 +78,12 @@ function categoryBlock(section, name, note, items) {
   return section_;
 }
 
+let itemRowCounter = 0;
+
 function itemRow(item) {
   const row = document.createElement('div');
   row.className = 'edit-item';
+  row.id = `item-${itemRowCounter++}`;
   const initialImages = item.images || (item.image ? [item.image] : []);
   row.dataset.images = JSON.stringify(initialImages);
   const priceValue = item.price != null ? Number(item.price).toFixed(2) : '';
@@ -124,9 +130,14 @@ function itemRow(item) {
     </div>
   `;
   renderThumbGallery(row);
-  row.querySelector('.remove-item').addEventListener('click', () => row.remove());
+  row.querySelector('.remove-item').addEventListener('click', () => {
+    row.remove();
+    refreshFeaturedSummary();
+  });
   row.querySelector('.item-image-input').addEventListener('change', (event) => uploadItemImage(row, event));
   row.querySelector('.photo-google-btn').addEventListener('click', () => openGooglePhotoPicker(row));
+  row.querySelector('.item-featured').addEventListener('change', refreshFeaturedSummary);
+  row.querySelector('.item-name').addEventListener('change', refreshFeaturedSummary);
   return row;
 }
 
@@ -274,17 +285,65 @@ async function openGooglePhotoPicker(row) {
 function renderEditor(data) {
   restaurantName = data.restaurant || restaurantName;
   categoriesContainer.innerHTML = '';
+  categoryBlockCounter = 0;
+  itemRowCounter = 0;
+
+  const sectionJumpEl = document.getElementById('section-jump');
+  sectionJumpEl.innerHTML = '';
 
   SECTIONS.forEach(({ key, label }) => {
     const cats = (data.categories || []).filter((c) => c.section === key);
     if (!cats.length) return;
     const heading = document.createElement('h3');
     heading.className = 'section-heading';
+    heading.id = `section-${key}`;
     heading.textContent = label;
     categoriesContainer.appendChild(heading);
     cats.forEach((category) => {
       categoriesContainer.appendChild(categoryBlock(key, category.name, category.note, category.items));
     });
+
+    const jumpLink = document.createElement('a');
+    jumpLink.href = `#section-${key}`;
+    jumpLink.textContent = label;
+    jumpLink.addEventListener('click', (event) => {
+      event.preventDefault();
+      heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    sectionJumpEl.appendChild(jumpLink);
+  });
+
+  refreshFeaturedSummary();
+}
+
+function refreshFeaturedSummary() {
+  const summaryEl = document.getElementById('featured-summary');
+  const featuredRows = Array.from(categoriesContainer.querySelectorAll('.edit-item')).filter(
+    (row) => row.querySelector('.item-featured').checked
+  );
+
+  if (!featuredRows.length) {
+    summaryEl.innerHTML = '<p class="hint">No items are currently marked as today\'s specials.</p>';
+    return;
+  }
+
+  summaryEl.innerHTML = `
+    <p class="hint">Today's specials (${featuredRows.length}) — click to jump to one:</p>
+    <div class="section-tabs"></div>
+  `;
+  const chipsEl = summaryEl.querySelector('.section-tabs');
+  featuredRows.forEach((row) => {
+    const name = row.querySelector('.item-name').value.trim() || '(unnamed item)';
+    const chip = document.createElement('a');
+    chip.href = `#${row.id}`;
+    chip.textContent = name;
+    chip.addEventListener('click', (event) => {
+      event.preventDefault();
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.classList.add('edit-item-highlight');
+      setTimeout(() => row.classList.remove('edit-item-highlight'), 1500);
+    });
+    chipsEl.appendChild(chip);
   });
 }
 

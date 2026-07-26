@@ -91,6 +91,7 @@ now historical background rather than the current plan.
 - Daily specials / featured-item toggle, surfaced on the homepage
 - Per-item sold-out ("86'd") toggle — item stays visible on the public menu, grayed out with a "Sold Out Today" badge, instead of disappearing or requiring deletion
 - Staff editor (`/edit.html`) — prices, descriptions, multi-photo galleries (manual upload or pick from Google Places), tags, featured toggle, sold-out toggle. Requires login (any employee); saves directly to the live site.
+- The editor covers all 24 categories across Food/Sushi/Drinks/Happy Hour on one long page — a jump-nav at the top links straight to each section (Happy Hour is last, after ~170 other items, easy to miss without it), and a "Today's specials" panel lists every currently-featured item with a click-to-jump link, so finding/changing daily specials doesn't mean scrolling the whole menu looking for checked boxes.
 - The "Staff: edit menu →" link on `/menu`, `/sushi`, `/drinks`, and `/happy-hour` is hidden by default and only reveals itself (via `/api/auth/me`) if you're currently logged in as staff — anonymous visitors never see it.
 
 **Loyalty & engagement**

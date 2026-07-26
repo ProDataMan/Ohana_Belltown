@@ -472,6 +472,12 @@ button.secondary:hover {
   display: flex;
   gap: 0.75rem;
   align-items: flex-start;
+  border-radius: 10px;
+  transition: background-color 0.4s ease;
+}
+
+.edit-item-highlight {
+  background-color: #fdf1f6;
 }
 
 .edit-item input {
