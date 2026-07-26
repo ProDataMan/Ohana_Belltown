@@ -90,7 +90,8 @@ now historical background rather than the current plan.
 | `/loyalty-admin.html` | Staff: punch a card, redeem a reward, approve/deny bonus claims. **Any logged-in employee.** |
 | `/events-admin.html` | Staff: edit the events/specials shown on `/local`. **Admin only.** |
 | `/create-account.html`, `/manage-users.html` | Admin: create staff accounts, change roles, reset passwords. **Admin only.** |
-| `/table-card.html` | Printable QR-code table tents linking to `/menu` |
+| `/table-card.html` | Printable QR-code table tents — QR encodes `ohanasushigrill.com/scan` |
+| `/scan` | Smart QR landing: redirects to `/happy-hour` during Happy Hour (Mon&ndash;Fri, 3&ndash;6pm Pacific), otherwise `/menu` |
 | `/signup`, `/account-login` | Customer registration and login (separate from staff accounts). `/account-login` links to `/login` for staff. |
 | `/logged-in` | Shared post-login router — sends staff to `/edit.html` and customers to `/my-account.html`. Where Google Sign-In lands after a successful login. |
 | `/my-account.html` | Customer's own account page — profile, password change |
@@ -133,7 +134,7 @@ now historical background rather than the current plan.
 - Digital sushi punch card (`/rewards` + `/loyalty-admin.html`) — phone-number identity, 1 punch per sushi order,
   10 punches = free roll. Photo/social shares are staff-reviewed and worth 1/10 of a punch each (10 approved shares = 1 punch), capped at the first 2 approved shares per calendar day per phone number — extra shares that day can still be submitted and approved, they just don't add points, so posting many photos of one meal doesn't multiply the reward.
 - Events & specials calendar (`/events-admin.html` + public display on `/local`)
-- Printable QR-code table tents linking straight to `/menu`
+- Printable QR-code table tents (`/table-card.html`) — the QR encodes `ohanasushigrill.com/scan`, a smart landing route that checks the current day/time (Pacific) and sends the scan straight to `/happy-hour` during Happy Hour (Mon&ndash;Fri, 3&ndash;6pm) or `/menu` otherwise. Happy Hour's page carries a clear "See the Full Menu" link back out, since a scan-in visitor may not want to hunt for the section tabs. Uses `ohanasushigrill.com` (the restaurant's real domain) as the printed URL now, ahead of DNS being pointed at this site — those links go live automatically once DNS switches over.
 - Google/Yelp review buttons link directly to Ohana's actual listings (not a generic search)
 - Embedded map on the Contact page (no API key/billing needed — uses the classic `maps.google.com/maps?...&output=embed` URL)
 - `/gallery` — aggregates all distinct menu item photos and the rotating Google Places photos into one browsable page
@@ -190,7 +191,7 @@ now historical background rather than the current plan.
 - `sitemap.xml` and `robots.txt`
 - Cache-Control revalidation on every response (avoids stale-cache bugs after a deploy)
 - Accessibility pass — fixed real WCAG AA contrast failures (brand pink/gold read ~3:1 as text on light backgrounds; added darker `--pink-text`/`--gold-text` variants used only for text, keeping the brighter originals for backgrounds/borders), a focus state that was fully removed without a visible replacement, and a heading-hierarchy skip on the Contact page. Alt text was already solid site-wide.
-- Automated test suite (`server/Tests/AppTests`, 81 tests) — loyalty punch/redeem math, waitlist queue behavior, analytics aggregation, single-item menu CRUD, staff and customer auth (including deactivation and OAuth linking), menu backward-compat decoding, and route-level permission boundaries. Run with `swift test` from `server/`.
+- Automated test suite (`server/Tests/AppTests`, 88 tests) — loyalty punch/redeem math, waitlist queue behavior, analytics aggregation, single-item menu CRUD, staff and customer auth (including deactivation and OAuth linking), menu backward-compat decoding, the Happy Hour time-window/QR-redirect logic, and route-level permission boundaries. Run with `swift test` from `server/`.
 - Self-hosted analytics (`/analytics.html`, admin only) — pageview counts by page and by day, device type (mobile/tablet/desktop), average time on page, and most-viewed menu items (detail-popup opens — a proxy for interest, not a sales figure, since this site has no access to real order data from ChowNow). No cookies, no third-party tracking script, no per-visitor identity anywhere. Bounded to 120 days of aggregated data.
 - "Popular Right Now" on `/specials` — the top menu items by real view count over the last 30 days, computed fresh on every page load (`/api/analytics/popular-items`), automatically skipping anything sold out or removed from the menu. Sits alongside, not instead of, the staff-curated "Today's Specials" section — nothing here overwrites what staff manually feature.
 - "Menu Items Missing a Price" / "Menu Items Missing a Photo" reports on `/analytics.html`, scanning the entire live menu (including Happy Hour) — each row links straight to that item's `/edit-item.html` page to fix it on the spot.

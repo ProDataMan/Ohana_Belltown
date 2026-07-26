@@ -49,6 +49,12 @@ func routes(_ app: Application) throws {
 
     app.get("healthz") { _ in "ok" }
 
+    // QR-code smart landing: sends whoever scans the table-card straight to
+    // Happy Hour during the window, otherwise the full menu.
+    app.get("scan") { req in
+        req.redirect(to: HappyHourSchedule.landingPath(), redirectType: .normal)
+    }
+
     app.get("api", "menu") { _ throws -> Menu in
         try MenuStore.shared.get()
     }

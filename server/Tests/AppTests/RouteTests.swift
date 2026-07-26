@@ -36,6 +36,14 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testScanRedirectsToMenuOrHappyHour() throws {
+        try app.test(.GET, "scan") { res in
+            XCTAssertEqual(res.status, .seeOther)
+            let location = res.headers.first(name: .location)
+            XCTAssertTrue(location == "/menu" || location == "/happy-hour", "unexpected redirect target: \(location ?? "nil")")
+        }
+    }
+
     func testMenuAPIReturnsSeedMenuWithoutAuth() throws {
         try app.test(.GET, "api/menu") { res in
             XCTAssertEqual(res.status, .ok)
