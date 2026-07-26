@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Edit Menu Item — Ohana Belltown</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <p class="eyebrow" id="item-category-eyebrow">Ohana Belltown — Staff</p>
+        <h1>Edit Menu Item</h1>
+        <p class="admin-link"><a href="/edit.html">&larr; Back to Menu Editor</a></p>
+      </header>
+
+      <p id="status" class="status"></p>
+
+      <section id="editor-panel" class="panel" hidden>
+        <div class="edit-item-photo" style="margin-bottom: 1.25rem;">
+          <div class="item-thumb-gallery" id="item-thumb-gallery"></div>
+          <div class="photo-actions">
+            <label class="photo-upload-btn secondary">
+              + Upload
+              <input type="file" id="item-image-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+            </label>
+            <button type="button" id="photo-google-btn" class="secondary">+ Google</button>
+          </div>
+          <p id="photo-status" class="status"></p>
+        </div>
+
+        <label>Item name
+          <input type="text" id="item-name-input" required />
+        </label>
+        <label>Description
+          <textarea id="item-desc-input" rows="2"></textarea>
+        </label>
+        <label>Price
+          <input type="number" id="item-price-input" step="0.01" min="0" placeholder="No price" />
+        </label>
+
+        <label class="featured-toggle">
+          <input type="checkbox" id="item-featured-input" />
+          &#9733; Today's special (shows on homepage)
+        </label>
+        <label class="featured-toggle">
+          <input type="checkbox" id="item-sold-out-input" />
+          86'd / sold out today
+        </label>
+        <label class="featured-toggle">
+          <input type="checkbox" id="item-happy-hour-input" />
+          Available at Happy Hour
+        </label>
+
+        <details class="tags-details">
+          <summary>Dietary &amp; allergen tags</summary>
+          <div class="tags-grid" id="item-tags-grid"></div>
+        </details>
+
+        <div class="save-row">
+          <button id="save-btn" type="button">Save changes</button>
+          <button id="delete-btn" type="button" class="secondary">Delete item</button>
+          <p id="save-status" class="status"></p>
+        </div>
+      </section>
+    </main>
+
+    <script src="./staff-auth.js"></script>
+    <script src="./edit-item.js"></script>
+  </body>
+</html>

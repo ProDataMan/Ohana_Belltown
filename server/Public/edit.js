@@ -66,7 +66,7 @@ function categoryBlock(section, name, note, items) {
   (items || []).forEach((item) => itemsContainer.appendChild(itemRow(item)));
 
   section_.querySelector('.add-item').addEventListener('click', () => {
-    itemsContainer.appendChild(itemRow({ name: '', description: '', price: null, images: [], tags: [], featured: false, available: true }));
+    itemsContainer.appendChild(itemRow({ name: '', description: '', price: null, images: [], tags: [], featured: false, available: true, happyHour: false }));
   });
 
   section_.querySelector('.remove-category').addEventListener('click', () => {
@@ -84,6 +84,7 @@ function itemRow(item) {
   const row = document.createElement('div');
   row.className = 'edit-item';
   row.id = `item-${itemRowCounter++}`;
+  row.dataset.itemId = item.id || (window.crypto && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
   const initialImages = item.images || (item.image ? [item.image] : []);
   row.dataset.images = JSON.stringify(initialImages);
   const priceValue = item.price != null ? Number(item.price).toFixed(2) : '';
@@ -113,6 +114,10 @@ function itemRow(item) {
       <label class="featured-toggle sold-out-toggle">
         <input type="checkbox" class="item-sold-out" ${item.available === false ? 'checked' : ''} />
         86'd / sold out today
+      </label>
+      <label class="featured-toggle">
+        <input type="checkbox" class="item-happy-hour" ${item.happyHour ? 'checked' : ''} />
+        Available at Happy Hour
       </label>
       <details class="tags-details">
         <summary>Dietary &amp; allergen tags${(item.tags || []).length ? ` (${item.tags.length} set)` : ''}</summary>
@@ -377,8 +382,9 @@ function collectMenuData() {
       const images = getRowImages(row);
       const featured = row.querySelector('.item-featured').checked;
       const available = !row.querySelector('.item-sold-out').checked;
+      const happyHour = row.querySelector('.item-happy-hour').checked;
       const tags = Array.from(row.querySelectorAll('.item-tag:checked')).map((cb) => cb.value);
-      items.push({ name: itemName, description, price, images, tags, featured, available });
+      items.push({ id: row.dataset.itemId, name: itemName, description, price, images, tags, featured, available, happyHour });
     }
 
     categories.push({ section, name, note, items });

@@ -49,6 +49,63 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testSingleItemGetPatchDeleteLifecycle() throws {
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        let menuBody = ByteBuffer(string: #"""
+        {"restaurant":"Ohana","lastUpdated":"now","categories":[
+          {"section":"menu","name":"Rolls","note":null,"items":[
+            {"id":"item-1","name":"Volcano Roll","description":null,"price":14,"images":[],"tags":[],"featured":false,"available":true,"happyHour":false}
+          ]}
+        ]}
+        """#)
+        try app.test(.PUT, "api/menu", headers: ["Content-Type": "application/json", "Cookie": cookie], body: menuBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+
+        try app.test(.GET, "api/menu/items/item-1") { res in
+            XCTAssertEqual(res.status, .ok)
+            let location = try res.content.decode(MenuItemLocation.self)
+            XCTAssertEqual(location.item.name, "Volcano Roll")
+            XCTAssertEqual(location.categoryName, "Rolls")
+        }
+
+        try app.test(.GET, "api/menu/items/does-not-exist") { res in
+            XCTAssertEqual(res.status, .notFound)
+        }
+
+        let patchBody = ByteBuffer(string: #"""
+        {"name":"Volcano Roll","description":"Now spicier","price":16,"images":["/uploads/x.jpg"],"tags":[],"featured":true,"available":true,"happyHour":true}
+        """#)
+        try app.test(.PATCH, "api/menu/items/item-1", headers: ["Content-Type": "application/json"], body: patchBody) { res in
+            XCTAssertEqual(res.status, .unauthorized, "editing an item requires a logged-in employee")
+        }
+        try app.test(.PATCH, "api/menu/items/item-1", headers: ["Content-Type": "application/json", "Cookie": cookie], body: patchBody) { res in
+            XCTAssertEqual(res.status, .ok)
+            let updated = try res.content.decode(MenuItem.self)
+            XCTAssertEqual(updated.price, 16)
+            XCTAssertTrue(updated.featured)
+            XCTAssertTrue(updated.happyHour)
+        }
+
+        try app.test(.DELETE, "api/menu/items/item-1") { res in
+            XCTAssertEqual(res.status, .unauthorized, "deleting an item requires a logged-in employee")
+        }
+        try app.test(.DELETE, "api/menu/items/item-1", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .noContent)
+        }
+        try app.test(.GET, "api/menu/items/item-1") { res in
+            XCTAssertEqual(res.status, .notFound)
+        }
+    }
+
     func testEventsWriteRequiresAdmin() throws {
         let body = ByteBuffer(string: #"{"events":[]}"#)
         try app.test(.PUT, "api/events", headers: ["Content-Type": "application/json"], body: body) { res in

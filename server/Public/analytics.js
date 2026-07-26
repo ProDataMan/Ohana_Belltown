@@ -117,6 +117,66 @@ async function loadAnalytics() {
   }
 }
 
+function renderMenuHealthTable(el, rows) {
+  if (!rows.length) {
+    el.innerHTML = '<p class="hint">None &mdash; nice work.</p>';
+    return;
+  }
+  el.innerHTML = `
+    <div class="data-table">
+      <table>
+        <thead><tr><th>Item</th><th>Category</th><th>Section</th><th></th></tr></thead>
+        <tbody>
+          ${rows
+            .map(
+              (r) => `
+            <tr>
+              <td>${escapeHtmlAnalytics(r.name)}</td>
+              <td>${escapeHtmlAnalytics(r.categoryName)}</td>
+              <td>${escapeHtmlAnalytics(r.section)}</td>
+              <td><a class="cta-button secondary" style="padding: 0.35rem 0.7rem; font-size: 0.82rem;" href="/edit-item.html?id=${encodeURIComponent(r.id)}">Edit</a></td>
+            </tr>
+          `
+            )
+            .join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function loadMenuHealthReports() {
+  const missingPriceEl = document.getElementById('missing-price-list');
+  const missingPhotoEl = document.getElementById('missing-photo-list');
+  missingPriceEl.innerHTML = '<p class="hint">Loading...</p>';
+  missingPhotoEl.innerHTML = '<p class="hint">Loading...</p>';
+
+  try {
+    const response = await staffFetch('/api/menu');
+    if (!response.ok) throw new Error(`Unable to load the menu (${response.status}).`);
+    const data = await response.json();
+
+    const missingPrice = [];
+    const missingPhoto = [];
+    (data.categories || []).forEach((category) => {
+      (category.items || []).forEach((item) => {
+        const row = { id: item.id, name: item.name, categoryName: category.name, section: category.section };
+        if (item.price == null) missingPrice.push(row);
+        if (!item.images || !item.images.length) missingPhoto.push(row);
+      });
+    });
+
+    renderMenuHealthTable(missingPriceEl, missingPrice);
+    renderMenuHealthTable(missingPhotoEl, missingPhoto);
+  } catch (error) {
+    const message = `<p class="status status-error">${escapeHtmlAnalytics(error.message)}</p>`;
+    missingPriceEl.innerHTML = message;
+    missingPhotoEl.innerHTML = message;
+  }
+}
+
 document.getElementById('range-select').addEventListener('change', loadAnalytics);
+document.getElementById('reload-menu-health-btn').addEventListener('click', loadMenuHealthReports);
 
 loadAnalytics();
+loadMenuHealthReports();

@@ -16,6 +16,28 @@ final class MenuTests: XCTestCase {
         XCTAssertEqual(item.tags, [])
         XCTAssertFalse(item.featured)
         XCTAssertTrue(item.available, "items should default to available when the field predates the sold-out toggle")
+        XCTAssertFalse(item.happyHour, "items should default to not-happy-hour when the field predates that flag")
+        XCTAssertFalse(item.id.isEmpty, "a pre-existing item without a persisted id should still get a usable one")
+    }
+
+    func testItemWithoutPersistedIdGetsAFreshOneEachDecode() throws {
+        let json = """
+        { "name": "No ID Yet", "price": 10 }
+        """
+        let first = try JSONDecoder().decode(MenuItem.self, from: Data(json.utf8))
+        let second = try JSONDecoder().decode(MenuItem.self, from: Data(json.utf8))
+        // Confirms *why* MenuStore.loadIfNeeded() must immediately re-persist
+        // after decoding — without that, a legacy item's id would silently
+        // change on every server restart.
+        XCTAssertNotEqual(first.id, second.id)
+    }
+
+    func testPersistedIdSurvivesRoundTrip() throws {
+        let json = """
+        { "id": "fixed-id-123", "name": "Has An ID", "price": 10 }
+        """
+        let item = try JSONDecoder().decode(MenuItem.self, from: Data(json.utf8))
+        XCTAssertEqual(item.id, "fixed-id-123")
     }
 
     func testDecodesNewFormatWithImagesArray() throws {

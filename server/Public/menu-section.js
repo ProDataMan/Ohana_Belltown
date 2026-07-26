@@ -177,6 +177,9 @@ function renderMenu(data) {
           const specialBadge = item.featured ? '<span class="special-badge">&#9733; Today\'s Special</span>' : '';
           const soldOut = item.available === false;
           const soldOutBadge = soldOut ? '<span class="sold-out-badge">Sold Out Today</span>' : '';
+          const editLink = item.id
+            ? `<a class="staff-edit-link" href="/edit-item.html?id=${encodeURIComponent(item.id)}" hidden>Edit</a>`
+            : '';
           return `
             <article class="item${soldOut ? ' item-sold-out' : ''}" data-search="${escapeHtml(searchText)}" data-index="${index}" data-tags="${escapeHtml(tags.join(','))}">
               ${imageMarkup}
@@ -187,6 +190,7 @@ function renderMenu(data) {
                 ${tagsMarkup}
               </div>
               ${priceMarkup}
+              ${editLink}
             </article>
           `;
         })
@@ -344,6 +348,9 @@ async function openItemModal(index) {
 }
 
 menuContainer.addEventListener('click', (event) => {
+  if (event.target.closest('.staff-edit-link')) {
+    return;
+  }
   const photo = event.target.closest('.item-photo');
   if (photo) {
     window.openLightbox(photo.src, photo.alt);
@@ -355,6 +362,19 @@ menuContainer.addEventListener('click', (event) => {
   }
 });
 
+async function revealStaffEditLinksIfLoggedIn() {
+  const links = document.querySelectorAll('.staff-edit-link');
+  if (!links.length) return;
+  try {
+    const response = await fetch('/api/auth/me');
+    if (response.ok) {
+      links.forEach((link) => { link.hidden = false; });
+    }
+  } catch {
+    // stay hidden
+  }
+}
+
 async function loadMenu() {
   try {
     const response = await fetch('/api/menu');
@@ -364,6 +384,7 @@ async function loadMenu() {
 
     const data = await response.json();
     renderMenu(data);
+    revealStaffEditLinksIfLoggedIn();
   } catch (error) {
     menuContainer.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;
   }

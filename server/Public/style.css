@@ -164,6 +164,24 @@ h1 {
   font-family: var(--font-ui);
 }
 
+.staff-edit-link {
+  align-self: center;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--pink);
+  color: var(--pink-text);
+  text-decoration: none;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: var(--font-ui);
+  white-space: nowrap;
+}
+
+.staff-edit-link:hover {
+  background: #fdf1f6;
+}
+
 .error {
   padding: 1rem;
   border-radius: 12px;
@@ -177,7 +195,8 @@ h1 {
     flex-direction: column;
   }
 
-  .price {
+  .price,
+  .staff-edit-link {
     align-self: flex-start;
   }
 }

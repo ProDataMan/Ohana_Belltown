@@ -68,7 +68,8 @@ now historical background rather than the current plan.
 | `/login` | Staff login. First run (zero accounts) shows a one-time "create the first admin" form instead. |
 | `/account.html` | Self-service: view own profile, log out |
 | `/change-password.html` | Self-service password change (requires current password) |
-| `/edit.html` | Staff menu editor — prices, descriptions, photos, tags, featured/sold-out toggles. **Any logged-in employee.** |
+| `/edit.html` | Staff menu editor (bulk) — prices, descriptions, photos, tags, featured/sold-out/Happy-Hour toggles. **Any logged-in employee.** |
+| `/edit-item.html?id=...` | Staff: single-item editor — same fields as above plus delete, for editing one item quickly. **Any logged-in employee.** |
 | `/loyalty-admin.html` | Staff: punch a card, redeem a reward, approve/deny bonus claims. **Any logged-in employee.** |
 | `/events-admin.html` | Staff: edit the events/specials shown on `/local`. **Admin only.** |
 | `/create-account.html`, `/manage-users.html` | Admin: create staff accounts, change roles, reset passwords. **Admin only.** |
@@ -96,6 +97,8 @@ now historical background rather than the current plan.
 - Per-item sold-out ("86'd") toggle — item stays visible on the public menu, grayed out with a "Sold Out Today" badge, instead of disappearing or requiring deletion
 - Staff editor (`/edit.html`) — prices, descriptions, multi-photo galleries (manual upload or pick from Google Places), tags, featured toggle, sold-out toggle. Requires login (any employee); saves directly to the live site.
 - The editor covers all 24 categories across Food/Sushi/Drinks/Happy Hour on one long page — a jump-nav at the top links straight to each section (Happy Hour is last, after ~170 other items, easy to miss without it), and a "Today's specials" panel lists every currently-featured item with a click-to-jump link, so finding/changing daily specials doesn't mean scrolling the whole menu looking for checked boxes.
+- Every menu item now has a stable id (auto-migrated on first load for items saved before this existed) plus a "Happy Hour" flag alongside the existing featured/sold-out toggles — editable from either the bulk editor or the new single-item editor below.
+- `/edit-item.html?id=...` — a focused single-item editor (photos, price, description, tags, featured/sold-out/Happy-Hour toggles, delete) reached by clicking a small "Edit" link that now appears next to every item on the public menu pages (`/menu`, `/sushi`, `/drinks`, `/happy-hour`) whenever a staff member is logged in — invisible to everyone else. The original bulk editor at `/edit.html` (edit many prices, then one Save) still works exactly as before; this is an additional, faster path for touching one item at a time, e.g. from an analytics report link.
 - The "Staff: edit menu →" link on `/menu`, `/sushi`, `/drinks`, and `/happy-hour` is hidden by default and only reveals itself (via `/api/auth/me`) if you're currently logged in as staff — anonymous visitors never see it.
 
 **Loyalty & engagement**
@@ -142,9 +145,10 @@ now historical background rather than the current plan.
 - `sitemap.xml` and `robots.txt`
 - Cache-Control revalidation on every response (avoids stale-cache bugs after a deploy)
 - Accessibility pass — fixed real WCAG AA contrast failures (brand pink/gold read ~3:1 as text on light backgrounds; added darker `--pink-text`/`--gold-text` variants used only for text, keeping the brighter originals for backgrounds/borders), a focus state that was fully removed without a visible replacement, and a heading-hierarchy skip on the Contact page. Alt text was already solid site-wide.
-- Automated test suite (`server/Tests/AppTests`, 65 tests) — loyalty punch/redeem math, waitlist queue behavior, analytics aggregation, staff and customer auth (including deactivation and OAuth linking), menu backward-compat decoding, and route-level permission boundaries. Run with `swift test` from `server/`.
+- Automated test suite (`server/Tests/AppTests`, 74 tests) — loyalty punch/redeem math, waitlist queue behavior, analytics aggregation, single-item menu CRUD, staff and customer auth (including deactivation and OAuth linking), menu backward-compat decoding, and route-level permission boundaries. Run with `swift test` from `server/`.
 - Self-hosted analytics (`/analytics.html`, admin only) — pageview counts by page and by day, device type (mobile/tablet/desktop), average time on page, and most-viewed menu items (detail-popup opens — a proxy for interest, not a sales figure, since this site has no access to real order data from ChowNow). No cookies, no third-party tracking script, no per-visitor identity anywhere. Bounded to 120 days of aggregated data.
 - "Popular Right Now" on `/specials` — the top menu items by real view count over the last 30 days, computed fresh on every page load (`/api/analytics/popular-items`), automatically skipping anything sold out or removed from the menu. Sits alongside, not instead of, the staff-curated "Today's Specials" section — nothing here overwrites what staff manually feature.
+- "Menu Items Missing a Price" / "Menu Items Missing a Photo" reports on `/analytics.html`, scanning the entire live menu (including Happy Hour) — each row links straight to that item's `/edit-item.html` page to fix it on the spot.
 - Uploaded photos (menu editor, customer bonus-claim photos) are auto-resized (1600px long-edge cap) and re-compressed via ImageMagick, run off the event loop so it doesn't stall other requests. Fails closed — if optimization fails for any reason, the original upload is kept as-is rather than blocking the upload.
 
 **Visual design refresh**

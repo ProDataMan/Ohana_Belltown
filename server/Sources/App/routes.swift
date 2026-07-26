@@ -31,6 +31,17 @@ struct DwellRequest: Content {
     var seconds: Double
 }
 
+struct MenuItemUpdateRequest: Content {
+    var name: String
+    var description: String?
+    var price: Double?
+    var images: [String]
+    var tags: [String]
+    var featured: Bool
+    var available: Bool
+    var happyHour: Bool
+}
+
 func routes(_ app: Application) throws {
     try registerAuthRoutes(app)
     try registerCustomerAuthRoutes(app)
@@ -46,6 +57,34 @@ func routes(_ app: Application) throws {
         try requireLogin(req)
         let incoming = try req.content.decode(Menu.self)
         return try MenuStore.shared.save(incoming)
+    }
+
+    app.get("api", "menu", "items", ":id") { req throws -> MenuItemLocation in
+        guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
+        return try MenuStore.shared.findItem(id: id)
+    }
+
+    app.on(.PATCH, "api", "menu", "items", ":id") { req throws -> MenuItem in
+        try requireLogin(req)
+        guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
+        let body = try req.content.decode(MenuItemUpdateRequest.self)
+        return try MenuStore.shared.updateItem(id: id) { item in
+            item.name = body.name
+            item.description = body.description
+            item.price = body.price
+            item.images = body.images
+            item.tags = body.tags
+            item.featured = body.featured
+            item.available = body.available
+            item.happyHour = body.happyHour
+        }
+    }
+
+    app.on(.DELETE, "api", "menu", "items", ":id") { req throws -> HTTPStatus in
+        try requireLogin(req)
+        guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
+        try MenuStore.shared.deleteItem(id: id)
+        return .noContent
     }
 
     app.on(.POST, "api", "upload", body: .collect(maxSize: "8mb")) { req async throws -> UploadResponse in
@@ -189,6 +228,7 @@ func routes(_ app: Application) throws {
 
     let staffPages: [(String, String, Bool)] = [
         ("edit.html", "staff/edit.html", false),
+        ("edit-item.html", "staff/edit-item.html", false),
         ("loyalty-admin.html", "staff/loyalty-admin.html", false),
         ("waitlist-admin.html", "staff/waitlist-admin.html", false),
         ("events-admin.html", "staff/events-admin.html", true),
