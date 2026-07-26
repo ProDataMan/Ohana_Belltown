@@ -59,6 +59,7 @@ now historical background rather than the current plan.
 | Path | What it is |
 |---|---|
 | `/`, `/about`, `/local`, `/contact`, `/catering`, `/gallery` | Marketing pages |
+| `/faq` | Common questions — reservations, hours, parking, dietary/allergen info, private events, gift cards |
 | `/privacy`, `/terms` | Privacy Policy and Terms of Service — linked from every public page's footer and the signup form |
 | `/menu`, `/sushi`, `/drinks`, `/happy-hour` | Menu sections (216 items total) — search box + allergen/dietary filter chips |
 | `/specials` | Stable landing page (today's specials, "Popular Right Now" auto-ranked from real view data, Happy Hour hours, drinks teaser) for linking from social media/bio links |
@@ -86,6 +87,7 @@ now historical background rather than the current plan.
 - Full real menu — 216 items across Food/Sushi/Drinks/Happy Hour, transcribed from the current printed menu
 - 204/216 items have written descriptions; brand-name drinks researched and described
 - Home, About, Local, Contact, Catering pages with real copy, ported from the old Weebly site
+- `/faq` — reservations, hours, parking, dietary/allergen info, private events, gift cards. Deliberately doesn't state specific opening hours (not published anywhere in this codebase to begin with) — points to Google/a phone call instead of guessing, since a wrong published hour is worse than no hour at all.
 - Catering page now also covers Private Events &mdash; booking Ohana's own space for a large party, distinct from off-site catering
 - Legacy `.html` URL redirects preserved for SEO
 - HTTPS + persistent storage (Azure Files-backed menu data and photos)

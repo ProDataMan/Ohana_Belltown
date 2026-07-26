@@ -219,6 +219,7 @@ func routes(_ app: Application) throws {
         ("privacy", "pages/privacy.html"),
         ("terms", "pages/terms.html"),
         ("waitlist", "pages/waitlist.html"),
+        ("faq", "pages/faq.html"),
     ]
     for (route, file) in cleanPages {
         app.get(PathComponent(stringLiteral: route)) { req in
