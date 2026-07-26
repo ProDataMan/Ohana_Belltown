@@ -90,6 +90,7 @@ now historical background rather than the current plan.
 - Daily specials / featured-item toggle, surfaced on the homepage
 - Per-item sold-out ("86'd") toggle — item stays visible on the public menu, grayed out with a "Sold Out Today" badge, instead of disappearing or requiring deletion
 - Staff editor (`/edit.html`) — prices, descriptions, multi-photo galleries (manual upload or pick from Google Places), tags, featured toggle, sold-out toggle. Requires login (any employee); saves directly to the live site.
+- The "Staff: edit menu →" link on `/menu`, `/sushi`, `/drinks`, and `/happy-hour` is hidden by default and only reveals itself (via `/api/auth/me`) if you're currently logged in as staff — anonymous visitors never see it.
 
 **Loyalty & engagement**
 - Digital sushi punch card (`/rewards` + `/loyalty-admin.html`) — phone-number identity, 1 punch per sushi order,
@@ -119,9 +120,11 @@ now historical background rather than the current plan.
 - Self-service account deactivation (`/my-account.html`) — immediately ends the session and blocks future login (password or OAuth)
 
 **OAuth sign-in (Google + Apple)**
-- Customers: "Continue with Google/Apple" on `/signup` and `/account-login` — self-serve, first sign-in creates an account (or links to an existing email/password account with a matching verified email)
-- Staff: link-only, not self-serve — an employee must already have a username/password account, log in, then link Google/Apple from `/account.html`. Only after linking does "Sign in with Google/Apple" work on `/login`. (Prevents anyone with a Google account from getting staff access.)
-- **Neither provider is actually configured yet** — see [Setting up Google/Apple Sign-In](#setting-up-googleapple-sign-in). The buttons are live in the UI but return a clear 503 until real credentials are set.
+- Customers: "Continue with Google" on `/signup` and `/account-login` — self-serve, first sign-in creates an account (or links to an existing email/password account with a matching verified email)
+- Staff: link-only, not self-serve — an employee must already have a username/password account, log in, then link Google from `/account.html`. Only after linking does "Sign in with Google" work on `/login`. (Prevents anyone with a Google account from getting staff access.)
+- `/account-login` (the customer-facing "Log In" linked from the main nav) is the one login page most visitors reach; it has a "Staff? Log in with your username" link pointing to `/login`, the separate staff login page (username-or-email + password, or linked Google)
+- Apple's button is hidden site-wide for now (`hidden` attribute + a CSS rule, easy to re-enable) until Apple credentials are actually set up — see [`docs/oauth-setup.md`](docs/oauth-setup.md)
+- **Neither provider is actually configured yet** — see [`docs/oauth-setup.md`](docs/oauth-setup.md). The Google button is live in the UI but returns a clear 503 until real credentials are set.
 
 **SEO & technical**
 - Per-page Open Graph / Twitter Card tags

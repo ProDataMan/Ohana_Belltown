@@ -334,6 +334,13 @@ button.secondary:hover {
   border-color: #000;
 }
 
+/* Apple Sign-In isn't configured yet — hidden for now via the `hidden`
+   attribute. Needs its own rule since `.oauth-btn-apple` and `[hidden]`
+   tie in specificity, and the later class rule would otherwise win. */
+.oauth-btn-apple[hidden] {
+  display: none;
+}
+
 .oauth-divider {
   display: flex;
   align-items: center;

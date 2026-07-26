@@ -29,7 +29,7 @@ async function loadProfile() {
           : '<a class="oauth-btn oauth-btn-google" href="/auth/google/staff?mode=link">Link Google Account</a>'}
         ${user.appleLinked
           ? '<span class="pill pill-approved">Apple linked</span>'
-          : '<a class="oauth-btn oauth-btn-apple" href="/auth/apple/staff?mode=link">Link Apple Account</a>'}
+          : ''}
       `;
     }
   } catch (error) {
