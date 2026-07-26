@@ -207,5 +207,51 @@ async function loadCustomers() {
 
 document.getElementById('reload-customers-btn').addEventListener('click', loadCustomers);
 
+const birthdaysListEl = document.getElementById('birthdays-list');
+
+function formatMonthDay(monthDay) {
+  const [month, day] = monthDay.split('-').map(Number);
+  const date = new Date(2000, month - 1, day);
+  return date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
+}
+
+async function loadBirthdays() {
+  birthdaysListEl.innerHTML = '<p class="hint">Loading...</p>';
+  try {
+    const response = await staffFetch('/api/customer/birthdays-upcoming?days=7');
+    if (!response.ok) throw new Error(`Unable to load birthdays (${response.status}).`);
+    const customers = await response.json();
+    if (!customers.length) {
+      birthdaysListEl.innerHTML = '<p class="hint">No Birthday Club members in the next 7 days.</p>';
+      return;
+    }
+    birthdaysListEl.innerHTML = `
+      <div class="data-table">
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Birthday</th></tr></thead>
+          <tbody>
+            ${customers
+              .map(
+                (c) => `
+              <tr>
+                <td>${escapeHtmlLoyalty(c.displayName)}</td>
+                <td>${escapeHtmlLoyalty(c.email)}</td>
+                <td>${escapeHtmlLoyalty(formatMonthDay(c.birthday))}</td>
+              </tr>
+            `
+              )
+              .join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (error) {
+    birthdaysListEl.innerHTML = `<p class="status status-error">${escapeHtmlLoyalty(error.message)}</p>`;
+  }
+}
+
+document.getElementById('reload-birthdays-btn').addEventListener('click', loadBirthdays);
+
 loadBonusRequests();
 loadCustomers();
+loadBirthdays();

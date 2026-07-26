@@ -25,6 +25,10 @@ struct CustomerChangePasswordRequest: Content {
     var newPassword: String
 }
 
+struct CustomerBirthdayRequest: Content {
+    var birthday: String?
+}
+
 struct GenericOK: Content {
     var ok: Bool = true
 }
@@ -140,5 +144,18 @@ func registerCustomerAuthRoutes(_ app: Application) throws {
         let result = try CustomerUserStore.shared.deactivate(id: customer.id)
         req.session.data["customerId"] = nil
         return result
+    }
+
+    app.post("api", "customer", "birthday") { req throws -> CustomerUserPublic in
+        let customer = try requireCustomerLogin(req)
+        let body = try req.content.decode(CustomerBirthdayRequest.self)
+        return try CustomerUserStore.shared.updateBirthday(id: customer.id, birthday: body.birthday)
+    }
+
+    // Staff-facing — who has a birthday coming up, so a server can treat them.
+    app.get("api", "customer", "birthdays-upcoming") { req throws -> [CustomerUserPublic] in
+        try requireLogin(req)
+        let days = req.query[Int.self, at: "days"] ?? 7
+        return try CustomerUserStore.shared.upcomingBirthdays(withinDays: days)
     }
 }

@@ -28,6 +28,12 @@ async function loadProfile() {
       <p>${escapeHtmlMyAccount(customer.email)}</p>
       ${!customer.verified ? '<p class="hint">Check your email to verify your account (a verification link was sent when you signed up).</p>' : ''}
     `;
+    const birthdayInput = document.getElementById('birthday-input');
+    if (birthdayInput && customer.birthday) {
+      // The year is never stored or sent anywhere — 2000 is just a
+      // leap-year placeholder so the native date picker has a full date to show.
+      birthdayInput.value = `2000-${customer.birthday}`;
+    }
   } catch (error) {
     el.textContent = error.message;
   }
@@ -61,6 +67,47 @@ document.getElementById('change-password-form').addEventListener('submit', async
     }
     setMyAccountStatus(statusEl, 'Password changed!', false);
     event.target.reset();
+  } catch (error) {
+    setMyAccountStatus(statusEl, error.message, true);
+  }
+});
+
+document.getElementById('birthday-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const statusEl = document.getElementById('birthday-status');
+  const value = document.getElementById('birthday-input').value;
+  if (!value) return setMyAccountStatus(statusEl, 'Pick a date first, or use Clear.', true);
+  const monthDay = value.slice(5);
+
+  setMyAccountStatus(statusEl, 'Saving...', false);
+  try {
+    const response = await fetch('/api/customer/birthday', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ birthday: monthDay }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.reason || `Failed (${response.status}).`);
+    }
+    setMyAccountStatus(statusEl, 'Saved!', false);
+  } catch (error) {
+    setMyAccountStatus(statusEl, error.message, true);
+  }
+});
+
+document.getElementById('clear-birthday-btn').addEventListener('click', async () => {
+  const statusEl = document.getElementById('birthday-status');
+  setMyAccountStatus(statusEl, 'Clearing...', false);
+  try {
+    const response = await fetch('/api/customer/birthday', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ birthday: null }),
+    });
+    if (!response.ok) throw new Error(`Failed (${response.status}).`);
+    document.getElementById('birthday-input').value = '';
+    setMyAccountStatus(statusEl, 'Cleared.', false);
   } catch (error) {
     setMyAccountStatus(statusEl, error.message, true);
   }

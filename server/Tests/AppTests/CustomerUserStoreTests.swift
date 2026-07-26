@@ -142,4 +142,73 @@ final class CustomerUserStoreTests: XCTestCase {
         let authed = try CustomerUserStore.shared.authenticate(email: "oauth@example.com", password: "newpass123")
         XCTAssertEqual(authed.id, customer.id)
     }
+
+    private func monthDay(daysFromToday offset: Int) -> String {
+        let date = Calendar.current.date(byAdding: .day, value: offset, to: Date())!
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM-dd"
+        return formatter.string(from: date)
+    }
+
+    func testBirthdayRejectsInvalidFormat() throws {
+        let (customer, _) = try CustomerUserStore.shared.register(email: "guest@example.com", displayName: "Guest", password: "guestpass1")
+        XCTAssertThrowsError(try CustomerUserStore.shared.updateBirthday(id: customer.id, birthday: "not-a-date")) { error in
+            guard let customerError = error as? CustomerUserError else { return XCTFail("wrong error type") }
+            XCTAssertEqual(customerError, .invalidBirthdayFormat)
+        }
+        XCTAssertThrowsError(try CustomerUserStore.shared.updateBirthday(id: customer.id, birthday: "13-40"))
+    }
+
+    func testBirthdayCanBeSetAndCleared() throws {
+        let (customer, _) = try CustomerUserStore.shared.register(email: "guest@example.com", displayName: "Guest", password: "guestpass1")
+        let set = try CustomerUserStore.shared.updateBirthday(id: customer.id, birthday: "07-26")
+        XCTAssertEqual(set.birthday, "07-26")
+
+        let cleared = try CustomerUserStore.shared.updateBirthday(id: customer.id, birthday: nil)
+        XCTAssertNil(cleared.birthday)
+    }
+
+    func testUpcomingBirthdaysFindsCustomerWithinWindow() throws {
+        let (customer, _) = try CustomerUserStore.shared.register(email: "guest@example.com", displayName: "Guest", password: "guestpass1")
+        try CustomerUserStore.shared.updateBirthday(id: customer.id, birthday: monthDay(daysFromToday: 3))
+
+        let upcoming = try CustomerUserStore.shared.upcomingBirthdays(withinDays: 7)
+        XCTAssertTrue(upcoming.contains { $0.id == customer.id })
+    }
+
+    func testUpcomingBirthdaysIncludesToday() throws {
+        let (customer, _) = try CustomerUserStore.shared.register(email: "guest@example.com", displayName: "Guest", password: "guestpass1")
+        try CustomerUserStore.shared.updateBirthday(id: customer.id, birthday: monthDay(daysFromToday: 0))
+
+        let upcoming = try CustomerUserStore.shared.upcomingBirthdays(withinDays: 0)
+        XCTAssertTrue(upcoming.contains { $0.id == customer.id })
+    }
+
+    func testUpcomingBirthdaysExcludesOutsideWindow() throws {
+        let (customer, _) = try CustomerUserStore.shared.register(email: "guest@example.com", displayName: "Guest", password: "guestpass1")
+        try CustomerUserStore.shared.updateBirthday(id: customer.id, birthday: monthDay(daysFromToday: 20))
+
+        let upcoming = try CustomerUserStore.shared.upcomingBirthdays(withinDays: 7)
+        XCTAssertFalse(upcoming.contains { $0.id == customer.id })
+    }
+
+    func testUpcomingBirthdaysWrapsToNextYearForAPastDate() throws {
+        // A birthday that already happened this year (yesterday) shouldn't
+        // show up in a short window — its next real occurrence is ~364 days
+        // away, not "already passed, ignore forever."
+        let (customer, _) = try CustomerUserStore.shared.register(email: "guest@example.com", displayName: "Guest", password: "guestpass1")
+        try CustomerUserStore.shared.updateBirthday(id: customer.id, birthday: monthDay(daysFromToday: -1))
+
+        let upcoming = try CustomerUserStore.shared.upcomingBirthdays(withinDays: 7)
+        XCTAssertFalse(upcoming.contains { $0.id == customer.id })
+    }
+
+    func testUpcomingBirthdaysExcludesInactiveCustomers() throws {
+        let (customer, _) = try CustomerUserStore.shared.register(email: "guest@example.com", displayName: "Guest", password: "guestpass1")
+        try CustomerUserStore.shared.updateBirthday(id: customer.id, birthday: monthDay(daysFromToday: 1))
+        try CustomerUserStore.shared.deactivate(id: customer.id)
+
+        let upcoming = try CustomerUserStore.shared.upcomingBirthdays(withinDays: 7)
+        XCTAssertFalse(upcoming.contains { $0.id == customer.id })
+    }
 }

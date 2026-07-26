@@ -9,6 +9,9 @@ struct CustomerUser: Codable {
     var appleId: String?
     var verified: Bool
     var active: Bool
+    /// Month and day only, formatted "MM-DD" — never the birth year, since
+    /// nothing here needs age, just the day to mark for a birthday perk.
+    var birthday: String?
     var verificationToken: String?
     var resetToken: String?
     var resetTokenExpiresAt: String?
@@ -16,14 +19,14 @@ struct CustomerUser: Codable {
     var updatedAt: String
 
     enum CodingKeys: String, CodingKey {
-        case id, email, displayName, passwordHash, googleId, appleId, verified, active
+        case id, email, displayName, passwordHash, googleId, appleId, verified, active, birthday
         case verificationToken, resetToken, resetTokenExpiresAt, createdAt, updatedAt
     }
 
     init(
         id: String, email: String, displayName: String, passwordHash: String?,
         googleId: String?, appleId: String?, verified: Bool, active: Bool = true,
-        verificationToken: String?, resetToken: String?, resetTokenExpiresAt: String?,
+        birthday: String? = nil, verificationToken: String?, resetToken: String?, resetTokenExpiresAt: String?,
         createdAt: String, updatedAt: String
     ) {
         self.id = id
@@ -34,6 +37,7 @@ struct CustomerUser: Codable {
         self.appleId = appleId
         self.verified = verified
         self.active = active
+        self.birthday = birthday
         self.verificationToken = verificationToken
         self.resetToken = resetToken
         self.resetTokenExpiresAt = resetTokenExpiresAt
@@ -51,6 +55,7 @@ struct CustomerUser: Codable {
         appleId = try container.decodeIfPresent(String.self, forKey: .appleId)
         verified = try container.decode(Bool.self, forKey: .verified)
         active = try container.decodeIfPresent(Bool.self, forKey: .active) ?? true
+        birthday = try container.decodeIfPresent(String.self, forKey: .birthday)
         verificationToken = try container.decodeIfPresent(String.self, forKey: .verificationToken)
         resetToken = try container.decodeIfPresent(String.self, forKey: .resetToken)
         resetTokenExpiresAt = try container.decodeIfPresent(String.self, forKey: .resetTokenExpiresAt)
@@ -67,6 +72,7 @@ struct CustomerUserPublic: Content {
     var hasPassword: Bool
     var googleLinked: Bool
     var appleLinked: Bool
+    var birthday: String?
 
     init(_ user: CustomerUser) {
         id = user.id
@@ -76,6 +82,7 @@ struct CustomerUserPublic: Content {
         hasPassword = user.passwordHash != nil
         googleLinked = user.googleId != nil
         appleLinked = user.appleId != nil
+        birthday = user.birthday
     }
 }
 
@@ -87,6 +94,7 @@ enum CustomerUserError: Error, Equatable {
     case notFound
     case invalidOrExpiredToken
     case wrongCurrentPassword
+    case invalidBirthdayFormat
 }
 
 extension CustomerUserError: AbortError {
@@ -95,7 +103,7 @@ extension CustomerUserError: AbortError {
         case .emailTaken: return .conflict
         case .invalidCredentials, .wrongCurrentPassword, .noPasswordSet, .accountDeactivated: return .unauthorized
         case .notFound: return .notFound
-        case .invalidOrExpiredToken: return .badRequest
+        case .invalidOrExpiredToken, .invalidBirthdayFormat: return .badRequest
         }
     }
 
@@ -108,6 +116,7 @@ extension CustomerUserError: AbortError {
         case .notFound: return "Account not found."
         case .invalidOrExpiredToken: return "That link is invalid or has expired."
         case .wrongCurrentPassword: return "Current password is incorrect."
+        case .invalidBirthdayFormat: return "Birthday must be in MM-DD format."
         }
     }
 }
@@ -333,6 +342,73 @@ final class CustomerUserStore: @unchecked Sendable {
         users[idx].updatedAt = nowString()
         try persist()
         return CustomerUserPublic(users[idx])
+    }
+
+    /// `birthday` is "MM-DD" (e.g. "07-26"), or nil/empty to clear it — never
+    /// a full date, so no birth year is ever stored.
+    @discardableResult
+    func updateBirthday(id: String, birthday: String?) throws -> CustomerUserPublic {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard let idx = users.firstIndex(where: { $0.id == id }) else {
+            throw CustomerUserError.notFound
+        }
+        if let birthday, !birthday.isEmpty {
+            guard Self.isValidMonthDay(birthday) else {
+                throw CustomerUserError.invalidBirthdayFormat
+            }
+            users[idx].birthday = birthday
+        } else {
+            users[idx].birthday = nil
+        }
+        users[idx].updatedAt = nowString()
+        try persist()
+        return CustomerUserPublic(users[idx])
+    }
+
+    private static func isValidMonthDay(_ value: String) -> Bool {
+        let parts = value.split(separator: "-")
+        guard parts.count == 2, let month = Int(parts[0]), let day = Int(parts[1]) else { return false }
+        return (1...12).contains(month) && (1...31).contains(day)
+    }
+
+    /// Active customers with a birthday in the next `withinDays` days
+    /// (inclusive of today), wrapping correctly across a year boundary —
+    /// staff-facing, so a server can proactively treat a regular on their
+    /// birthday rather than relying on an automated discount.
+    func upcomingBirthdays(withinDays: Int) throws -> [CustomerUserPublic] {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        let calendar = Calendar(identifier: .gregorian)
+        let today = calendar.startOfDay(for: Date())
+
+        func daysUntilNextOccurrence(ofMonthDay value: String) -> Int? {
+            let parts = value.split(separator: "-")
+            guard parts.count == 2, let month = Int(parts[0]), let day = Int(parts[1]) else { return nil }
+            let currentYear = calendar.component(.year, from: today)
+            for yearOffset in 0...1 {
+                var components = DateComponents()
+                components.year = currentYear + yearOffset
+                components.month = month
+                components.day = day
+                guard let candidate = calendar.date(from: components) else { continue }
+                let diff = calendar.dateComponents([.day], from: today, to: candidate).day ?? -1
+                if diff >= 0 { return diff }
+            }
+            return nil
+        }
+
+        return users
+            .filter { $0.active }
+            .compactMap { user -> (CustomerUserPublic, Int)? in
+                guard let birthday = user.birthday, let daysAway = daysUntilNextOccurrence(ofMonthDay: birthday) else { return nil }
+                guard daysAway <= withinDays else { return nil }
+                return (CustomerUserPublic(user), daysAway)
+            }
+            .sorted { $0.1 < $1.1 }
+            .map { $0.0 }
     }
 
     private func loadIfNeeded() throws {
