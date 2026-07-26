@@ -59,6 +59,7 @@ now historical background rather than the current plan.
 | Path | What it is |
 |---|---|
 | `/`, `/about`, `/local`, `/contact`, `/catering`, `/gallery` | Marketing pages |
+| `/privacy`, `/terms` | Privacy Policy and Terms of Service — linked from every public page's footer and the signup form |
 | `/menu`, `/sushi`, `/drinks`, `/happy-hour` | Menu sections (216 items total) — search box + allergen/dietary filter chips |
 | `/specials` | Stable landing page (today's specials, Happy Hour hours, drinks teaser) for linking from social media/bio links |
 | `/rewards` | Customer-facing sushi punch card: check a card by phone, submit a photo/social bonus claim |

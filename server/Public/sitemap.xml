@@ -45,4 +45,14 @@
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
+  <url>
+    <loc>https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/privacy</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.2</priority>
+  </url>
+  <url>
+    <loc>https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/terms</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.2</priority>
+  </url>
 </urlset>

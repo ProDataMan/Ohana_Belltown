@@ -134,6 +134,8 @@ func routes(_ app: Application) throws {
         ("rewards", "pages/rewards.html"),
         ("specials", "pages/specials.html"),
         ("gallery", "pages/gallery.html"),
+        ("privacy", "pages/privacy.html"),
+        ("terms", "pages/terms.html"),
     ]
     for (route, file) in cleanPages {
         app.get(PathComponent(stringLiteral: route)) { req in
