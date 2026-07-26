@@ -61,7 +61,7 @@ now historical background rather than the current plan.
 | `/`, `/about`, `/local`, `/contact`, `/catering`, `/gallery` | Marketing pages |
 | `/privacy`, `/terms` | Privacy Policy and Terms of Service — linked from every public page's footer and the signup form |
 | `/menu`, `/sushi`, `/drinks`, `/happy-hour` | Menu sections (216 items total) — search box + allergen/dietary filter chips |
-| `/specials` | Stable landing page (today's specials, Happy Hour hours, drinks teaser) for linking from social media/bio links |
+| `/specials` | Stable landing page (today's specials, "Popular Right Now" auto-ranked from real view data, Happy Hour hours, drinks teaser) for linking from social media/bio links |
 | `/rewards` | Customer-facing sushi punch card: check a card by phone, submit a photo/social bonus claim |
 | `/waitlist` | Join the walk-in waitlist from your phone before arriving |
 | `/waitlist-admin.html` | Staff: view the live waitlist queue, text a guest their table's ready, remove entries. **Any logged-in employee.** |
@@ -142,8 +142,9 @@ now historical background rather than the current plan.
 - `sitemap.xml` and `robots.txt`
 - Cache-Control revalidation on every response (avoids stale-cache bugs after a deploy)
 - Accessibility pass — fixed real WCAG AA contrast failures (brand pink/gold read ~3:1 as text on light backgrounds; added darker `--pink-text`/`--gold-text` variants used only for text, keeping the brighter originals for backgrounds/borders), a focus state that was fully removed without a visible replacement, and a heading-hierarchy skip on the Contact page. Alt text was already solid site-wide.
-- Automated test suite (`server/Tests/AppTests`, 64 tests) — loyalty punch/redeem math, waitlist queue behavior, analytics aggregation, staff and customer auth (including deactivation and OAuth linking), menu backward-compat decoding, and route-level permission boundaries. Run with `swift test` from `server/`.
+- Automated test suite (`server/Tests/AppTests`, 65 tests) — loyalty punch/redeem math, waitlist queue behavior, analytics aggregation, staff and customer auth (including deactivation and OAuth linking), menu backward-compat decoding, and route-level permission boundaries. Run with `swift test` from `server/`.
 - Self-hosted analytics (`/analytics.html`, admin only) — pageview counts by page and by day, device type (mobile/tablet/desktop), average time on page, and most-viewed menu items (detail-popup opens — a proxy for interest, not a sales figure, since this site has no access to real order data from ChowNow). No cookies, no third-party tracking script, no per-visitor identity anywhere. Bounded to 120 days of aggregated data.
+- "Popular Right Now" on `/specials` — the top menu items by real view count over the last 30 days, computed fresh on every page load (`/api/analytics/popular-items`), automatically skipping anything sold out or removed from the menu. Sits alongside, not instead of, the staff-curated "Today's Specials" section — nothing here overwrites what staff manually feature.
 - Uploaded photos (menu editor, customer bonus-claim photos) are auto-resized (1600px long-edge cap) and re-compressed via ImageMagick, run off the event loop so it doesn't stall other requests. Fails closed — if optimization fails for any reason, the original upload is kept as-is rather than blocking the upload.
 
 **Visual design refresh**

@@ -20,6 +20,8 @@ final class RouteTests: XCTestCase {
         LoyaltyStore.shared.configure(dataDirectory: tempDir.path)
         UserStore.shared.configure(dataDirectory: tempDir.path)
         CustomerUserStore.shared.configure(dataDirectory: tempDir.path)
+        AnalyticsStore.shared.configure(dataDirectory: tempDir.path)
+        WaitlistStore.shared.configure(dataDirectory: tempDir.path)
     }
 
     override func tearDown() async throws {
@@ -104,6 +106,48 @@ final class RouteTests: XCTestCase {
         let wrongBody = ByteBuffer(string: #"{"email":"guest@example.com","password":"wrong"}"#)
         try app.test(.POST, "api/customer/login", headers: ["Content-Type": "application/json"], body: wrongBody) { res in
             XCTAssertEqual(res.status, .unauthorized)
+        }
+    }
+
+    func testPopularItemsExcludesSoldOutAndRanksByViews() throws {
+        let menuBody = ByteBuffer(string: #"""
+        {"restaurant":"Ohana","lastUpdated":"now","categories":[
+          {"section":"menu","name":"Rolls","note":null,"items":[
+            {"name":"Volcano Roll","description":null,"price":14,"images":[],"tags":[],"featured":false,"available":true},
+            {"name":"Rainbow Roll","description":null,"price":13,"images":[],"tags":[],"featured":false,"available":true},
+            {"name":"Sold Out Roll","description":null,"price":12,"images":[],"tags":[],"featured":false,"available":false}
+          ]}
+        ]}
+        """#)
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        try app.test(.PUT, "api/menu", headers: ["Content-Type": "application/json", "Cookie": cookie], body: menuBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+
+        func recordView(_ name: String, times: Int) throws {
+            for _ in 0..<times {
+                try app.test(.POST, "api/analytics/item-view", headers: ["Content-Type": "application/json"],
+                             body: ByteBuffer(string: #"{"name":"\#(name)"}"#)) { res in
+                    XCTAssertEqual(res.status, .ok)
+                }
+            }
+        }
+        try recordView("Volcano Roll", times: 3)
+        try recordView("Rainbow Roll", times: 1)
+        try recordView("Sold Out Roll", times: 5)
+
+        try app.test(.GET, "api/analytics/popular-items?days=30&limit=6") { res in
+            XCTAssertEqual(res.status, .ok)
+            let items = try res.content.decode([MenuItem].self)
+            XCTAssertEqual(items.map { $0.name }, ["Volcano Roll", "Rainbow Roll"], "sold-out item should be excluded despite having the most views")
         }
     }
 }

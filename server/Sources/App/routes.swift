@@ -224,6 +224,28 @@ func routes(_ app: Application) throws {
         return .ok
     }
 
+    // Most-viewed items over a rolling window, cross-referenced against the
+    // live menu so removed or 86'd items never show up here. This is a
+    // "what are people looking at" signal, not a sales figure — there's no
+    // real order data available to this site (ordering happens via ChowNow).
+    app.get("api", "analytics", "popular-items") { req throws -> [MenuItem] in
+        let days = req.query[Int.self, at: "days"] ?? 30
+        let limit = req.query[Int.self, at: "limit"] ?? 6
+        let candidateNames = try AnalyticsStore.shared.topItemNames(days: days, limit: limit * 3)
+        let menu = try MenuStore.shared.get()
+        var results: [MenuItem] = []
+        for name in candidateNames {
+            guard results.count < limit else { break }
+            for category in menu.categories {
+                if let item = category.items.first(where: { $0.name == name && $0.available != false }) {
+                    results.append(item)
+                    break
+                }
+            }
+        }
+        return results
+    }
+
     let legacyRedirects: [(String, String)] = [
         ("menu.html", "/menu"),
         ("sushi.html", "/sushi"),
