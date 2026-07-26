@@ -22,6 +22,15 @@ struct WaitlistJoinRequest: Content {
     var note: String?
 }
 
+struct ItemViewRequest: Content {
+    var name: String
+}
+
+struct DwellRequest: Content {
+    var path: String
+    var seconds: Double
+}
+
 func routes(_ app: Application) throws {
     try registerAuthRoutes(app)
     try registerCustomerAuthRoutes(app)
@@ -199,6 +208,20 @@ func routes(_ app: Application) throws {
         try requireAdmin(req)
         let days = req.query[Int.self, at: "days"] ?? 30
         return try AnalyticsStore.shared.summary(days: days)
+    }
+
+    app.post("api", "analytics", "item-view") { req throws -> HTTPStatus in
+        let body = try req.content.decode(ItemViewRequest.self)
+        let name = body.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return .ok }
+        AnalyticsStore.shared.recordItemView(name: name)
+        return .ok
+    }
+
+    app.post("api", "analytics", "dwell") { req throws -> HTTPStatus in
+        let body = try req.content.decode(DwellRequest.self)
+        AnalyticsStore.shared.recordDwell(path: body.path, seconds: body.seconds)
+        return .ok
     }
 
     let legacyRedirects: [(String, String)] = [

@@ -271,6 +271,12 @@ async function openItemModal(index) {
   const { item, categoryName } = entry;
   const modal = ensureItemModal();
 
+  fetch('/api/analytics/item-view', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: item.name }),
+  }).catch(() => {});
+
   modal.querySelector('.item-modal-category').textContent = categoryName;
   modal.querySelector('.item-modal-sold-out').hidden = item.available !== false;
   modal.querySelector('.item-modal-name').textContent = item.name;
