@@ -70,7 +70,8 @@ now historical background rather than the current plan.
 | `/events-admin.html` | Staff: edit the events/specials shown on `/local`. **Admin only.** |
 | `/create-account.html`, `/manage-users.html` | Admin: create staff accounts, change roles, reset passwords. **Admin only.** |
 | `/table-card.html` | Printable QR-code table tents linking to `/menu` |
-| `/signup`, `/account-login` | Customer registration and login (separate from staff accounts) |
+| `/signup`, `/account-login` | Customer registration and login (separate from staff accounts). `/account-login` links to `/login` for staff. |
+| `/logged-in` | Shared post-login router — sends staff to `/edit.html` and customers to `/my-account.html`. Where Google Sign-In lands after a successful login. |
 | `/my-account.html` | Customer's own account page — profile, password change |
 | `/forgot-password.html`, `/reset-password.html` | Customer self-service password reset |
 | `/api/menu`, `/api/events`, `/api/loyalty/*`, `/api/auth/*`, `/api/users/*`, `/api/account/*`, `/api/customer/*` | JSON API backing all of the above |
@@ -123,6 +124,7 @@ now historical background rather than the current plan.
 - Customers: "Continue with Google" on `/signup` and `/account-login` — self-serve, first sign-in creates an account (or links to an existing email/password account with a matching verified email)
 - Staff: link-only, not self-serve — an employee must already have a username/password account, log in, then link Google from `/account.html`. Only after linking does "Sign in with Google" work on `/login`. (Prevents anyone with a Google account from getting staff access.)
 - `/account-login` (the customer-facing "Log In" linked from the main nav) is the one login page most visitors reach; it has a "Staff? Log in with your username" link pointing to `/login`, the separate staff login page (username-or-email + password, or linked Google)
+- Google sign-in uses a single shared callback URL (`/auth/google/callback`) for both customers and staff — which account type it's handling is encoded in OAuth `state`, not the URL — so only one redirect URI needs registering in Google Cloud Console. Both flows land on `/logged-in` afterward, which routes staff to `/edit.html` and customers to `/my-account.html`.
 - Apple's button is hidden site-wide for now (`hidden` attribute + a CSS rule, easy to re-enable) until Apple credentials are actually set up — see [`docs/oauth-setup.md`](docs/oauth-setup.md)
 - **Neither provider is actually configured yet** — see [`docs/oauth-setup.md`](docs/oauth-setup.md). The Google button is live in the UI but returns a clear 503 until real credentials are set.
 

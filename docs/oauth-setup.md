@@ -1,10 +1,15 @@
 # Setting Up Google & Apple Sign-In
 
-Both providers are fully built and live in the site's UI already — the
-"Continue with Google" / "Continue with Apple" buttons appear on `/signup`,
-`/account-login`, `/login`, and `/account.html` — but clicking them returns a
-`503 Service Unavailable` until real credentials are set on the Container App.
-This doc walks through getting those credentials for both.
+Both providers are fully built underneath, but clicking either button
+returns a `503 Service Unavailable` until real credentials are set on the
+Container App. This doc walks through getting those credentials for both.
+
+The "Continue with Google" button appears on `/signup`, `/account-login`,
+`/login`, and `/account.html`. Apple's button is currently **hidden**
+site-wide (via a `hidden` attribute in each page's HTML) since it isn't
+configured yet — once you have real Apple credentials, remove the `hidden`
+attribute from the `.oauth-btn-apple` elements in those same four files to
+bring it back.
 
 Customers can use either provider to sign in self-serve. Staff can only
 *link* an existing username/password account to Google/Apple from
@@ -23,15 +28,18 @@ live immediately, no redeploy needed.
 3. Go to **APIs & Services → Credentials** → **Create Credentials → OAuth client ID**.
    - Application type: **Web application**
    - Name it whatever you like (e.g. "Ohana Belltown Web")
-4. Under **Authorized redirect URIs**, add these two exactly:
-   - `https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/auth/google/customer/callback`
-   - `https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/auth/google/staff/callback`
-   - Optional, for testing locally: also add `http://localhost:8080/auth/google/customer/callback` and `http://localhost:8080/auth/google/staff/callback`
+4. Under **Authorized redirect URIs**, add exactly this one URL — both customer and staff sign-in share it, dispatched internally by the app:
+   - `https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/auth/google/callback`
+   - Optional, for testing locally: also add `http://localhost:8080/auth/google/callback`
 5. Click **Create**. Google shows you a **Client ID** and **Client Secret** — copy both.
 
 These become:
 - `GOOGLE_OAUTH_CLIENT_ID`
 - `GOOGLE_OAUTH_CLIENT_SECRET`
+
+After a successful Google sign-in, both customers and staff land on
+`/logged-in`, a small router page that checks the session and forwards
+staff to `/edit.html` and customers to `/my-account.html`.
 
 ## Apple (has a real cost — $99/year Apple Developer Program)
 
@@ -80,6 +88,7 @@ minute).
 
 ## Verifying it worked
 
-Visit `/signup` or `/login` and click "Continue with Google" (or Apple). If
-it's configured correctly you'll be taken to the provider's real sign-in
-page instead of seeing a `503` error.
+Visit `/signup` or `/login` and click "Continue with Google". If it's
+configured correctly you'll be taken to Google's real sign-in page instead
+of seeing a `503` error. (Apple's button is hidden until you've set up Apple
+credentials — see the note above on re-enabling it.)
