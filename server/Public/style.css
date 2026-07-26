@@ -519,6 +519,18 @@ button.secondary:hover {
   display: none;
 }
 
+.oauth-btn-facebook {
+  background: #1877f2;
+  color: #fff;
+  border-color: #1877f2;
+}
+
+/* Facebook Login isn't configured yet — hidden for now, same reasoning
+   as .oauth-btn-apple[hidden] above. */
+.oauth-btn-facebook[hidden] {
+  display: none;
+}
+
 .oauth-divider {
   display: flex;
   align-items: center;

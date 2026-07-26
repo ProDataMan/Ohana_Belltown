@@ -27,7 +27,7 @@ async function loadProfile() {
       ${user.email ? `<p>${escapeHtmlAccount(user.email)}</p>` : ''}
       ${user.birthday ? `<p>Birthday: ${escapeHtmlAccount(formatMonthDayAccount(user.birthday))}</p>` : ''}
       ${user.phone ? `<p>Phone: ${escapeHtmlAccount(user.phone)}</p>` : ''}
-      ${user.googleLinked || user.appleLinked ? `<p class="hint">Signs in with: ${[user.googleLinked ? 'Google' : null, user.appleLinked ? 'Apple' : null].filter(Boolean).join(', ')}</p>` : ''}
+      ${user.googleLinked || user.appleLinked || user.facebookLinked ? `<p class="hint">Signs in with: ${[user.googleLinked ? 'Google' : null, user.appleLinked ? 'Apple' : null, user.facebookLinked ? 'Facebook' : null].filter(Boolean).join(', ')}</p>` : ''}
     `;
     const emailInput = document.getElementById('email-input');
     if (emailInput) {
@@ -51,6 +51,9 @@ async function loadProfile() {
         ${user.appleLinked
           ? '<span class="pill pill-approved">Apple linked</span>'
           : ''}
+        ${user.facebookLinked
+          ? '<span class="pill pill-approved">Facebook linked</span>'
+          : '<a class="oauth-btn oauth-btn-facebook" href="/auth/facebook/staff?mode=link" hidden>Link Facebook Account</a>'}
       `;
     }
   } catch (error) {

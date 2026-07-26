@@ -1,23 +1,26 @@
-# Setting Up Google & Apple Sign-In
+# Setting Up Google, Apple & Facebook Sign-In
 
-Both providers are fully built underneath, but clicking either button
+All three providers are fully built underneath, but clicking a button
 returns a `503 Service Unavailable` until real credentials are set on the
-Container App. This doc walks through getting those credentials for both.
+Container App. This doc walks through getting those credentials for each.
 
 The "Continue with Google" button appears on `/signup`, `/account-login`,
-`/login`, and `/account.html`. Apple's button is currently **hidden**
-site-wide (via a `hidden` attribute in each page's HTML) since it isn't
-configured yet — once you have real Apple credentials, remove the `hidden`
-attribute from the `.oauth-btn-apple` elements in those same four files to
-bring it back.
+`/login`, and `/account.html`. Apple's and Facebook's buttons are currently
+**hidden** site-wide (via a `hidden` attribute in each page's HTML, or a
+`hidden` attribute on the JS-generated link button on `/account.html`) since
+neither is configured yet — once you have real credentials for one, remove
+the `hidden` attribute from its `.oauth-btn-apple` / `.oauth-btn-facebook`
+elements in `customer/signup.html`, `customer/account-login.html`,
+`staff/login.html`, and (for the staff account-linking button) `account.js`
+to bring it back.
 
-Customers can use either provider to sign in self-serve. Staff can only
-*link* an existing username/password account to Google/Apple from
+Customers can use any provider to sign in self-serve. Staff can only *link*
+an existing username/password account to Google/Apple/Facebook from
 `/account.html` — they can't create a brand-new staff account through OAuth.
 
 Once you have the values below, send them over (or set them yourself — see
-[Applying the values](#applying-the-values)) and Google/Apple sign-in goes
-live immediately, no redeploy needed.
+[Applying the values](#applying-the-values)) and sign-in for that provider
+goes live immediately, no redeploy needed.
 
 ## Google (free, ~10 minutes)
 
@@ -64,6 +67,20 @@ These become:
 - `APPLE_OAUTH_KEY_ID` — the Key ID
 - `APPLE_OAUTH_PRIVATE_KEY` — the full contents of the downloaded `.p8` file, including the `-----BEGIN PRIVATE KEY-----` / `-----END PRIVATE KEY-----` lines
 
+## Facebook (free, ~10 minutes)
+
+1. Go to [developers.facebook.com/apps](https://developers.facebook.com/apps/) and create a new app (choose the "Consumer" or "None" use case — no business verification is needed for basic Facebook Login).
+2. From the app dashboard, add the **Facebook Login** product.
+3. Under **Facebook Login → Settings**, add this to **Valid OAuth Redirect URIs** — both customer and staff sign-in share it, dispatched internally by the app, same as Google:
+   - `https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/auth/facebook/callback`
+   - Optional, for testing locally: also add `http://localhost:8080/auth/facebook/callback`
+4. Under **App Settings → Basic**, copy the **App ID** and **App Secret**.
+5. While the app is in **Development Mode**, only accounts added as testers/admins under **App Roles** can sign in. Switch the app to **Live** (Basic Settings requires a privacy policy URL — `/privacy` already works for this) once you want anyone to be able to use it.
+
+These become:
+- `FACEBOOK_OAUTH_APP_ID`
+- `FACEBOOK_OAUTH_APP_SECRET`
+
 ## Applying the values
 
 Easiest: paste the values into the chat and they'll get set on the Container App directly.
@@ -80,6 +97,10 @@ az containerapp update -n ohana-belltown-server -g Ohana --set-env-vars \
   APPLE_OAUTH_TEAM_ID="<team id>" \
   APPLE_OAUTH_KEY_ID="<key id>" \
   APPLE_OAUTH_PRIVATE_KEY="<full .p8 file contents>"
+
+az containerapp update -n ohana-belltown-server -g Ohana --set-env-vars \
+  FACEBOOK_OAUTH_APP_ID="<app id>" \
+  FACEBOOK_OAUTH_APP_SECRET="<app secret>"
 ```
 
 No redeploy or code change is needed — the server reads these at request
@@ -90,5 +111,5 @@ minute).
 
 Visit `/signup` or `/login` and click "Continue with Google". If it's
 configured correctly you'll be taken to Google's real sign-in page instead
-of seeing a `503` error. (Apple's button is hidden until you've set up Apple
-credentials — see the note above on re-enabling it.)
+of seeing a `503` error. (Apple's and Facebook's buttons are hidden until
+you've set up their credentials — see the note above on re-enabling them.)

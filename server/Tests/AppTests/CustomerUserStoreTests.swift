@@ -76,6 +76,15 @@ final class CustomerUserStoreTests: XCTestCase {
         XCTAssertEqual(first.id, second.id)
     }
 
+    func testFacebookOAuthOnlyAccountHasNoPassword() throws {
+        let customer = try CustomerUserStore.shared.findOrCreateFromOAuth(
+            provider: .facebook, providerId: "facebook-1", email: "fb@example.com", displayName: "FB User"
+        )
+        XCTAssertFalse(customer.hasPassword)
+        XCTAssertTrue(customer.facebookLinked)
+        XCTAssertFalse(customer.googleLinked)
+    }
+
     func testPasswordResetTokenExpiresAndIsSingleUse() throws {
         try CustomerUserStore.shared.register(email: "guest@example.com", displayName: "Guest", password: "guestpass1")
         let token = try CustomerUserStore.shared.requestPasswordReset(email: "guest@example.com")

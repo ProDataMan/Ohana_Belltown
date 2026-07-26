@@ -33,6 +33,7 @@ async function loadProfile() {
     const signInMethods = [];
     if (customer.googleLinked) signInMethods.push('Google');
     if (customer.appleLinked) signInMethods.push('Apple');
+    if (customer.facebookLinked) signInMethods.push('Facebook');
     if (customer.hasPassword) signInMethods.push('Password');
 
     el.innerHTML = `

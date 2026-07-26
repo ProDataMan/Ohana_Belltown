@@ -7,6 +7,7 @@ struct CustomerUser: Codable {
     var passwordHash: String?
     var googleId: String?
     var appleId: String?
+    var facebookId: String?
     var verified: Bool
     var active: Bool
     /// Month and day only, formatted "MM-DD" — never the birth year, since
@@ -25,13 +26,13 @@ struct CustomerUser: Codable {
     var updatedAt: String
 
     enum CodingKeys: String, CodingKey {
-        case id, email, displayName, passwordHash, googleId, appleId, verified, active, birthday, photoURL, loyaltyPhone
+        case id, email, displayName, passwordHash, googleId, appleId, facebookId, verified, active, birthday, photoURL, loyaltyPhone
         case verificationToken, resetToken, resetTokenExpiresAt, createdAt, updatedAt
     }
 
     init(
         id: String, email: String, displayName: String, passwordHash: String?,
-        googleId: String?, appleId: String?, verified: Bool, active: Bool = true,
+        googleId: String?, appleId: String?, facebookId: String? = nil, verified: Bool, active: Bool = true,
         birthday: String? = nil, photoURL: String? = nil, loyaltyPhone: String? = nil,
         verificationToken: String?, resetToken: String?, resetTokenExpiresAt: String?,
         createdAt: String, updatedAt: String
@@ -42,6 +43,7 @@ struct CustomerUser: Codable {
         self.passwordHash = passwordHash
         self.googleId = googleId
         self.appleId = appleId
+        self.facebookId = facebookId
         self.verified = verified
         self.active = active
         self.birthday = birthday
@@ -62,6 +64,7 @@ struct CustomerUser: Codable {
         passwordHash = try container.decodeIfPresent(String.self, forKey: .passwordHash)
         googleId = try container.decodeIfPresent(String.self, forKey: .googleId)
         appleId = try container.decodeIfPresent(String.self, forKey: .appleId)
+        facebookId = try container.decodeIfPresent(String.self, forKey: .facebookId)
         verified = try container.decode(Bool.self, forKey: .verified)
         active = try container.decodeIfPresent(Bool.self, forKey: .active) ?? true
         birthday = try container.decodeIfPresent(String.self, forKey: .birthday)
@@ -83,6 +86,7 @@ struct CustomerUserPublic: Content {
     var hasPassword: Bool
     var googleLinked: Bool
     var appleLinked: Bool
+    var facebookLinked: Bool
     var birthday: String?
     var photoURL: String?
     var loyaltyPhone: String?
@@ -95,6 +99,7 @@ struct CustomerUserPublic: Content {
         hasPassword = user.passwordHash != nil
         googleLinked = user.googleId != nil
         appleLinked = user.appleId != nil
+        facebookLinked = user.facebookId != nil
         birthday = user.birthday
         photoURL = user.photoURL
         loyaltyPhone = user.loyaltyPhone

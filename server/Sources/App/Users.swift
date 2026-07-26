@@ -13,6 +13,7 @@ struct StaffUser: Codable {
     var email: String?
     var googleId: String?
     var appleId: String?
+    var facebookId: String?
     var role: UserRole
     var mustChangePassword: Bool
     var active: Bool
@@ -26,13 +27,13 @@ struct StaffUser: Codable {
     var updatedAt: String
 
     enum CodingKeys: String, CodingKey {
-        case id, username, displayName, passwordHash, email, googleId, appleId, role, mustChangePassword, active
+        case id, username, displayName, passwordHash, email, googleId, appleId, facebookId, role, mustChangePassword, active
         case photoURL, birthday, phone, createdAt, updatedAt
     }
 
     init(
         id: String, username: String, displayName: String, passwordHash: String,
-        googleId: String?, appleId: String?, role: UserRole, mustChangePassword: Bool,
+        googleId: String?, appleId: String?, facebookId: String? = nil, role: UserRole, mustChangePassword: Bool,
         active: Bool = true, photoURL: String? = nil, birthday: String? = nil, phone: String? = nil,
         createdAt: String, updatedAt: String, email: String? = nil
     ) {
@@ -43,6 +44,7 @@ struct StaffUser: Codable {
         self.email = email
         self.googleId = googleId
         self.appleId = appleId
+        self.facebookId = facebookId
         self.role = role
         self.mustChangePassword = mustChangePassword
         self.active = active
@@ -62,6 +64,7 @@ struct StaffUser: Codable {
         email = try container.decodeIfPresent(String.self, forKey: .email)
         googleId = try container.decodeIfPresent(String.self, forKey: .googleId)
         appleId = try container.decodeIfPresent(String.self, forKey: .appleId)
+        facebookId = try container.decodeIfPresent(String.self, forKey: .facebookId)
         role = try container.decode(UserRole.self, forKey: .role)
         mustChangePassword = try container.decode(Bool.self, forKey: .mustChangePassword)
         active = try container.decodeIfPresent(Bool.self, forKey: .active) ?? true
@@ -82,6 +85,7 @@ struct StaffUserPublic: Content {
     var mustChangePassword: Bool
     var googleLinked: Bool
     var appleLinked: Bool
+    var facebookLinked: Bool
     var active: Bool
     var photoURL: String?
     var birthday: String?
@@ -96,6 +100,7 @@ struct StaffUserPublic: Content {
         mustChangePassword = user.mustChangePassword
         googleLinked = user.googleId != nil
         appleLinked = user.appleId != nil
+        facebookLinked = user.facebookId != nil
         active = user.active
         photoURL = user.photoURL
         birthday = user.birthday

@@ -132,6 +132,16 @@ final class UserStoreTests: XCTestCase {
         }
     }
 
+    func testLinkFacebookOAuthIsIndependentFromGoogle() throws {
+        let admin = try bootstrapAdmin()
+        try UserStore.shared.linkOAuth(id: admin.id, provider: .google, providerId: "google-1")
+        let linked = try UserStore.shared.linkOAuth(id: admin.id, provider: .facebook, providerId: "facebook-1")
+
+        XCTAssertEqual(try UserStore.shared.findByOAuth(provider: .google, providerId: "google-1").id, admin.id)
+        XCTAssertEqual(try UserStore.shared.findByOAuth(provider: .facebook, providerId: "facebook-1").id, admin.id)
+        XCTAssertEqual(linked.id, admin.id)
+    }
+
     func testCanAuthenticateWithEmailAfterSettingIt() throws {
         let admin = try bootstrapAdmin()
         try UserStore.shared.updateEmail(id: admin.id, email: "  Admin1@Example.com  ")

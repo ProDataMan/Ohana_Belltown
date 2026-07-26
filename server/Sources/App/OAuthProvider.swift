@@ -27,11 +27,13 @@ extension OAuthConfigError: AbortError {
 enum OAuthProvider: String {
     case google
     case apple
+    case facebook
 
     func id(of user: CustomerUser) -> String? {
         switch self {
         case .google: return user.googleId
         case .apple: return user.appleId
+        case .facebook: return user.facebookId
         }
     }
 
@@ -39,6 +41,7 @@ enum OAuthProvider: String {
         switch self {
         case .google: user.googleId = id
         case .apple: user.appleId = id
+        case .facebook: user.facebookId = id
         }
     }
 
@@ -46,6 +49,7 @@ enum OAuthProvider: String {
         switch self {
         case .google: return user.googleId
         case .apple: return user.appleId
+        case .facebook: return user.facebookId
         }
     }
 
@@ -53,6 +57,7 @@ enum OAuthProvider: String {
         switch self {
         case .google: user.googleId = id
         case .apple: user.appleId = id
+        case .facebook: user.facebookId = id
         }
     }
 }

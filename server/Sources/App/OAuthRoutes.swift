@@ -95,6 +95,51 @@ func registerOAuthRoutes(_ app: Application) throws {
         return try finishStaffOAuth(req, info: info, provider: .google, mode: parsed.mode)
     }
 
+    // MARK: Facebook — one shared callback URL for both customers and staff,
+    // same dispatch-by-state pattern as Google. Hidden in the UI until
+    // FACEBOOK_OAUTH_APP_ID / FACEBOOK_OAUTH_APP_SECRET are configured.
+
+    app.get("auth", "facebook", "customer") { req -> Response in
+        let state = makeState(audience: "customer", mode: "signin")
+        req.session.data["oauthState"] = state
+        let url = try FacebookOAuth.authorizationURL(state: state, redirectURI: "\(base)/auth/facebook/callback")
+        return req.redirect(to: url)
+    }
+
+    app.get("auth", "facebook", "staff") { req throws -> Response in
+        let mode = req.query[String.self, at: "mode"] ?? "signin"
+        if mode == "link" {
+            try requireLogin(req)
+        }
+        let state = makeState(audience: "staff", mode: mode)
+        req.session.data["oauthState"] = state
+        let url = try FacebookOAuth.authorizationURL(state: state, redirectURI: "\(base)/auth/facebook/callback")
+        return req.redirect(to: url)
+    }
+
+    app.get("auth", "facebook", "callback") { req async throws -> Response in
+        guard let code = req.query[String.self, at: "code"],
+              let state = req.query[String.self, at: "state"],
+              state == req.session.data["oauthState"],
+              let parsed = parseState(state) else {
+            return req.redirect(to: "/login?error=oauth_failed")
+        }
+        req.session.data["oauthState"] = nil
+        let info = try await FacebookOAuth.exchangeCodeAndFetchUser(
+            code: code, redirectURI: "\(base)/auth/facebook/callback", client: req.client
+        )
+
+        if parsed.audience == "customer" {
+            let customer = try CustomerUserStore.shared.findOrCreateFromOAuth(
+                provider: .facebook, providerId: info.providerId, email: info.email, displayName: info.displayName,
+                pictureURL: info.pictureURL
+            )
+            req.session.data["customerId"] = customer.id
+            return req.redirect(to: "/logged-in")
+        }
+        return try finishStaffOAuth(req, info: info, provider: .facebook, mode: parsed.mode)
+    }
+
     // MARK: Customer — Apple (hidden in the UI for now, kept working underneath)
 
     app.get("auth", "apple", "customer") { req -> Response in

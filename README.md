@@ -22,7 +22,7 @@ now historical background rather than the current plan.
 [Pages & routes](#pages--routes) ·
 [What's shipped](#whats-shipped) ·
 [Known gaps](#known-gaps--not-yet-implemented) ·
-[Google/Apple Sign-In setup](#setting-up-googleapple-sign-in) ·
+[Google/Apple/Facebook Sign-In setup](#setting-up-googleapplefacebook-sign-in) ·
 [Local development](#local-development) ·
 [Other docs](#other-docs-in-this-repo)
 
@@ -44,7 +44,7 @@ now historical background rather than the current plan.
   Falls back to `Resources/seed-menu.json` on first boot if no persisted data exists yet.
 - **Auth:** Vapor's built-in `Bcrypt` (password hashing) and `SessionsMiddleware` (`.memory` driver —
   sessions don't survive a restart, so a deploy logs everyone out; acceptable for a small internal team).
-  Google/Apple OAuth on top of that (see [Setting up Google/Apple Sign-In](#setting-up-googleapple-sign-in)),
+  Google/Apple/Facebook OAuth on top of that (see [Setting up Google/Apple/Facebook Sign-In](#setting-up-googleapplefacebook-sign-in)),
   using `swift-crypto`'s `P256.Signing` directly for Apple's required client-secret JWT signing.
 - **Hosting:** Azure Container Apps (Consumption plan), resource group `Ohana`, app `ohana-belltown-server`
 - **Images:** [ghcr.io/prodataman/ohana-belltown-server](https://ghcr.io/prodataman/ohana-belltown-server) (GitHub Container Registry, public)
@@ -67,6 +67,7 @@ now historical background rather than the current plan.
 | `PUBLIC_BASE_URL` | The site's own public HTTPS origin, used to build OAuth redirect URIs. Defaults to the production URL above if unset — only needs overriding for local dev (`http://localhost:8080`). |
 | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` | Google Sign-In. Not set yet — see [`docs/oauth-setup.md`](docs/oauth-setup.md). |
 | `APPLE_OAUTH_CLIENT_ID`, `APPLE_OAUTH_TEAM_ID`, `APPLE_OAUTH_KEY_ID`, `APPLE_OAUTH_PRIVATE_KEY` | Sign in with Apple. Not set yet — needs a paid Apple Developer Program enrollment first. See [`docs/oauth-setup.md`](docs/oauth-setup.md). |
+| `FACEBOOK_OAUTH_APP_ID`, `FACEBOOK_OAUTH_APP_SECRET` | Facebook Login — free, no paid tier required. Not set yet — see [`docs/oauth-setup.md`](docs/oauth-setup.md). |
 
 `STAFF_PIN` is no longer used — it was retired in favor of real per-user login (see below) and can be removed from the Container App if still set.
 
@@ -181,14 +182,14 @@ now historical background rather than the current plan.
 </details>
 
 <details>
-<summary><strong>OAuth sign-in (Google + Apple)</strong></summary>
+<summary><strong>OAuth sign-in (Google + Apple + Facebook)</strong></summary>
 
 - Customers: "Continue with Google" on `/signup` and `/account-login` — self-serve, first sign-in creates an account (or links to an existing email/password account with a matching verified email)
 - Staff: link-only, not self-serve — an employee must already have a username/password account, log in, then link Google from `/account.html`. Only after linking does "Sign in with Google" work on `/login`. (Prevents anyone with a Google account from getting staff access.)
 - `/account-login` (the customer-facing "Log In" linked from the main nav) is the one login page most visitors reach; a Customer/Staff tab pair at the top switches to `/login`, the separate staff login page (username-or-email + password, or linked Google)
-- Google sign-in uses a single shared callback URL (`/auth/google/callback`) for both customers and staff — which account type it's handling is encoded in OAuth `state`, not the URL — so only one redirect URI needs registering in Google Cloud Console. Both flows land on `/logged-in` afterward, which routes staff to `/edit.html` and customers to `/my-account.html`.
-- Apple's button is hidden site-wide for now (`hidden` attribute + a CSS rule, easy to re-enable) until Apple credentials are actually set up — see [`docs/oauth-setup.md`](docs/oauth-setup.md)
-- **Neither provider is actually configured yet** — see [`docs/oauth-setup.md`](docs/oauth-setup.md). The Google button is live in the UI but returns a clear 503 until real credentials are set.
+- Google and Facebook sign-in each use a single shared callback URL (`/auth/google/callback`, `/auth/facebook/callback`) for both customers and staff — which account type it's handling is encoded in OAuth `state`, not the URL — so only one redirect URI needs registering per provider. Both flows land on `/logged-in` afterward, which routes staff to `/edit.html` and customers to `/my-account.html`.
+- Apple's and Facebook's buttons are hidden site-wide for now (`hidden` attribute + a CSS rule, easy to re-enable per provider) until their credentials are actually set up — see [`docs/oauth-setup.md`](docs/oauth-setup.md)
+- **Only Google is actually configured so far** — see [`docs/oauth-setup.md`](docs/oauth-setup.md). The Google button is live in the UI but returns a clear 503 until real credentials are set; Apple and Facebook are fully built underneath but hidden until their credentials exist. X/Twitter and Instagram were deliberately not built — X's API pricing for third-party login is unclear/likely paid, and Instagram isn't designed as a general-purpose login provider.
 
 </details>
 
@@ -201,7 +202,7 @@ now historical background rather than the current plan.
 - `sitemap.xml` and `robots.txt`
 - Cache-Control revalidation on every response (avoids stale-cache bugs after a deploy)
 - Accessibility pass — fixed real WCAG AA contrast failures (brand pink/gold read ~3:1 as text on light backgrounds; added darker `--pink-text`/`--gold-text` variants used only for text, keeping the brighter originals for backgrounds/borders), a focus state that was fully removed without a visible replacement, and a heading-hierarchy skip on the Contact page. Alt text was already solid site-wide.
-- Automated test suite (`server/Tests/AppTests`, 145 tests) — loyalty punch/redeem math, waitlist and table-order lifecycle behavior (including prep-time estimation and delivery-stats aggregation), analytics aggregation (including OS/browser/device-model user-agent parsing), single-item menu CRUD, staff and customer auth (including deactivation, OAuth linking/photo- and email-backfill for both account types, and rewards-card linking), menu backward-compat decoding, the Happy Hour time-window/QR-redirect logic (including table-id passthrough), and route-level permission boundaries. Run with `swift test` from `server/`.
+- Automated test suite (`server/Tests/AppTests`, 147 tests) — loyalty punch/redeem math, waitlist and table-order lifecycle behavior (including prep-time estimation and delivery-stats aggregation), analytics aggregation (including OS/browser/device-model user-agent parsing), single-item menu CRUD, staff and customer auth (including deactivation, OAuth linking/photo- and email-backfill for both account types, Facebook as an independent provider alongside Google/Apple, and rewards-card linking), menu backward-compat decoding, the Happy Hour time-window/QR-redirect logic (including table-id passthrough), and route-level permission boundaries. Run with `swift test` from `server/`.
 - Self-hosted analytics (`/analytics.html`, admin only) — pageview counts by page and by day, device type (mobile/tablet/desktop), operating system (iPhone/iPad/Android/macOS/Windows/Linux), browser (Safari/Chrome/Firefox/Edge/Samsung Internet/Opera), best-effort Android hardware model (e.g. "Pixel 8" — parsed only when a browser's user-agent happens to include it; iOS never exposes a specific model, so there's no equivalent list for Apple devices), average time on page, and most-viewed menu items (detail-popup opens — a proxy for interest, not a sales figure, since this site has no access to real order data from ChowNow). No cookies, no third-party tracking script, no per-visitor identity anywhere. Bounded to 120 days of aggregated data.
 - Every analytics section now leads with a small summary line (peak day, most-viewed page/item, device/OS/browser split, sitewide missing-price/photo counts) instead of making you read the full table to find the headline number.
 - Table-order wait/prep/delivery time KPIs on `/analytics.html`, computed from real completed orders: wait (placed → entered), prep (entered → delivered), and total (placed → delivered), both overall and broken out per menu item.
@@ -255,12 +256,13 @@ actually shipped as of this README. Not in priority order.
 - Google Places photos are capped at 10 per API call (a hard Google limit, not a bug) and matched to menu items manually.
 - Sign in with Apple needs a client-secret JWT that's re-signed on every token exchange (Apple doesn't accept a static secret like Google does) — implemented with `swift-crypto`'s `P256.Signing` rather than pulling in a full JWT library, since that's the only cryptographic operation needed.
 
-## Setting up Google/Apple Sign-In
+## Setting up Google/Apple/Facebook Sign-In
 
-Both are built and live in the UI (buttons on `/signup`, `/account-login`,
-`/login`, `/account.html`) but return a `503` until real credentials are set
-as Container App secrets/env vars. Full step-by-step instructions for both
-providers, including exact links and where to paste each value, are in
+All three are built underneath (buttons on `/signup`, `/account-login`,
+`/login`, `/account.html`) but Apple and Facebook stay hidden in the UI, and
+Google returns a `503`, until real credentials are set as Container App
+secrets/env vars. Full step-by-step instructions for all three providers,
+including exact links and where to paste each value, are in
 [`docs/oauth-setup.md`](docs/oauth-setup.md).
 
 ## Local development
@@ -295,7 +297,7 @@ caveat above) — after registering at `/signup` or requesting a reset at
 
 - `docs/feature-roadmap.md` — original feature audit and phased plan (predates most of what's now shipped; see the gaps list above for current state)
 - `docs/visual-design-direction.md` — the palette/type direction used for the visual refresh
-- `docs/oauth-setup.md` — step-by-step Google/Apple Sign-In credential setup
+- `docs/oauth-setup.md` — step-by-step Google/Apple/Facebook Sign-In credential setup
 - `docs/uptime-monitoring.md` — how to point UptimeRobot (free) at the existing `/healthz` endpoint
 - `docs/page-inventory.md`, `docs/migration-plan.md`, `docs/ohana-project-plan.md` — early planning docs from the static-site-capture phase, kept for history
 - `reference-site/` — the original Weebly site mirror this project was migrated from
