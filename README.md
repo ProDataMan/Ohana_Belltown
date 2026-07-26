@@ -1,14 +1,30 @@
 # Ohana Belltown Website
 
+[![Build and deploy](https://github.com/ProDataMan/Ohana_Belltown/actions/workflows/deploy-server.yml/badge.svg)](https://github.com/ProDataMan/Ohana_Belltown/actions/workflows/deploy-server.yml)
+![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)
+![Vapor](https://img.shields.io/badge/Vapor-server-2ED0FF)
+[![Live site](https://img.shields.io/badge/live%20site-ohanabelltown-ff2f8f)](https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io)
+
 A Swift/Vapor server powering [Ohana Belltown](https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io)'s
 full website: marketing pages, the complete food/sushi/drinks/happy-hour menu,
-a staff editor, a digital punch card, and an events calendar — deployed on
-Azure Container Apps.
+a staff editor, a digital punch card, a walk-in waitlist, and an events calendar
+— deployed on Azure Container Apps.
 
 This started as a static-site capture of the old Weebly site (see
 `docs/migration-plan.md` and `docs/ohana-project-plan.md` for that history);
 it has since been rebuilt as a real server-backed app and those early docs are
 now historical background rather than the current plan.
+
+### Contents
+
+[Live site](#live-site) ·
+[Architecture](#architecture) ·
+[Pages & routes](#pages--routes) ·
+[What's shipped](#whats-shipped) ·
+[Known gaps](#known-gaps--not-yet-implemented) ·
+[Google/Apple Sign-In setup](#setting-up-googleapple-sign-in) ·
+[Local development](#local-development) ·
+[Other docs](#other-docs-in-this-repo)
 
 ## Live site
 
@@ -83,7 +99,9 @@ now historical background rather than the current plan.
 
 ## What's shipped
 
-**Content & migration**
+<details open>
+<summary><strong>Content & migration</strong></summary>
+
 - Full real menu — 216 items across Food/Sushi/Drinks/Happy Hour, transcribed from the current printed menu
 - 204/216 items have written descriptions; brand-name drinks researched and described
 - Home, About, Local, Contact, Catering pages with real copy, ported from the old Weebly site
@@ -92,7 +110,11 @@ now historical background rather than the current plan.
 - Legacy `.html` URL redirects preserved for SEO
 - HTTPS + persistent storage (Azure Files-backed menu data and photos)
 
-**Menu experience**
+</details>
+
+<details>
+<summary><strong>Menu experience</strong></summary>
+
 - Search box + allergen/dietary tag filter chips (`server/Public/menu-section.js`)
 - Photo lightbox + per-item detail modal with a photo gallery (multiple photos per item, rotates in Google Places photos where matched)
 - Daily specials / featured-item toggle, surfaced on the homepage
@@ -103,7 +125,11 @@ now historical background rather than the current plan.
 - `/edit-item.html?id=...` — a focused single-item editor (photos, price, description, tags, featured/sold-out/Happy-Hour toggles, delete) reached by clicking a small "Edit" link that now appears next to every item on the public menu pages (`/menu`, `/sushi`, `/drinks`, `/happy-hour`) whenever a staff member is logged in — invisible to everyone else. The original bulk editor at `/edit.html` (edit many prices, then one Save) still works exactly as before; this is an additional, faster path for touching one item at a time, e.g. from an analytics report link.
 - The "Staff: edit menu →" link on `/menu`, `/sushi`, `/drinks`, and `/happy-hour` is hidden by default and only reveals itself (via `/api/auth/me`) if you're currently logged in as staff — anonymous visitors never see it.
 
-**Loyalty & engagement**
+</details>
+
+<details>
+<summary><strong>Loyalty & engagement</strong></summary>
+
 - Digital sushi punch card (`/rewards` + `/loyalty-admin.html`) — phone-number identity, 1 punch per sushi order,
   10 punches = free roll. Photo/social shares are staff-reviewed and worth 1/10 of a punch each (10 approved shares = 1 punch), capped at the first 2 approved shares per calendar day per phone number — extra shares that day can still be submitted and approved, they just don't add points, so posting many photos of one meal doesn't multiply the reward.
 - Events & specials calendar (`/events-admin.html` + public display on `/local`)
@@ -116,7 +142,11 @@ now historical background rather than the current plan.
 - Text-based waitlist (`/waitlist` + `/waitlist-admin.html`) — not a reservation, just lets a walk-in put their name in before arriving. Staff's "Text they're ready" button opens the staff member's own phone's messaging app with the number and a ready-made message pre-filled (no SMS gateway/automated texting — nothing is sent without a staff member hitting send themselves). Entries older than 4 hours drop off the live queue automatically.
 - `/specials` — a stable page for social bio links / post links, so a marketing link doesn't have to point at the homepage or bounce between three different pages
 
-**Staff accounts**
+</details>
+
+<details>
+<summary><strong>Staff accounts</strong></summary>
+
 - Named username/password logins (bcrypt-hashed) with two roles: `admin` and `employee`
 - First-run bootstrap creates the first admin when zero accounts exist, then permanently disables itself
 - Admins manage the roster (`/manage-users.html`, `/create-account.html`): create accounts, change roles, force-reset a forgotten password, deactivate/reactivate an account
@@ -126,7 +156,11 @@ now historical background rather than the current plan.
 - Optional email per staff account, set from `/account.html` — not required, and not currently used for anything but sign-in (no notifications are actually sent yet). Once set, it works as an alternate login identifier alongside the username
 - Log in with either your username or your email (`/login`) — same password, whichever's easier to remember
 
-**Customer accounts**
+</details>
+
+<details>
+<summary><strong>Customer accounts</strong></summary>
+
 - Separate from staff accounts — email/password identity only, no `admin`/`employee` role, no order history yet
 - Self-service registration (`/signup`), login (`/account-login`), password change and reset (`/forgot-password.html` → `/reset-password.html`, 1-hour expiring token)
 - The "Log In" link in the main site nav (every public page, via `nav.js`) automatically becomes "Log Out" when a customer or staff session is already active — checks `/api/customer/me` then `/api/auth/me` client-side and swaps the link's text/behavior, no page-specific code needed
@@ -134,15 +168,23 @@ now historical background rather than the current plan.
 - Self-service account deactivation (`/my-account.html`) — immediately ends the session and blocks future login (password or OAuth)
 - Birthday Club (`/my-account.html`) — optional month+day only (no birth year ever stored). Staff see who has a birthday in the next 7 days from `/loyalty-admin.html`, so a server can proactively treat a regular — deliberately a staff-visible list rather than an automated discount, since this account system has no connection to a checkout/POS to apply one automatically.
 
-**OAuth sign-in (Google + Apple)**
+</details>
+
+<details>
+<summary><strong>OAuth sign-in (Google + Apple)</strong></summary>
+
 - Customers: "Continue with Google" on `/signup` and `/account-login` — self-serve, first sign-in creates an account (or links to an existing email/password account with a matching verified email)
 - Staff: link-only, not self-serve — an employee must already have a username/password account, log in, then link Google from `/account.html`. Only after linking does "Sign in with Google" work on `/login`. (Prevents anyone with a Google account from getting staff access.)
-- `/account-login` (the customer-facing "Log In" linked from the main nav) is the one login page most visitors reach; it has a "Staff? Log in with your username" link pointing to `/login`, the separate staff login page (username-or-email + password, or linked Google)
+- `/account-login` (the customer-facing "Log In" linked from the main nav) is the one login page most visitors reach; a Customer/Staff tab pair at the top switches to `/login`, the separate staff login page (username-or-email + password, or linked Google)
 - Google sign-in uses a single shared callback URL (`/auth/google/callback`) for both customers and staff — which account type it's handling is encoded in OAuth `state`, not the URL — so only one redirect URI needs registering in Google Cloud Console. Both flows land on `/logged-in` afterward, which routes staff to `/edit.html` and customers to `/my-account.html`.
 - Apple's button is hidden site-wide for now (`hidden` attribute + a CSS rule, easy to re-enable) until Apple credentials are actually set up — see [`docs/oauth-setup.md`](docs/oauth-setup.md)
 - **Neither provider is actually configured yet** — see [`docs/oauth-setup.md`](docs/oauth-setup.md). The Google button is live in the UI but returns a clear 503 until real credentials are set.
 
-**SEO & technical**
+</details>
+
+<details>
+<summary><strong>SEO & technical</strong></summary>
+
 - Per-page Open Graph / Twitter Card tags
 - schema.org `Restaurant` JSON-LD on the homepage
 - `sitemap.xml` and `robots.txt`
@@ -154,11 +196,17 @@ now historical background rather than the current plan.
 - "Menu Items Missing a Price" / "Menu Items Missing a Photo" reports on `/analytics.html`, scanning the entire live menu (including Happy Hour) — each row links straight to that item's `/edit-item.html` page to fix it on the spot.
 - Uploaded photos (menu editor, customer bonus-claim photos) are auto-resized (1600px long-edge cap) and re-compressed via ImageMagick, run off the event loop so it doesn't stall other requests. Fails closed — if optimization fails for any reason, the original upload is kept as-is rather than blocking the upload.
 
-**Visual design refresh**
+</details>
+
+<details>
+<summary><strong>Visual design refresh</strong></summary>
+
 - New palette: neon pink (from the actual storefront sign) paired with the University of Washington's official purple as the secondary brand color — see `docs/visual-design-direction.md` for the full rationale
 - Bold display face (Bungee) used sparingly for page `h1`s and the header logotype; body/UI copy moved from Georgia serif to a warmer, more modern sans (Nunito Sans)
 - A subtle wave-shaped divider on every hero banner, a recurring nod to the restaurant's waterfront/tiki setting
 - New color pairs re-verified against WCAG AA (4.5:1) for text usage, same methodology as the earlier accessibility pass
+
+</details>
 
 ## Known gaps / not yet implemented
 
