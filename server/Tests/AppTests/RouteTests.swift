@@ -24,6 +24,7 @@ final class RouteTests: XCTestCase {
         WaitlistStore.shared.configure(dataDirectory: tempDir.path)
         TableOrdersStore.shared.configure(dataDirectory: tempDir.path)
         StaffingStore.shared.configure(dataDirectory: tempDir.path)
+        FeedbackStore.shared.configure(dataDirectory: tempDir.path)
     }
 
     override func tearDown() async throws {
@@ -145,6 +146,60 @@ final class RouteTests: XCTestCase {
             XCTAssertEqual(res.status, .ok)
             let entry = try res.content.decode(TableOrderEntry.self)
             XCTAssertEqual(entry.modifiers, ["Yosh Size", "Add Katsu"])
+        }
+    }
+
+    func testFeedbackSubmitIsPublicButListingRequiresLogin() throws {
+        let body = ByteBuffer(string: #"{"category":"food","rating":5,"message":"Great sushi!","page":"/menu"}"#)
+        try app.test(.POST, "api/feedback", headers: ["Content-Type": "application/json"], body: body) { res in
+            XCTAssertEqual(res.status, .ok)
+            let entry = try res.content.decode(FeedbackEntry.self)
+            XCTAssertEqual(entry.category, "food")
+            XCTAssertEqual(entry.rating, 5)
+        }
+
+        try app.test(.GET, "api/feedback") { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+
+        let bootstrapBody = ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"], body: bootstrapBody) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        try app.test(.GET, "api/feedback", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+            let entries = try res.content.decode([FeedbackEntry].self)
+            XCTAssertEqual(entries.count, 1)
+        }
+
+        try app.test(.GET, "api/feedback/unacknowledged-count", headers: ["Cookie": cookie]) { res in
+            let count = try res.content.decode(FeedbackUnacknowledgedCount.self)
+            XCTAssertEqual(count.count, 1)
+        }
+
+        try app.test(.POST, "api/feedback/acknowledge-all", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+        try app.test(.GET, "api/feedback/unacknowledged-count", headers: ["Cookie": cookie]) { res in
+            let count = try res.content.decode(FeedbackUnacknowledgedCount.self)
+            XCTAssertEqual(count.count, 0)
+        }
+    }
+
+    func testFeedbackRejectsEmptyMessageAndInvalidRating() throws {
+        let emptyBody = ByteBuffer(string: #"{"category":"food","message":""}"#)
+        try app.test(.POST, "api/feedback", headers: ["Content-Type": "application/json"], body: emptyBody) { res in
+            XCTAssertEqual(res.status, .badRequest)
+        }
+
+        let badRatingBody = ByteBuffer(string: #"{"category":"food","message":"Hi","rating":9}"#)
+        try app.test(.POST, "api/feedback", headers: ["Content-Type": "application/json"], body: badRatingBody) { res in
+            XCTAssertEqual(res.status, .badRequest)
         }
     }
 

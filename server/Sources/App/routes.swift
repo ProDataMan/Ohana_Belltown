@@ -29,6 +29,18 @@ struct TableOrdersDashboard: Content {
     var readyCount: Int
 }
 
+struct FeedbackSubmission: Content {
+    var category: String
+    var rating: Int?
+    var message: String
+    var page: String?
+    var contactEmail: String?
+}
+
+struct FeedbackUnacknowledgedCount: Content {
+    var count: Int
+}
+
 struct WaitlistJoinRequest: Content {
     var name: String
     var phone: String
@@ -285,6 +297,43 @@ func routes(_ app: Application) throws {
         try requireLogin(req)
         let body = try req.content.decode(StaffingConfig.self)
         return try StaffingStore.shared.setStaffOnDuty(body.staffOnDuty)
+    }
+
+    // Feedback: a widget on every public page lets a guest leave feedback on
+    // the website, food, or service without needing an account.
+    app.post("api", "feedback") { req throws -> FeedbackEntry in
+        let body = try req.content.decode(FeedbackSubmission.self)
+        let message = body.message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !message.isEmpty else {
+            throw Abort(.badRequest, reason: "Feedback message can't be empty.")
+        }
+        let category = ["website", "food", "service", "other"].contains(body.category) ? body.category : "other"
+        if let rating = body.rating {
+            guard (1...5).contains(rating) else {
+                throw Abort(.badRequest, reason: "Rating must be between 1 and 5.")
+            }
+        }
+        return try FeedbackStore.shared.submit(
+            category: category, rating: body.rating, message: message,
+            page: body.page, contactEmail: body.contactEmail
+        )
+    }
+
+    app.get("api", "feedback") { req throws -> [FeedbackEntry] in
+        try requireLogin(req)
+        let days = req.query[Int.self, at: "days"] ?? 30
+        return try FeedbackStore.shared.recent(days: days)
+    }
+
+    app.get("api", "feedback", "unacknowledged-count") { req throws -> FeedbackUnacknowledgedCount in
+        try requireLogin(req)
+        return FeedbackUnacknowledgedCount(count: try FeedbackStore.shared.unacknowledgedCount())
+    }
+
+    app.post("api", "feedback", "acknowledge-all") { req throws -> HTTPStatus in
+        try requireLogin(req)
+        try FeedbackStore.shared.acknowledgeAll()
+        return .ok
     }
 
     func serveStatic(_ req: Request, file: String) async throws -> Response {

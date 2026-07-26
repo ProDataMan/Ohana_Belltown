@@ -22,8 +22,13 @@ func configure(_ app: Application) throws {
     WaitlistStore.shared.configure(dataDirectory: dataDirectory)
     TableOrdersStore.shared.configure(dataDirectory: dataDirectory)
     StaffingStore.shared.configure(dataDirectory: dataDirectory)
+    FeedbackStore.shared.configure(dataDirectory: dataDirectory)
 
     app.routes.defaultMaxBodySize = "10mb"
+
+    if app.environment != .testing {
+        FeedbackDigest.schedule(app)
+    }
 
     try routes(app)
 }

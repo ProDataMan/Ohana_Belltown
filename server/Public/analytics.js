@@ -335,6 +335,66 @@ async function loadDeliveryStats() {
   }
 }
 
+function categoryLabel(category) {
+  return { website: 'Website', food: 'Food', service: 'Service', other: 'Other' }[category] || category;
+}
+
+async function loadFeedback() {
+  const summaryEl = document.getElementById('feedback-summary');
+  const listEl = document.getElementById('feedback-list');
+  try {
+    const response = await staffFetch('/api/feedback?days=30');
+    if (!response.ok) throw new Error(`Unable to load feedback (${response.status}).`);
+    const entries = await response.json();
+
+    const ratings = entries.map((e) => e.rating).filter((r) => r != null);
+    const avg = ratings.length ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1) : null;
+    const unacknowledged = entries.filter((e) => !e.acknowledged).length;
+    renderSummaryPills(summaryEl, [
+      { label: `${entries.length} submissions (last 30 days)` },
+      ...(avg !== null ? [{ label: `Avg rating: ${avg} / 5` }] : []),
+      ...(unacknowledged ? [{ label: `${unacknowledged} unread`, cls: 'pill-warning' }] : [{ label: 'All read', cls: 'pill-approved' }]),
+    ]);
+
+    if (!entries.length) {
+      listEl.innerHTML = '<p class="hint">No feedback yet.</p>';
+      return;
+    }
+    listEl.innerHTML = `
+      <div class="data-table">
+        <table>
+          <thead><tr><th>When</th><th>Category</th><th>Rating</th><th>Message</th><th>Page</th><th>Contact</th></tr></thead>
+          <tbody>
+            ${entries
+              .map(
+                (e) => `
+              <tr>
+                <td>${new Date(e.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</td>
+                <td><span class="pill ${e.acknowledged ? '' : 'pill-warning'}">${escapeHtmlAnalytics(categoryLabel(e.category))}</span></td>
+                <td>${e.rating != null ? `${e.rating}/5` : '—'}</td>
+                <td>${escapeHtmlAnalytics(e.message)}</td>
+                <td>${escapeHtmlAnalytics(e.page || '')}</td>
+                <td>${escapeHtmlAnalytics(e.contactEmail || '')}</td>
+              </tr>
+            `
+              )
+              .join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (error) {
+    summaryEl.innerHTML = '';
+    listEl.innerHTML = `<p class="status status-error">${escapeHtmlAnalytics(error.message)}</p>`;
+  }
+}
+
+document.getElementById('acknowledge-feedback-btn').addEventListener('click', async () => {
+  await staffFetch('/api/feedback/acknowledge-all', { method: 'POST' });
+  await loadFeedback();
+});
+document.getElementById('reload-feedback-btn').addEventListener('click', loadFeedback);
+
 document.getElementById('range-select').addEventListener('change', loadAnalytics);
 document.getElementById('range-select').addEventListener('change', loadDeliveryStats);
 document.getElementById('reload-menu-health-btn').addEventListener('click', loadMenuHealthReports);
@@ -342,3 +402,4 @@ document.getElementById('reload-menu-health-btn').addEventListener('click', load
 loadAnalytics();
 loadMenuHealthReports();
 loadDeliveryStats();
+loadFeedback();
