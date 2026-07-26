@@ -20,7 +20,7 @@ private func parseState(_ state: String) -> (csrf: String, audience: String, mod
 private func finishStaffOAuth(_ req: Request, info: OAuthUserInfo, provider: OAuthProvider, mode: String) throws -> Response {
     if mode == "link" {
         let currentStaff = try requireLogin(req)
-        try UserStore.shared.linkOAuth(id: currentStaff.id, provider: provider, providerId: info.providerId, pictureURL: info.pictureURL)
+        try UserStore.shared.linkOAuth(id: currentStaff.id, provider: provider, providerId: info.providerId, pictureURL: info.pictureURL, email: info.email)
         return req.redirect(to: "/account.html")
     }
     guard let staff = try? UserStore.shared.findByOAuth(provider: provider, providerId: info.providerId) else {
@@ -29,6 +29,7 @@ private func finishStaffOAuth(_ req: Request, info: OAuthUserInfo, provider: OAu
     if let pictureURL = info.pictureURL {
         try? UserStore.shared.setPhotoIfMissing(id: staff.id, pictureURL: pictureURL)
     }
+    try? UserStore.shared.setEmailIfMissing(id: staff.id, email: info.email)
     req.session.data["userId"] = staff.id
     return req.redirect(to: "/logged-in")
 }

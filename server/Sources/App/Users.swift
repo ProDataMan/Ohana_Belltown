@@ -327,7 +327,7 @@ final class UserStore: @unchecked Sendable {
     }
 
     @discardableResult
-    func linkOAuth(id: String, provider: OAuthProvider, providerId: String, pictureURL: String? = nil) throws -> StaffUserPublic {
+    func linkOAuth(id: String, provider: OAuthProvider, providerId: String, pictureURL: String? = nil, email: String? = nil) throws -> StaffUserPublic {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
@@ -340,6 +340,12 @@ final class UserStore: @unchecked Sendable {
         provider.setId(providerId, on: &users[idx])
         if let pictureURL, users[idx].photoURL == nil {
             users[idx].photoURL = pictureURL
+        }
+        if let email, users[idx].email == nil {
+            let normalized = Self.normalizeIdentifier(email)
+            if !users.contains(where: { $0.id != id && $0.email == normalized }) {
+                users[idx].email = normalized
+            }
         }
         users[idx].updatedAt = now()
         try persist()
@@ -361,6 +367,29 @@ final class UserStore: @unchecked Sendable {
             users[idx].photoURL = pictureURL
             users[idx].updatedAt = now()
             try persist()
+        }
+        return StaffUserPublic(users[idx])
+    }
+
+    /// Same idea as setPhotoIfMissing, for the email Google supplies on every
+    /// sign-in — an account that linked Google before this was captured (or
+    /// whose account predates having any email at all) gets it filled in on
+    /// their next login, never overwriting one that's already on file.
+    @discardableResult
+    func setEmailIfMissing(id: String, email: String) throws -> StaffUserPublic {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard let idx = users.firstIndex(where: { $0.id == id }) else {
+            throw UserError.notFound
+        }
+        if users[idx].email == nil {
+            let normalized = Self.normalizeIdentifier(email)
+            if !users.contains(where: { $0.id != id && $0.email == normalized }) {
+                users[idx].email = normalized
+                users[idx].updatedAt = now()
+                try persist()
+            }
         }
         return StaffUserPublic(users[idx])
     }

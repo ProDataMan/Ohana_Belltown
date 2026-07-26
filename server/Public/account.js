@@ -24,8 +24,10 @@ async function loadProfile() {
       ${user.photoURL ? `<img class="profile-avatar" src="${escapeHtmlAccount(user.photoURL)}" alt="" />` : ''}
       <p><strong>${escapeHtmlAccount(user.displayName)}</strong> (@${escapeHtmlAccount(user.username)})</p>
       <p>Role: <span class="pill ${user.role === 'admin' ? 'pill-approved' : ''}">${escapeHtmlAccount(user.role)}</span></p>
+      ${user.email ? `<p>${escapeHtmlAccount(user.email)}</p>` : ''}
       ${user.birthday ? `<p>Birthday: ${escapeHtmlAccount(formatMonthDayAccount(user.birthday))}</p>` : ''}
       ${user.phone ? `<p>Phone: ${escapeHtmlAccount(user.phone)}</p>` : ''}
+      ${user.googleLinked || user.appleLinked ? `<p class="hint">Signs in with: ${[user.googleLinked ? 'Google' : null, user.appleLinked ? 'Apple' : null].filter(Boolean).join(', ')}</p>` : ''}
     `;
     const emailInput = document.getElementById('email-input');
     if (emailInput) {

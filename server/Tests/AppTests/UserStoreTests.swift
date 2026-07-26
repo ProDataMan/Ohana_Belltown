@@ -210,4 +210,33 @@ final class UserStoreTests: XCTestCase {
         let unchanged = try UserStore.shared.setPhotoIfMissing(id: admin.id, pictureURL: "https://example.com/second.png")
         XCTAssertEqual(unchanged.photoURL, "https://example.com/first.png")
     }
+
+    func testLinkOAuthCapturesEmail() throws {
+        let admin = try bootstrapAdmin()
+        let linked = try UserStore.shared.linkOAuth(id: admin.id, provider: .google, providerId: "google-1", email: "admin1@example.com")
+        XCTAssertEqual(linked.email, "admin1@example.com")
+    }
+
+    func testSetEmailIfMissingBackfillsButDoesNotOverwrite() throws {
+        let admin = try bootstrapAdmin()
+        try UserStore.shared.linkOAuth(id: admin.id, provider: .google, providerId: "google-1")
+
+        let backfilled = try UserStore.shared.setEmailIfMissing(id: admin.id, email: "first@example.com")
+        XCTAssertEqual(backfilled.email, "first@example.com")
+
+        let unchanged = try UserStore.shared.setEmailIfMissing(id: admin.id, email: "second@example.com")
+        XCTAssertEqual(unchanged.email, "first@example.com")
+    }
+
+    func testSetEmailIfMissingSkipsSilentlyWhenAlreadyTakenByAnotherAccount() throws {
+        let admin = try bootstrapAdmin()
+        let tim = try UserStore.shared.create(
+            username: "tim", displayName: "Tim", password: "12345", role: .employee, mustChangePassword: false
+        )
+        try UserStore.shared.updateEmail(id: tim.id, email: "shared@example.com")
+
+        // Shouldn't throw, and shouldn't steal the email — just leaves admin's blank.
+        let result = try UserStore.shared.setEmailIfMissing(id: admin.id, email: "shared@example.com")
+        XCTAssertNil(result.email)
+    }
 }
