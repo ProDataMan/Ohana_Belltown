@@ -164,7 +164,7 @@ actually shipped as of this README. Not in priority order.
 - Native delivery radius checking (delivery relies entirely on ChowNow's partners)
 
 **Technical**
-- Uptime/error monitoring/alerting
+- Uptime/error monitoring/alerting — setup steps ready in [`docs/uptime-monitoring.md`](docs/uptime-monitoring.md), just needs a UptimeRobot account (can't be created on your behalf)
 - Formal Lighthouse performance pass — no Node.js in this dev environment to run the actual CLI. Manually reviewed the usual Lighthouse-audited factors (image sizing/lazy-loading, render-blocking resources, cache headers) and found nothing actionable beyond what's already in place; a real run would still be worth doing from a machine with Node/Chrome.
 
 **Admin & operations**
@@ -221,5 +221,6 @@ caveat above) — after registering at `/signup` or requesting a reset at
 - `docs/feature-roadmap.md` — original feature audit and phased plan (predates most of what's now shipped; see the gaps list above for current state)
 - `docs/visual-design-direction.md` — the palette/type direction used for the visual refresh
 - `docs/oauth-setup.md` — step-by-step Google/Apple Sign-In credential setup
+- `docs/uptime-monitoring.md` — how to point UptimeRobot (free) at the existing `/healthz` endpoint
 - `docs/page-inventory.md`, `docs/migration-plan.md`, `docs/ohana-project-plan.md` — early planning docs from the static-site-capture phase, kept for history
 - `reference-site/` — the original Weebly site mirror this project was migrated from
