@@ -131,6 +131,64 @@ final class CustomerUserStoreTests: XCTestCase {
         }
     }
 
+    func testOAuthSignupCapturesProfilePhoto() throws {
+        let customer = try CustomerUserStore.shared.findOrCreateFromOAuth(
+            provider: .google, providerId: "google-1", email: "oauth@example.com", displayName: "OAuth User",
+            pictureURL: "https://example.com/photo.png"
+        )
+        XCTAssertEqual(customer.photoURL, "https://example.com/photo.png")
+    }
+
+    func testOAuthLinkBackfillsPhotoOnExistingAccountByEmail() throws {
+        try CustomerUserStore.shared.register(email: "guest@example.com", displayName: "Guest", password: "guestpass1")
+
+        let linked = try CustomerUserStore.shared.findOrCreateFromOAuth(
+            provider: .google, providerId: "google-1", email: "guest@example.com", displayName: "Guest via Google",
+            pictureURL: "https://example.com/photo.png"
+        )
+        XCTAssertEqual(linked.photoURL, "https://example.com/photo.png")
+    }
+
+    func testOAuthBackfillsMissingPhotoOnSubsequentLogin() throws {
+        // Simulates an account that linked Google before this field existed —
+        // no picture on file yet, even though it's already linked by providerId.
+        let first = try CustomerUserStore.shared.findOrCreateFromOAuth(
+            provider: .google, providerId: "google-1", email: "oauth@example.com", displayName: "OAuth User"
+        )
+        XCTAssertNil(first.photoURL)
+
+        let second = try CustomerUserStore.shared.findOrCreateFromOAuth(
+            provider: .google, providerId: "google-1", email: "oauth@example.com", displayName: "OAuth User",
+            pictureURL: "https://example.com/photo.png"
+        )
+        XCTAssertEqual(second.photoURL, "https://example.com/photo.png")
+    }
+
+    func testOAuthDoesNotOverwriteExistingPhoto() throws {
+        _ = try CustomerUserStore.shared.findOrCreateFromOAuth(
+            provider: .google, providerId: "google-1", email: "oauth@example.com", displayName: "OAuth User",
+            pictureURL: "https://example.com/first.png"
+        )
+        let second = try CustomerUserStore.shared.findOrCreateFromOAuth(
+            provider: .google, providerId: "google-1", email: "oauth@example.com", displayName: "OAuth User",
+            pictureURL: "https://example.com/second.png"
+        )
+        XCTAssertEqual(second.photoURL, "https://example.com/first.png")
+    }
+
+    func testLoyaltyPhoneCanBeLinkedAndNormalized() throws {
+        let (customer, _) = try CustomerUserStore.shared.register(email: "guest@example.com", displayName: "Guest", password: "guestpass1")
+        let linked = try CustomerUserStore.shared.updateLoyaltyPhone(id: customer.id, phone: "(206) 555-0100")
+        XCTAssertEqual(linked.loyaltyPhone, "2065550100")
+    }
+
+    func testLoyaltyPhoneCanBeUnlinked() throws {
+        let (customer, _) = try CustomerUserStore.shared.register(email: "guest@example.com", displayName: "Guest", password: "guestpass1")
+        try CustomerUserStore.shared.updateLoyaltyPhone(id: customer.id, phone: "2065550100")
+        let unlinked = try CustomerUserStore.shared.updateLoyaltyPhone(id: customer.id, phone: nil)
+        XCTAssertNil(unlinked.loyaltyPhone)
+    }
+
     func testChangePasswordOnOAuthOnlyAccountSetsFirstPassword() throws {
         let customer = try CustomerUserStore.shared.findOrCreateFromOAuth(
             provider: .google, providerId: "google-1", email: "oauth@example.com", displayName: "OAuth User"

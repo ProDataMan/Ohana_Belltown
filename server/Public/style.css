@@ -778,6 +778,15 @@ select {
   font-size: 1.05rem;
 }
 
+.profile-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  margin-bottom: 0.6rem;
+}
+
 .brand-logo {
   height: 36px;
   width: 36px;
@@ -1657,6 +1666,11 @@ fieldset legend {
   color: #b91c1c;
 }
 
+.pill-warning {
+  background: #fbf0dd;
+  color: var(--gold-text);
+}
+
 .loyalty-card-summary {
   display: flex;
   flex-wrap: wrap;
@@ -1667,6 +1681,10 @@ fieldset legend {
 
 .data-table {
   overflow-x: auto;
+}
+
+.menu-health-group + .menu-health-group {
+  margin-top: 1.5rem;
 }
 
 .data-table table {

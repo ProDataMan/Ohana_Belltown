@@ -4,6 +4,9 @@ struct OAuthUserInfo {
     var providerId: String
     var email: String
     var displayName: String
+    /// A profile photo URL, when the provider supplies one. Google does;
+    /// Apple Sign In never does, so this is always nil for that provider.
+    var pictureURL: String? = nil
 }
 
 enum OAuthConfigError: Error {

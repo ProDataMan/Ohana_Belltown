@@ -12,20 +12,27 @@ struct DailyPageviews: Codable {
     var deviceCounts: [String: Int]
     var itemViewCounts: [String: Int]
     var dwell: [String: DwellStat]
+    var osCounts: [String: Int]
+    var browserCounts: [String: Int]
+    var deviceModelCounts: [String: Int]
 
     enum CodingKeys: String, CodingKey {
-        case date, counts, deviceCounts, itemViewCounts, dwell
+        case date, counts, deviceCounts, itemViewCounts, dwell, osCounts, browserCounts, deviceModelCounts
     }
 
     init(
         date: String, counts: [String: Int], deviceCounts: [String: Int] = [:],
-        itemViewCounts: [String: Int] = [:], dwell: [String: DwellStat] = [:]
+        itemViewCounts: [String: Int] = [:], dwell: [String: DwellStat] = [:],
+        osCounts: [String: Int] = [:], browserCounts: [String: Int] = [:], deviceModelCounts: [String: Int] = [:]
     ) {
         self.date = date
         self.counts = counts
         self.deviceCounts = deviceCounts
         self.itemViewCounts = itemViewCounts
         self.dwell = dwell
+        self.osCounts = osCounts
+        self.browserCounts = browserCounts
+        self.deviceModelCounts = deviceModelCounts
     }
 
     init(from decoder: Decoder) throws {
@@ -35,6 +42,9 @@ struct DailyPageviews: Codable {
         deviceCounts = try container.decodeIfPresent([String: Int].self, forKey: .deviceCounts) ?? [:]
         itemViewCounts = try container.decodeIfPresent([String: Int].self, forKey: .itemViewCounts) ?? [:]
         dwell = try container.decodeIfPresent([String: DwellStat].self, forKey: .dwell) ?? [:]
+        osCounts = try container.decodeIfPresent([String: Int].self, forKey: .osCounts) ?? [:]
+        browserCounts = try container.decodeIfPresent([String: Int].self, forKey: .browserCounts) ?? [:]
+        deviceModelCounts = try container.decodeIfPresent([String: Int].self, forKey: .deviceModelCounts) ?? [:]
     }
 }
 
@@ -45,6 +55,9 @@ struct AnalyticsSummary: Content {
     var deviceBreakdown: [DeviceCount]
     var topItems: [ItemCount]
     var pageDwell: [PageDwell]
+    var osBreakdown: [OSCount]
+    var browserBreakdown: [BrowserCount]
+    var deviceModelBreakdown: [DeviceModelCount]
 }
 
 struct PageCount: Content {
@@ -66,6 +79,21 @@ struct PageDwell: Content {
     var path: String
     var avgSeconds: Double
     var samples: Int
+}
+
+struct OSCount: Content {
+    var os: String
+    var count: Int
+}
+
+struct BrowserCount: Content {
+    var browser: String
+    var count: Int
+}
+
+struct DeviceModelCount: Content {
+    var model: String
+    var count: Int
 }
 
 /// Paths that shouldn't show up in "top pages" — staff/admin tools and
@@ -117,6 +145,52 @@ final class AnalyticsStore: @unchecked Sendable {
         return "desktop"
     }
 
+    /// Coarse OS/platform, heuristically read from the User-Agent — no raw UA
+    /// is ever stored, just which bucket it fell into.
+    static func operatingSystem(from userAgent: String?) -> String {
+        guard let ua = userAgent else { return "Unknown" }
+        if ua.contains("iPhone") { return "iPhone" }
+        if ua.contains("iPad") { return "iPad" }
+        if ua.contains("Android") { return "Android" }
+        if ua.contains("Macintosh") || ua.contains("Mac OS X") { return "macOS" }
+        if ua.contains("Windows") { return "Windows" }
+        if ua.contains("Linux") { return "Linux" }
+        return "Other"
+    }
+
+    /// Browser family from the User-Agent. Order matters: Chrome-based
+    /// browsers (Edge, Samsung Internet, Opera) all include "Chrome" in
+    /// their UA string, and Chrome itself includes "Safari" — so the more
+    /// specific tokens have to be checked first.
+    static func browserName(from userAgent: String?) -> String {
+        guard let ua = userAgent else { return "Unknown" }
+        if ua.contains("EdgiOS") || ua.contains("EdgA") || ua.contains("Edg/") || ua.contains("Edge/") { return "Edge" }
+        if ua.contains("SamsungBrowser") { return "Samsung Internet" }
+        if ua.contains("OPR/") || ua.contains("Opera") { return "Opera" }
+        if ua.contains("FxiOS") || ua.contains("Firefox") { return "Firefox" }
+        if ua.contains("CriOS") || ua.contains("Chrome") { return "Chrome" }
+        if ua.contains("Safari") { return "Safari" }
+        return "Other"
+    }
+
+    /// Best-effort Android hardware model (e.g. "Pixel 8", "SM-G991B"), parsed
+    /// from the `Android <version>; <model>` segment many Android browsers
+    /// include in their UA. Returns nil when it can't be confidently parsed
+    /// (including on every iOS device — Apple's UA never exposes a specific
+    /// hardware model, only "iPhone"/"iPad") rather than storing a guess.
+    static func androidModel(from userAgent: String?) -> String? {
+        guard let ua = userAgent, let androidRange = ua.range(of: "Android ") else { return nil }
+        let afterAndroid = ua[androidRange.upperBound...]
+        guard let semicolon = afterAndroid.firstIndex(of: ";") else { return nil }
+        let afterVersion = afterAndroid[afterAndroid.index(after: semicolon)...]
+        guard let terminatorIndex = afterVersion.firstIndex(where: { $0 == ")" || $0 == ";" }) else { return nil }
+        var model = String(afterVersion[..<terminatorIndex]).trimmingCharacters(in: .whitespaces)
+        if let buildRange = model.range(of: " Build/") {
+            model = String(model[..<buildRange.lowerBound])
+        }
+        return model.isEmpty ? nil : model
+    }
+
     private func todayIndex() -> Int {
         let today = Self.today()
         if let idx = days.firstIndex(where: { $0.date == today }) {
@@ -133,6 +207,11 @@ final class AnalyticsStore: @unchecked Sendable {
         let idx = todayIndex()
         days[idx].counts[path, default: 0] += 1
         days[idx].deviceCounts[Self.deviceType(from: userAgent), default: 0] += 1
+        days[idx].osCounts[Self.operatingSystem(from: userAgent), default: 0] += 1
+        days[idx].browserCounts[Self.browserName(from: userAgent), default: 0] += 1
+        if let model = Self.androidModel(from: userAgent) {
+            days[idx].deviceModelCounts[model, default: 0] += 1
+        }
         try? persist()
     }
 
@@ -168,6 +247,9 @@ final class AnalyticsStore: @unchecked Sendable {
         var deviceTotals: [String: Int] = [:]
         var itemTotals: [String: Int] = [:]
         var dwellTotals: [String: DwellStat] = [:]
+        var osTotals: [String: Int] = [:]
+        var browserTotals: [String: Int] = [:]
+        var deviceModelTotals: [String: Int] = [:]
         for day in recent {
             for (path, count) in day.counts {
                 totals[path, default: 0] += count
@@ -183,6 +265,15 @@ final class AnalyticsStore: @unchecked Sendable {
                 combined.totalSeconds += stat.totalSeconds
                 combined.samples += stat.samples
                 dwellTotals[path] = combined
+            }
+            for (os, count) in day.osCounts {
+                osTotals[os, default: 0] += count
+            }
+            for (browser, count) in day.browserCounts {
+                browserTotals[browser, default: 0] += count
+            }
+            for (model, count) in day.deviceModelCounts {
+                deviceModelTotals[model, default: 0] += count
             }
         }
 
@@ -207,13 +298,29 @@ final class AnalyticsStore: @unchecked Sendable {
             .sorted { $0.avgSeconds > $1.avgSeconds }
             .prefix(15)
 
+        let osBreakdown = osTotals
+            .sorted { $0.value > $1.value }
+            .map { OSCount(os: $0.key, count: $0.value) }
+
+        let browserBreakdown = browserTotals
+            .sorted { $0.value > $1.value }
+            .map { BrowserCount(browser: $0.key, count: $0.value) }
+
+        let deviceModelBreakdown = deviceModelTotals
+            .sorted { $0.value > $1.value }
+            .prefix(15)
+            .map { DeviceModelCount(model: $0.key, count: $0.value) }
+
         return AnalyticsSummary(
             days: recent.sorted { $0.date < $1.date },
             totalViews: totals.values.reduce(0, +),
             topPages: Array(topPages),
             deviceBreakdown: deviceBreakdown,
             topItems: Array(topItems),
-            pageDwell: Array(pageDwell)
+            pageDwell: Array(pageDwell),
+            osBreakdown: osBreakdown,
+            browserBreakdown: browserBreakdown,
+            deviceModelBreakdown: Array(deviceModelBreakdown)
         )
     }
 

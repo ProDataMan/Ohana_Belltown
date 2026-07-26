@@ -44,6 +44,50 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testCustomerLoyaltyPhoneLinkingRequiresLoginAndReflectsPunches() throws {
+        let phoneBody = ByteBuffer(string: #"{"phone":"2065550100"}"#)
+        try app.test(.POST, "api/customer/loyalty-phone", headers: ["Content-Type": "application/json"], body: phoneBody) { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+
+        let registerBody = ByteBuffer(string: #"{"email":"guest@example.com","displayName":"Guest","password":"guestpass1"}"#)
+        var sessionCookie: String?
+        try app.test(.POST, "api/customer/register", headers: ["Content-Type": "application/json"], body: registerBody) { res in
+            XCTAssertEqual(res.status, .ok)
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from register") }
+
+        try app.test(.GET, "api/customer/loyalty", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+            let view = try res.content.decode(CustomerLoyaltyView.self)
+            XCTAssertNil(view.linkedPhone)
+        }
+
+        try app.test(.POST, "api/customer/loyalty-phone", headers: ["Content-Type": "application/json", "Cookie": cookie], body: phoneBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+        try LoyaltyStore.shared.addPunch(phone: "2065550100", count: 3)
+
+        try app.test(.GET, "api/customer/loyalty", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+            let view = try res.content.decode(CustomerLoyaltyView.self)
+            XCTAssertEqual(view.linkedPhone, "2065550100")
+            XCTAssertEqual(view.status?.punches, 3)
+        }
+
+        let unlinkBody = ByteBuffer(string: #"{"phone":null}"#)
+        try app.test(.POST, "api/customer/loyalty-phone", headers: ["Content-Type": "application/json", "Cookie": cookie], body: unlinkBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+        try app.test(.GET, "api/customer/loyalty", headers: ["Cookie": cookie]) { res in
+            let view = try res.content.decode(CustomerLoyaltyView.self)
+            XCTAssertNil(view.linkedPhone)
+        }
+    }
+
     func testMenuAPIReturnsSeedMenuWithoutAuth() throws {
         try app.test(.GET, "api/menu") { res in
             XCTAssertEqual(res.status, .ok)

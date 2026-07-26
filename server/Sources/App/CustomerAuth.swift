@@ -29,6 +29,15 @@ struct CustomerBirthdayRequest: Content {
     var birthday: String?
 }
 
+struct CustomerLoyaltyPhoneRequest: Content {
+    var phone: String?
+}
+
+struct CustomerLoyaltyView: Content {
+    var linkedPhone: String?
+    var status: LoyaltyStatus?
+}
+
 struct GenericOK: Content {
     var ok: Bool = true
 }
@@ -150,6 +159,22 @@ func registerCustomerAuthRoutes(_ app: Application) throws {
         let customer = try requireCustomerLogin(req)
         let body = try req.content.decode(CustomerBirthdayRequest.self)
         return try CustomerUserStore.shared.updateBirthday(id: customer.id, birthday: body.birthday)
+    }
+
+    // Links this account to a phone-based punch card, so a signed-in
+    // customer can see their rewards status without re-entering their phone.
+    app.post("api", "customer", "loyalty-phone") { req throws -> CustomerUserPublic in
+        let customer = try requireCustomerLogin(req)
+        let body = try req.content.decode(CustomerLoyaltyPhoneRequest.self)
+        return try CustomerUserStore.shared.updateLoyaltyPhone(id: customer.id, phone: body.phone)
+    }
+
+    app.get("api", "customer", "loyalty") { req throws -> CustomerLoyaltyView in
+        let customer = try requireCustomerLogin(req)
+        guard let phone = customer.loyaltyPhone else {
+            return CustomerLoyaltyView(linkedPhone: nil, status: nil)
+        }
+        return CustomerLoyaltyView(linkedPhone: phone, status: try? LoyaltyStore.shared.lookup(phone: phone))
     }
 
     // Staff-facing — who has a birthday coming up, so a server can treat them.

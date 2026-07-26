@@ -42,29 +42,54 @@
 
       <section class="panel">
         <h2>Views by Day</h2>
+        <div id="daily-chart-summary" class="loyalty-card-summary"></div>
         <div id="daily-chart"></div>
       </section>
 
       <section class="panel">
         <h2>Top Pages</h2>
+        <div id="top-pages-summary" class="loyalty-card-summary"></div>
         <div id="top-pages"></div>
       </section>
 
       <section class="panel">
         <h2>Device Breakdown</h2>
         <p class="hint">Classified from the browser's user-agent — no cookies, no individual tracking.</p>
+        <div id="device-breakdown-summary" class="loyalty-card-summary"></div>
         <div id="device-breakdown"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Operating System</h2>
+        <p class="hint">Also classified from the user-agent — same privacy footing as Device Breakdown above.</p>
+        <div id="os-breakdown-summary" class="loyalty-card-summary"></div>
+        <div id="os-breakdown"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Browser</h2>
+        <div id="browser-breakdown-summary" class="loyalty-card-summary"></div>
+        <div id="browser-breakdown"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Android Device Models</h2>
+        <p class="hint">Best-effort, parsed only when a browser's user-agent happens to include it — most commonly stock Android browsers. iOS never exposes a specific hardware model (every iPhone/iPad reports the same generic string), so there's no equivalent list for Apple devices.</p>
+        <div id="device-model-breakdown-summary" class="loyalty-card-summary"></div>
+        <div id="device-model-breakdown"></div>
       </section>
 
       <section class="panel">
         <h2>Most-Viewed Menu Items</h2>
         <p class="hint">Counts times a menu item's detail popup was opened — a proxy for interest, not a sales figure (this site doesn't have access to real order data; ordering happens through ChowNow).</p>
+        <div id="top-items-summary" class="loyalty-card-summary"></div>
         <div id="top-items"></div>
       </section>
 
       <section class="panel">
         <h2>Average Time on Page</h2>
         <p class="hint">Pages with at least 3 samples, sorted longest first.</p>
+        <div id="page-dwell-summary" class="loyalty-card-summary"></div>
         <div id="page-dwell"></div>
       </section>
 
@@ -75,12 +100,14 @@
             <button id="reload-menu-health-btn" type="button" class="secondary">Reload</button>
           </div>
         </div>
-        <p class="hint">Across the full menu, including Happy Hour and anything marked a special.</p>
+        <p class="hint">Across the full menu, including Happy Hour and anything marked a special. Grouped by category, with a count at the top of each.</p>
+        <div id="missing-price-summary" class="loyalty-card-summary"></div>
         <div id="missing-price-list"></div>
       </section>
 
       <section class="panel">
         <h2>Menu Items Missing a Photo</h2>
+        <div id="missing-photo-summary" class="loyalty-card-summary"></div>
         <div id="missing-photo-list"></div>
       </section>
     </main>

@@ -28,6 +28,7 @@ enum GoogleOAuth {
         var email: String
         var email_verified: Bool?
         var name: String?
+        var picture: String?
     }
 
     static func exchangeCodeAndFetchUser(code: String, redirectURI: String, client: Client) async throws -> OAuthUserInfo {
@@ -64,6 +65,6 @@ enum GoogleOAuth {
             throw Abort(.forbidden, reason: "Your Google email isn't verified.")
         }
 
-        return OAuthUserInfo(providerId: info.sub, email: info.email, displayName: info.name ?? info.email)
+        return OAuthUserInfo(providerId: info.sub, email: info.email, displayName: info.name ?? info.email, pictureURL: info.picture)
     }
 }

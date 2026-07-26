@@ -22,6 +22,52 @@ final class AnalyticsStoreTests: XCTestCase {
         XCTAssertEqual(AnalyticsStore.deviceType(from: nil), "unknown")
     }
 
+    func testOperatingSystemClassification() {
+        XCTAssertEqual(AnalyticsStore.operatingSystem(from: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)"), "iPhone")
+        XCTAssertEqual(AnalyticsStore.operatingSystem(from: "Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X)"), "iPad")
+        XCTAssertEqual(AnalyticsStore.operatingSystem(from: "Mozilla/5.0 (Linux; Android 14; Pixel 8)"), "Android")
+        XCTAssertEqual(AnalyticsStore.operatingSystem(from: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"), "macOS")
+        XCTAssertEqual(AnalyticsStore.operatingSystem(from: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"), "Windows")
+        XCTAssertEqual(AnalyticsStore.operatingSystem(from: "Mozilla/5.0 (X11; Linux x86_64)"), "Linux")
+        XCTAssertEqual(AnalyticsStore.operatingSystem(from: nil), "Unknown")
+    }
+
+    func testBrowserClassificationPrefersMoreSpecificTokens() {
+        // Edge, Samsung Internet, and Opera all include "Chrome" in their UA —
+        // the more specific token has to win.
+        XCTAssertEqual(AnalyticsStore.browserName(from: "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36 Edg/120.0"), "Edge")
+        XCTAssertEqual(AnalyticsStore.browserName(from: "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120.0 SamsungBrowser/24.0"), "Samsung Internet")
+        XCTAssertEqual(AnalyticsStore.browserName(from: "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 Chrome/120.0 Safari/537.36 OPR/106.0"), "Opera")
+        XCTAssertEqual(AnalyticsStore.browserName(from: "Mozilla/5.0 (Windows NT 10.0; rv:120.0) Gecko/20100101 Firefox/120.0"), "Firefox")
+        XCTAssertEqual(AnalyticsStore.browserName(from: "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"), "Chrome")
+        XCTAssertEqual(AnalyticsStore.browserName(from: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"), "Safari")
+        XCTAssertEqual(AnalyticsStore.browserName(from: nil), "Unknown")
+    }
+
+    func testAndroidModelParsing() {
+        XCTAssertEqual(AnalyticsStore.androidModel(from: "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36"), "Pixel 8")
+        XCTAssertEqual(AnalyticsStore.androidModel(from: "Mozilla/5.0 (Linux; Android 13; SM-G991B Build/TP1A.220624.014) AppleWebKit/537.36"), "SM-G991B")
+        // iOS never exposes a hardware model in its UA.
+        XCTAssertNil(AnalyticsStore.androidModel(from: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)"))
+        XCTAssertNil(AnalyticsStore.androidModel(from: nil))
+    }
+
+    func testRecordViewTracksOSAndBrowserBreakdowns() throws {
+        AnalyticsStore.shared.recordView(path: "/menu", userAgent: "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120.0")
+        AnalyticsStore.shared.recordView(path: "/menu", userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Version/17.0 Mobile/15E148 Safari/604.1")
+
+        let summary = try AnalyticsStore.shared.summary(days: 7)
+        let osCounts = Dictionary(uniqueKeysWithValues: summary.osBreakdown.map { ($0.os, $0.count) })
+        XCTAssertEqual(osCounts["Android"], 1)
+        XCTAssertEqual(osCounts["iPhone"], 1)
+
+        let browserCounts = Dictionary(uniqueKeysWithValues: summary.browserBreakdown.map { ($0.browser, $0.count) })
+        XCTAssertEqual(browserCounts["Chrome"], 1)
+        XCTAssertEqual(browserCounts["Safari"], 1)
+
+        XCTAssertEqual(summary.deviceModelBreakdown.first?.model, "Pixel 8")
+    }
+
     func testRecordViewTracksPathAndDevice() throws {
         AnalyticsStore.shared.recordView(path: "/menu", userAgent: "Mozilla/5.0 (iPhone) Mobile/15E148")
         AnalyticsStore.shared.recordView(path: "/menu", userAgent: "Mozilla/5.0 (Macintosh)")

@@ -82,7 +82,8 @@ func registerOAuthRoutes(_ app: Application) throws {
 
         if parsed.audience == "customer" {
             let customer = try CustomerUserStore.shared.findOrCreateFromOAuth(
-                provider: .google, providerId: info.providerId, email: info.email, displayName: info.displayName
+                provider: .google, providerId: info.providerId, email: info.email, displayName: info.displayName,
+                pictureURL: info.pictureURL
             )
             req.session.data["customerId"] = customer.id
             return req.redirect(to: "/logged-in")

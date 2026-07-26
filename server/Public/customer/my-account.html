@@ -58,6 +58,22 @@
       </section>
 
       <section class="panel">
+        <h2>Rewards Card</h2>
+        <p class="hint">Link your phone number to see your sushi punch card here, instead of looking it up on <a href="/rewards">/rewards</a> each time.</p>
+        <div id="loyalty-info" class="hint">Loading...</div>
+        <form id="loyalty-phone-form">
+          <label>Phone number
+            <input type="tel" id="loyalty-phone-input" placeholder="(206) 555-0100" />
+          </label>
+          <div class="cta-row">
+            <button type="submit">Link</button>
+            <button id="unlink-loyalty-btn" type="button" class="secondary">Unlink</button>
+          </div>
+          <p id="loyalty-phone-status" class="status"></p>
+        </form>
+      </section>
+
+      <section class="panel">
         <h2>Birthday Club</h2>
         <p class="hint">Optional — just the month and day, no year needed. Let us know so we can treat you on your birthday.</p>
         <form id="birthday-form">

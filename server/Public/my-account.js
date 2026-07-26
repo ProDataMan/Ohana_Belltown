@@ -24,6 +24,7 @@ async function loadProfile() {
     if (!response.ok) throw new Error('Unable to load profile.');
     const customer = await response.json();
     el.innerHTML = `
+      ${customer.photoURL ? `<img class="profile-avatar" src="${escapeHtmlMyAccount(customer.photoURL)}" alt="" />` : ''}
       <p><strong>${escapeHtmlMyAccount(customer.displayName)}</strong></p>
       <p>${escapeHtmlMyAccount(customer.email)}</p>
       ${!customer.verified ? '<p class="hint">Check your email to verify your account (a verification link was sent when you signed up).</p>' : ''}
@@ -38,6 +39,76 @@ async function loadProfile() {
     el.textContent = error.message;
   }
 }
+
+async function loadLoyalty() {
+  const el = document.getElementById('loyalty-info');
+  const phoneInput = document.getElementById('loyalty-phone-input');
+  try {
+    const response = await fetch('/api/customer/loyalty');
+    if (!response.ok) throw new Error('Unable to load rewards status.');
+    const data = await response.json();
+    if (!data.linkedPhone) {
+      el.textContent = 'No phone number linked yet.';
+      return;
+    }
+    phoneInput.value = data.linkedPhone;
+    if (data.status) {
+      el.innerHTML = `
+        <div class="loyalty-card-summary">
+          <span class="pill pill-approved">${data.status.punches} / ${data.status.punchesNeeded} punches</span>
+          ${data.status.rewardReady ? '<span class="pill pill-approved">Reward ready!</span>' : ''}
+          <span class="pill">${data.status.totalRedeemed} redeemed all-time</span>
+        </div>
+      `;
+    } else {
+      el.textContent = `Linked to ${data.linkedPhone} — no punches yet.`;
+    }
+  } catch (error) {
+    el.textContent = error.message;
+  }
+}
+
+document.getElementById('loyalty-phone-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const statusEl = document.getElementById('loyalty-phone-status');
+  const phone = document.getElementById('loyalty-phone-input').value.trim();
+  if (!phone) return setMyAccountStatus(statusEl, 'Enter a phone number first.', true);
+
+  setMyAccountStatus(statusEl, 'Linking...', false);
+  try {
+    const response = await fetch('/api/customer/loyalty-phone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.reason || `Failed (${response.status}).`);
+    }
+    setMyAccountStatus(statusEl, 'Linked!', false);
+    loadLoyalty();
+  } catch (error) {
+    setMyAccountStatus(statusEl, error.message, true);
+  }
+});
+
+document.getElementById('unlink-loyalty-btn').addEventListener('click', async () => {
+  const statusEl = document.getElementById('loyalty-phone-status');
+  setMyAccountStatus(statusEl, 'Unlinking...', false);
+  try {
+    const response = await fetch('/api/customer/loyalty-phone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: null }),
+    });
+    if (!response.ok) throw new Error(`Failed (${response.status}).`);
+    document.getElementById('loyalty-phone-input').value = '';
+    setMyAccountStatus(statusEl, 'Unlinked.', false);
+    loadLoyalty();
+  } catch (error) {
+    setMyAccountStatus(statusEl, error.message, true);
+  }
+});
 
 if (new URLSearchParams(window.location.search).get('verified') === '1') {
   document.getElementById('verified-banner').hidden = false;
@@ -132,3 +203,4 @@ document.getElementById('deactivate-btn').addEventListener('click', async () => 
 });
 
 loadProfile();
+loadLoyalty();

@@ -12,6 +12,12 @@ struct CustomerUser: Codable {
     /// Month and day only, formatted "MM-DD" — never the birth year, since
     /// nothing here needs age, just the day to mark for a birthday perk.
     var birthday: String?
+    /// Profile photo URL, extracted from Google on signup/link. Apple never
+    /// supplies one, and there's no manual-upload path — only ever set from OAuth.
+    var photoURL: String?
+    /// Phone number linking this account to a punch card in LoyaltyStore
+    /// (which is phone-keyed and otherwise has no concept of a customer login).
+    var loyaltyPhone: String?
     var verificationToken: String?
     var resetToken: String?
     var resetTokenExpiresAt: String?
@@ -19,14 +25,15 @@ struct CustomerUser: Codable {
     var updatedAt: String
 
     enum CodingKeys: String, CodingKey {
-        case id, email, displayName, passwordHash, googleId, appleId, verified, active, birthday
+        case id, email, displayName, passwordHash, googleId, appleId, verified, active, birthday, photoURL, loyaltyPhone
         case verificationToken, resetToken, resetTokenExpiresAt, createdAt, updatedAt
     }
 
     init(
         id: String, email: String, displayName: String, passwordHash: String?,
         googleId: String?, appleId: String?, verified: Bool, active: Bool = true,
-        birthday: String? = nil, verificationToken: String?, resetToken: String?, resetTokenExpiresAt: String?,
+        birthday: String? = nil, photoURL: String? = nil, loyaltyPhone: String? = nil,
+        verificationToken: String?, resetToken: String?, resetTokenExpiresAt: String?,
         createdAt: String, updatedAt: String
     ) {
         self.id = id
@@ -38,6 +45,8 @@ struct CustomerUser: Codable {
         self.verified = verified
         self.active = active
         self.birthday = birthday
+        self.photoURL = photoURL
+        self.loyaltyPhone = loyaltyPhone
         self.verificationToken = verificationToken
         self.resetToken = resetToken
         self.resetTokenExpiresAt = resetTokenExpiresAt
@@ -56,6 +65,8 @@ struct CustomerUser: Codable {
         verified = try container.decode(Bool.self, forKey: .verified)
         active = try container.decodeIfPresent(Bool.self, forKey: .active) ?? true
         birthday = try container.decodeIfPresent(String.self, forKey: .birthday)
+        photoURL = try container.decodeIfPresent(String.self, forKey: .photoURL)
+        loyaltyPhone = try container.decodeIfPresent(String.self, forKey: .loyaltyPhone)
         verificationToken = try container.decodeIfPresent(String.self, forKey: .verificationToken)
         resetToken = try container.decodeIfPresent(String.self, forKey: .resetToken)
         resetTokenExpiresAt = try container.decodeIfPresent(String.self, forKey: .resetTokenExpiresAt)
@@ -73,6 +84,8 @@ struct CustomerUserPublic: Content {
     var googleLinked: Bool
     var appleLinked: Bool
     var birthday: String?
+    var photoURL: String?
+    var loyaltyPhone: String?
 
     init(_ user: CustomerUser) {
         id = user.id
@@ -83,6 +96,8 @@ struct CustomerUserPublic: Content {
         googleLinked = user.googleId != nil
         appleLinked = user.appleId != nil
         birthday = user.birthday
+        photoURL = user.photoURL
+        loyaltyPhone = user.loyaltyPhone
     }
 }
 
@@ -227,8 +242,11 @@ final class CustomerUserStore: @unchecked Sendable {
 
     /// Finds the account linked to this OAuth identity, links it to an existing
     /// account with a matching verified email, or creates a new account.
+    /// Whenever the provider supplies a profile photo and the account doesn't
+    /// have one on file yet, it's backfilled — covers both a brand-new signup
+    /// and an account that linked Google before this field existed.
     @discardableResult
-    func findOrCreateFromOAuth(provider: OAuthProvider, providerId: String, email: String, displayName: String) throws -> CustomerUserPublic {
+    func findOrCreateFromOAuth(provider: OAuthProvider, providerId: String, email: String, displayName: String, pictureURL: String? = nil) throws -> CustomerUserPublic {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
@@ -239,6 +257,11 @@ final class CustomerUserStore: @unchecked Sendable {
             guard users[idx].active else {
                 throw CustomerUserError.accountDeactivated
             }
+            if let pictureURL, users[idx].photoURL == nil {
+                users[idx].photoURL = pictureURL
+                users[idx].updatedAt = timestamp
+                try persist()
+            }
             return CustomerUserPublic(users[idx])
         }
 
@@ -248,6 +271,9 @@ final class CustomerUserStore: @unchecked Sendable {
             }
             provider.setId(providerId, on: &users[idx])
             users[idx].verified = true
+            if let pictureURL, users[idx].photoURL == nil {
+                users[idx].photoURL = pictureURL
+            }
             users[idx].updatedAt = timestamp
             try persist()
             return CustomerUserPublic(users[idx])
@@ -261,6 +287,7 @@ final class CustomerUserStore: @unchecked Sendable {
             googleId: nil,
             appleId: nil,
             verified: true,
+            photoURL: pictureURL,
             verificationToken: nil,
             resetToken: nil,
             resetTokenExpiresAt: nil,
@@ -361,6 +388,28 @@ final class CustomerUserStore: @unchecked Sendable {
             users[idx].birthday = birthday
         } else {
             users[idx].birthday = nil
+        }
+        users[idx].updatedAt = nowString()
+        try persist()
+        return CustomerUserPublic(users[idx])
+    }
+
+    /// Links this account to a phone-based punch card in LoyaltyStore, so a
+    /// signed-in customer can see their rewards status without re-entering
+    /// their phone every time. `phone` is normalized the same way LoyaltyStore
+    /// normalizes it (digits only) — pass nil/empty to unlink.
+    @discardableResult
+    func updateLoyaltyPhone(id: String, phone: String?) throws -> CustomerUserPublic {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard let idx = users.firstIndex(where: { $0.id == id }) else {
+            throw CustomerUserError.notFound
+        }
+        if let phone, !phone.isEmpty {
+            users[idx].loyaltyPhone = LoyaltyStore.normalizePhone(phone)
+        } else {
+            users[idx].loyaltyPhone = nil
         }
         users[idx].updatedAt = nowString()
         try persist()
