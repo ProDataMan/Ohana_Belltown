@@ -32,11 +32,43 @@ document.querySelectorAll('.nav-dropdown-toggle').forEach((btn) => {
     const staffResponse = await fetch('/api/auth/me');
     if (staffResponse.ok) {
       makeLogoutLink('/api/auth/logout');
+      startStaffTableOrderAlerts();
     }
   } catch {
     // leave the "Log In" link as-is
   }
 })();
+
+// A small floating indicator, shown site-wide to a logged-in staff member
+// whenever a dine-in guest has tapped "Order" on a menu item — so a server
+// walking the floor with the public site open on their phone still sees it,
+// not just someone parked on the dedicated /table-orders-admin.html page.
+function startStaffTableOrderAlerts() {
+  const alertEl = document.createElement('a');
+  alertEl.href = '/table-orders-admin.html';
+  alertEl.className = 'staff-order-alert';
+  alertEl.hidden = true;
+  document.body.appendChild(alertEl);
+
+  async function poll() {
+    try {
+      const response = await fetch('/api/table-orders/pending');
+      if (!response.ok) return;
+      const orders = await response.json();
+      if (orders.length) {
+        alertEl.textContent = `${orders.length} pending table order${orders.length === 1 ? '' : 's'}`;
+        alertEl.hidden = false;
+      } else {
+        alertEl.hidden = true;
+      }
+    } catch {
+      // leave the indicator as-is until the next successful poll
+    }
+  }
+
+  poll();
+  setInterval(poll, 20000);
+}
 
 // Anonymous, aggregate-only "time on page" tracking — no cookies, no
 // per-visitor identity, just how long this one page view lasted before the

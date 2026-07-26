@@ -15,6 +15,11 @@ struct BonusReviewRequest: Content {
     var approve: Bool
 }
 
+struct TableOrderRequest: Content {
+    var tableId: String
+    var itemName: String
+}
+
 struct WaitlistJoinRequest: Content {
     var name: String
     var phone: String
@@ -50,9 +55,16 @@ func routes(_ app: Application) throws {
     app.get("healthz") { _ in "ok" }
 
     // QR-code smart landing: sends whoever scans the table-card straight to
-    // Happy Hour during the window, otherwise the full menu.
+    // Happy Hour during the window, otherwise the full menu. A per-table QR
+    // also carries a `table` id, which rides along on the redirect so the
+    // menu page can show a per-item Order button tied to that table.
     app.get("scan") { req in
-        req.redirect(to: HappyHourSchedule.landingPath(), redirectType: .normal)
+        var target = HappyHourSchedule.landingPath()
+        if let table = req.query[String.self, at: "table"]?.trimmingCharacters(in: .whitespacesAndNewlines), !table.isEmpty,
+           let encoded = table.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+            target += "?table=\(encoded)"
+        }
+        return req.redirect(to: target, redirectType: .normal)
     }
 
     app.get("api", "menu") { _ throws -> Menu in
@@ -205,6 +217,30 @@ func routes(_ app: Application) throws {
         return try WaitlistStore.shared.remove(id: id)
     }
 
+    // A "table order" just flags staff that a dine-in guest tapped Order next
+    // to a menu item while scanned in from a numbered table — not routed
+    // through ChowNow or any payment system, just a heads-up to go take it.
+    app.post("api", "table-orders") { req throws -> TableOrderEntry in
+        let body = try req.content.decode(TableOrderRequest.self)
+        let tableId = body.tableId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let itemName = body.itemName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !tableId.isEmpty, !itemName.isEmpty else {
+            throw Abort(.badRequest, reason: "Table ID and item name are required.")
+        }
+        return try TableOrdersStore.shared.place(tableId: tableId, itemName: itemName)
+    }
+
+    app.get("api", "table-orders", "pending") { req throws -> [TableOrderEntry] in
+        try requireLogin(req)
+        return try TableOrdersStore.shared.pending()
+    }
+
+    app.post("api", "table-orders", ":id", "acknowledge") { req throws -> TableOrderEntry in
+        try requireLogin(req)
+        guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
+        return try TableOrdersStore.shared.acknowledge(id: id)
+    }
+
     func serveStatic(_ req: Request, file: String) async throws -> Response {
         let path = req.application.directory.publicDirectory + file
         return try await req.fileio.asyncStreamFile(at: path)
@@ -238,6 +274,7 @@ func routes(_ app: Application) throws {
         ("edit-item.html", "staff/edit-item.html", false),
         ("loyalty-admin.html", "staff/loyalty-admin.html", false),
         ("waitlist-admin.html", "staff/waitlist-admin.html", false),
+        ("table-orders-admin.html", "staff/table-orders-admin.html", false),
         ("events-admin.html", "staff/events-admin.html", true),
         ("account.html", "staff/account.html", false),
         ("change-password.html", "staff/change-password.html", false),

@@ -28,6 +28,39 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
+/// A `?table=` on the URL means the visitor scanned that table's QR code.
+/// Stashed in sessionStorage so it survives clicking to another menu page
+/// (e.g. Happy Hour's "Full Menu" link) without every internal link needing
+/// to carry the query param — cleared automatically when the tab closes.
+function getTableId() {
+  const fromQuery = new URLSearchParams(window.location.search).get('table');
+  if (fromQuery) {
+    sessionStorage.setItem('ohana_table_id', fromQuery);
+    return fromQuery;
+  }
+  return sessionStorage.getItem('ohana_table_id');
+}
+
+async function placeTableOrder(button) {
+  const tableId = getTableId();
+  if (!tableId) return;
+  const itemName = button.dataset.itemName;
+  button.disabled = true;
+  button.textContent = 'Sending...';
+  try {
+    const response = await fetch('/api/table-orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tableId, itemName }),
+    });
+    if (!response.ok) throw new Error();
+    button.textContent = 'Sent to staff!';
+  } catch {
+    button.textContent = 'Failed — tap to retry';
+    button.disabled = false;
+  }
+}
+
 function slugify(value) {
   return String(value)
     .toLowerCase()
@@ -155,6 +188,7 @@ function renderMenu(data) {
   }
 
   itemsByIndex = [];
+  const tableId = getTableId();
 
   menuContainer.innerHTML = categories
     .map((category) => {
@@ -180,6 +214,10 @@ function renderMenu(data) {
           const editLink = item.id
             ? `<a class="staff-edit-link" href="/edit-item.html?id=${encodeURIComponent(item.id)}" hidden>Edit</a>`
             : '';
+          const orderButton =
+            tableId && !soldOut
+              ? `<button type="button" class="order-btn" data-item-name="${escapeHtml(item.name)}">Order</button>`
+              : '';
           return `
             <article class="item${soldOut ? ' item-sold-out' : ''}" data-search="${escapeHtml(searchText)}" data-index="${index}" data-tags="${escapeHtml(tags.join(','))}">
               ${imageMarkup}
@@ -190,6 +228,7 @@ function renderMenu(data) {
                 ${tagsMarkup}
               </div>
               ${priceMarkup}
+              ${orderButton}
               ${editLink}
             </article>
           `;
@@ -348,6 +387,11 @@ async function openItemModal(index) {
 }
 
 menuContainer.addEventListener('click', (event) => {
+  const orderBtn = event.target.closest('.order-btn');
+  if (orderBtn) {
+    placeTableOrder(orderBtn);
+    return;
+  }
   if (event.target.closest('.staff-edit-link')) {
     return;
   }

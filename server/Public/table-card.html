@@ -70,6 +70,15 @@
         font-size: 0.85rem;
       }
 
+      .table-card .table-number {
+        font-family: var(--font-ui);
+        font-weight: 800;
+        font-size: 0.95rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #fff;
+      }
+
       @media print {
         .site-header,
         .site-footer,
@@ -104,23 +113,34 @@
 
     <div class="print-instructions">
       <h1>Table Cards</h1>
-      <p>Print this page (Cmd/Ctrl+P) to get table-ready cards sized for a standard 4&times;6" acrylic stand. Each card's QR code lands on Happy Hour automatically during Happy Hour (Mon&ndash;Fri, 3&ndash;6pm) and on the full menu the rest of the time.</p>
+      <p>
+        Print this page (Cmd/Ctrl+P) to get table-ready cards sized for a standard 4&times;6" acrylic
+        stand — one per numbered table. Each QR code is unique to its table: scanning it lands on
+        Happy Hour automatically during Happy Hour (Mon&ndash;Fri, 3&ndash;6pm) or the full menu the
+        rest of the time, and unlocks an "Order" button next to every menu item so a guest can flag
+        staff for something without waving anyone down. Currently set up for 12 tables &mdash; ask to
+        add more if Ohana has additional seating to cover.
+      </p>
       <button type="button" onclick="window.print()">Print This Page</button>
     </div>
 
-    <div class="card-sheet">
-      <div class="table-card">
-        <img class="logo" src="/images/logo.png" alt="" />
-        <h2>Scan for our Menu</h2>
-        <img class="qr" src="/images/menu-qr.png" alt="QR code linking to the Ohana Belltown menu" />
-        <p>Food &middot; Sushi &middot; Drinks &middot; Happy Hour</p>
-      </div>
-      <div class="table-card">
-        <img class="logo" src="/images/logo.png" alt="" />
-        <h2>Scan for our Menu</h2>
-        <img class="qr" src="/images/menu-qr.png" alt="QR code linking to the Ohana Belltown menu" />
-        <p>Food &middot; Sushi &middot; Drinks &middot; Happy Hour</p>
-      </div>
-    </div>
+    <div class="card-sheet" id="card-sheet"></div>
+
+    <script>
+      const tableCount = 12;
+      const sheet = document.getElementById('card-sheet');
+      for (let i = 1; i <= tableCount; i++) {
+        const card = document.createElement('div');
+        card.className = 'table-card';
+        card.innerHTML = `
+          <img class="logo" src="/images/logo.png" alt="" />
+          <span class="table-number">Table ${i}</span>
+          <h2>Scan to Order</h2>
+          <img class="qr" src="/images/table-qr-${i}.png" alt="QR code for Table ${i}, linking to the Ohana Belltown menu" />
+          <p>Food &middot; Sushi &middot; Drinks &middot; Happy Hour</p>
+        `;
+        sheet.appendChild(card);
+      }
+    </script>
   </body>
 </html>

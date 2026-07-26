@@ -22,6 +22,7 @@ final class RouteTests: XCTestCase {
         CustomerUserStore.shared.configure(dataDirectory: tempDir.path)
         AnalyticsStore.shared.configure(dataDirectory: tempDir.path)
         WaitlistStore.shared.configure(dataDirectory: tempDir.path)
+        TableOrdersStore.shared.configure(dataDirectory: tempDir.path)
     }
 
     override func tearDown() async throws {
@@ -41,6 +42,62 @@ final class RouteTests: XCTestCase {
             XCTAssertEqual(res.status, .seeOther)
             let location = res.headers.first(name: .location)
             XCTAssertTrue(location == "/menu" || location == "/happy-hour", "unexpected redirect target: \(location ?? "nil")")
+        }
+    }
+
+    func testScanPreservesTableIdOnRedirect() throws {
+        try app.test(.GET, "scan?table=5") { res in
+            XCTAssertEqual(res.status, .seeOther)
+            let location = res.headers.first(name: .location)
+            XCTAssertTrue(location == "/menu?table=5" || location == "/happy-hour?table=5", "unexpected redirect target: \(location ?? "nil")")
+        }
+    }
+
+    func testTableOrderPlacementAndStaffAcknowledgeFlow() throws {
+        let orderBody = ByteBuffer(string: #"{"tableId":"5","itemName":"Spam Musubi"}"#)
+        var orderId: String?
+        try app.test(.POST, "api/table-orders", headers: ["Content-Type": "application/json"], body: orderBody) { res in
+            XCTAssertEqual(res.status, .ok)
+            let entry = try res.content.decode(TableOrderEntry.self)
+            XCTAssertEqual(entry.tableId, "5")
+            XCTAssertEqual(entry.status, "pending")
+            orderId = entry.id
+        }
+        guard let id = orderId else { return XCTFail("expected an order id") }
+
+        try app.test(.GET, "api/table-orders/pending") { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+
+        let bootstrapBody = ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"], body: bootstrapBody) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        try app.test(.GET, "api/table-orders/pending", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+            let pending = try res.content.decode([TableOrderEntry].self)
+            XCTAssertEqual(pending.count, 1)
+            XCTAssertEqual(pending[0].id, id)
+        }
+
+        try app.test(.POST, "api/table-orders/\(id)/acknowledge", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+        try app.test(.GET, "api/table-orders/pending", headers: ["Cookie": cookie]) { res in
+            let pending = try res.content.decode([TableOrderEntry].self)
+            XCTAssertTrue(pending.isEmpty)
+        }
+    }
+
+    func testTableOrderRejectsEmptyFields() throws {
+        let orderBody = ByteBuffer(string: #"{"tableId":"","itemName":"Spam Musubi"}"#)
+        try app.test(.POST, "api/table-orders", headers: ["Content-Type": "application/json"], body: orderBody) { res in
+            XCTAssertEqual(res.status, .badRequest)
         }
     }
 
