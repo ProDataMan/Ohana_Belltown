@@ -191,6 +191,26 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testFeedbackFromLoggedInCustomerCapturesAccountEmailAutomatically() throws {
+        let registerBody = ByteBuffer(string: #"{"email":"guest@example.com","displayName":"Guest","password":"guestpass1"}"#)
+        var sessionCookie: String?
+        try app.test(.POST, "api/customer/register", headers: ["Content-Type": "application/json"], body: registerBody) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from register") }
+
+        // No contactEmail in the request body — it should still get attached
+        // server-side from the logged-in customer's account.
+        let body = ByteBuffer(string: #"{"category":"food","message":"Loved it!"}"#)
+        try app.test(.POST, "api/feedback", headers: ["Content-Type": "application/json", "Cookie": cookie], body: body) { res in
+            XCTAssertEqual(res.status, .ok)
+            let entry = try res.content.decode(FeedbackEntry.self)
+            XCTAssertEqual(entry.contactEmail, "guest@example.com")
+        }
+    }
+
     func testFeedbackRejectsEmptyMessageAndInvalidRating() throws {
         let emptyBody = ByteBuffer(string: #"{"category":"food","message":""}"#)
         try app.test(.POST, "api/feedback", headers: ["Content-Type": "application/json"], body: emptyBody) { res in

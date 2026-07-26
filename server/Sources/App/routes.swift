@@ -313,9 +313,13 @@ func routes(_ app: Application) throws {
                 throw Abort(.badRequest, reason: "Rating must be between 1 and 5.")
             }
         }
+        // A logged-in customer or staff member's account email is more
+        // trustworthy than a free-text field, so it wins over whatever
+        // (if anything) was typed into the optional email box.
+        let loggedInEmail = try currentCustomer(req)?.email ?? currentUser(req)?.email
         return try FeedbackStore.shared.submit(
             category: category, rating: body.rating, message: message,
-            page: body.page, contactEmail: body.contactEmail
+            page: body.page, contactEmail: loggedInEmail ?? body.contactEmail
         )
     }
 
