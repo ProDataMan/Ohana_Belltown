@@ -118,6 +118,7 @@ now historical background rather than the current plan.
 **Customer accounts**
 - Separate from staff accounts — email/password identity only, no `admin`/`employee` role, no order history yet
 - Self-service registration (`/signup`), login (`/account-login`), password change and reset (`/forgot-password.html` → `/reset-password.html`, 1-hour expiring token)
+- The "Log In" link in the main site nav (every public page, via `nav.js`) automatically becomes "Log Out" when a customer or staff session is already active — checks `/api/customer/me` then `/api/auth/me` client-side and swaps the link's text/behavior, no page-specific code needed
 - Email verification link on signup — **not actually delivered yet** (see gaps below), logged server-side instead
 - Self-service account deactivation (`/my-account.html`) — immediately ends the session and blocks future login (password or OAuth)
 
