@@ -28,6 +28,7 @@ document.getElementById('check-btn').addEventListener('click', async () => {
     checkResult.innerHTML = `
       <div class="loyalty-card-summary">
         <span class="pill ${card.rewardReady ? 'pill-approved' : ''}">${card.punches} / ${card.punchesNeeded} punches</span>
+        ${card.bonusPoints > 0 ? `<span class="pill">+${card.bonusPoints}/10 toward your next punch from shares</span>` : ''}
         ${card.rewardReady ? '<span class="pill pill-approved">Free roll ready — show this to your server!</span>' : ''}
       </div>
     `;
@@ -80,7 +81,7 @@ document.getElementById('bonus-form').addEventListener('submit', async (event) =
       body: JSON.stringify({ phone, type, content, note }),
     });
     if (!response.ok) throw new Error(`Submission failed (${response.status}).`);
-    setRewardsStatus(statusEl, "Thanks! We'll review it and add your bonus punch soon.", false);
+    setRewardsStatus(statusEl, "Thanks! We'll review it soon — approved shares are worth 1/10 of a punch, up to 2 per visit.", false);
     event.target.reset();
     photoLabel.hidden = false;
     socialLabel.hidden = true;

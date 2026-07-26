@@ -95,7 +95,7 @@ now historical background rather than the current plan.
 
 **Loyalty & engagement**
 - Digital sushi punch card (`/rewards` + `/loyalty-admin.html`) — phone-number identity, 1 punch per sushi order,
-  10 punches = free roll, bonus punches for photo/social shares via a staff approval queue
+  10 punches = free roll. Photo/social shares are staff-reviewed and worth 1/10 of a punch each (10 approved shares = 1 punch), capped at the first 2 approved shares per calendar day per phone number — extra shares that day can still be submitted and approved, they just don't add points, so posting many photos of one meal doesn't multiply the reward.
 - Events & specials calendar (`/events-admin.html` + public display on `/local`)
 - Printable QR-code table tents linking straight to `/menu`
 - Google/Yelp review buttons link directly to Ohana's actual listings (not a generic search)
@@ -134,7 +134,7 @@ now historical background rather than the current plan.
 - `sitemap.xml` and `robots.txt`
 - Cache-Control revalidation on every response (avoids stale-cache bugs after a deploy)
 - Accessibility pass — fixed real WCAG AA contrast failures (brand pink/gold read ~3:1 as text on light backgrounds; added darker `--pink-text`/`--gold-text` variants used only for text, keeping the brighter originals for backgrounds/borders), a focus state that was fully removed without a visible replacement, and a heading-hierarchy skip on the Contact page. Alt text was already solid site-wide.
-- Automated test suite (`server/Tests/AppTests`, 45 tests) — loyalty punch/redeem math, staff and customer auth (including deactivation and OAuth linking), menu backward-compat decoding, and route-level permission boundaries. Run with `swift test` from `server/`.
+- Automated test suite (`server/Tests/AppTests`, 51 tests) — loyalty punch/redeem math, staff and customer auth (including deactivation and OAuth linking), menu backward-compat decoding, and route-level permission boundaries. Run with `swift test` from `server/`.
 - Self-hosted analytics (`/analytics.html`, admin only) — pageview counts by page and by day, no cookies or third-party tracking script. Server-side only, bounded to 120 days of aggregated (not raw per-visit) data.
 - Uploaded photos (menu editor, customer bonus-claim photos) are auto-resized (1600px long-edge cap) and re-compressed via ImageMagick, run off the event loop so it doesn't stall other requests. Fails closed — if optimization fails for any reason, the original upload is kept as-is rather than blocking the upload.
 

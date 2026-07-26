@@ -21,6 +21,7 @@ function renderCard(card) {
   cardResult.innerHTML = `
     <div class="loyalty-card-summary">
       <span class="pill ${card.rewardReady ? 'pill-approved' : ''}">${card.punches} / ${card.punchesNeeded} punches</span>
+      ${card.bonusPoints > 0 ? `<span class="pill">+${card.bonusPoints}/10 from shares</span>` : ''}
       ${card.rewardReady ? '<span class="pill pill-approved">Free roll ready!</span>' : ''}
       <span class="hint">Total redeemed: ${card.totalRedeemed}</span>
     </div>
@@ -105,7 +106,7 @@ async function loadBonusRequests() {
       <div class="data-table">
         <table>
           <thead>
-            <tr><th>Phone</th><th>Type</th><th>Content</th><th>Note</th><th>Status</th><th></th></tr>
+            <tr><th>Phone</th><th>Type</th><th>Content</th><th>Note</th><th>Status</th><th>Points</th><th></th></tr>
           </thead>
           <tbody>
             ${requests
@@ -119,6 +120,9 @@ async function loadBonusRequests() {
                   : escapeHtmlLoyalty(r.content)}</td>
                 <td>${escapeHtmlLoyalty(r.note || '')}</td>
                 <td><span class="pill ${r.status === 'approved' ? 'pill-approved' : r.status === 'denied' ? 'pill-denied' : ''}">${r.status}</span></td>
+                <td>${r.status === 'approved'
+                  ? (r.pointsAwarded > 0 ? '+1/10' : '<span class="hint">0 (daily cap)</span>')
+                  : ''}</td>
                 <td>
                   ${r.status === 'pending'
                     ? `<button type="button" class="approve-btn">Approve</button> <button type="button" class="secondary deny-btn">Deny</button>`
@@ -176,7 +180,7 @@ async function loadCustomers() {
       <div class="data-table">
         <table>
           <thead>
-            <tr><th>Phone</th><th>Punches</th><th>Redeemed</th><th>Last activity</th></tr>
+            <tr><th>Phone</th><th>Punches</th><th>Bonus progress</th><th>Redeemed</th><th>Last activity</th></tr>
           </thead>
           <tbody>
             ${customers
@@ -185,6 +189,7 @@ async function loadCustomers() {
               <tr>
                 <td>${escapeHtmlLoyalty(c.phone)}</td>
                 <td>${c.punches} / 10</td>
+                <td>${c.bonusPoints || 0} / 10</td>
                 <td>${c.totalRedeemed}</td>
                 <td>${new Date(c.updatedAt).toLocaleString()}</td>
               </tr>

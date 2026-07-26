@@ -55,7 +55,7 @@ final class LoyaltyStoreTests: XCTestCase {
         XCTAssertThrowsError(try LoyaltyStore.shared.lookup(phone: "2065559999"))
     }
 
-    func testApprovedBonusRequestAddsPunch() throws {
+    func testApprovedBonusRequestAddsOnlyATenthOfAPunch() throws {
         let request = try LoyaltyStore.shared.submitBonusRequest(
             phone: "2065551234", type: "photo", content: "/uploads/test.jpg", note: nil
         )
@@ -63,9 +63,49 @@ final class LoyaltyStoreTests: XCTestCase {
 
         let reviewed = try LoyaltyStore.shared.reviewBonusRequest(id: request.id, approve: true)
         XCTAssertEqual(reviewed.status, "approved")
+        XCTAssertEqual(reviewed.pointsAwarded, 1)
 
         let status = try LoyaltyStore.shared.lookup(phone: "2065551234")
-        XCTAssertEqual(status.punches, 1)
+        XCTAssertEqual(status.punches, 0)
+        XCTAssertEqual(status.bonusPoints, 1)
+    }
+
+    func testTenBonusPointsRollOverIntoAPunch() throws {
+        // Seed a customer already sitting at 9/10 bonus points (as if earned
+        // across several earlier visits), then approve one more claim today —
+        // it should roll over into a real punch instead of just reading 10.
+        let phone = "2065551234"
+        let seeded = LoyaltyData(
+            customers: [LoyaltyCustomer(
+                phone: phone, punches: 0, bonusPoints: 9, totalRedeemed: 0,
+                createdAt: "2020-01-01T00:00:00Z", updatedAt: "2020-01-01T00:00:00Z"
+            )],
+            bonusRequests: []
+        )
+        try JSONEncoder().encode(seeded).write(to: tempDir.appendingPathComponent("loyalty.json"))
+        LoyaltyStore.shared.configure(dataDirectory: tempDir.path)
+
+        let request = try LoyaltyStore.shared.submitBonusRequest(phone: phone, type: "photo", content: "x", note: nil)
+        let reviewed = try LoyaltyStore.shared.reviewBonusRequest(id: request.id, approve: true)
+        XCTAssertEqual(reviewed.pointsAwarded, 1)
+
+        let status = try LoyaltyStore.shared.lookup(phone: phone)
+        XCTAssertEqual(status.punches, 1, "9 + 1 bonus points should roll over into a real punch")
+        XCTAssertEqual(status.bonusPoints, 0)
+    }
+
+    func testOnlyTwoBonusRequestsPerDayEarnPoints() throws {
+        let phone = "2065551234"
+        var lastReviewed: BonusRequest!
+        for _ in 1...3 {
+            let req = try LoyaltyStore.shared.submitBonusRequest(phone: phone, type: "photo", content: "x", note: nil)
+            lastReviewed = try LoyaltyStore.shared.reviewBonusRequest(id: req.id, approve: true)
+        }
+        XCTAssertEqual(lastReviewed.status, "approved")
+        XCTAssertEqual(lastReviewed.pointsAwarded, 0, "the 3rd claim in one day shouldn't earn points")
+
+        let status = try LoyaltyStore.shared.lookup(phone: phone)
+        XCTAssertEqual(status.bonusPoints, 2, "only the first 2 claims that day should have counted")
     }
 
     func testDeniedBonusRequestDoesNotAddPunch() throws {
@@ -74,6 +114,7 @@ final class LoyaltyStoreTests: XCTestCase {
         )
         let reviewed = try LoyaltyStore.shared.reviewBonusRequest(id: request.id, approve: false)
         XCTAssertEqual(reviewed.status, "denied")
+        XCTAssertEqual(reviewed.pointsAwarded, 0)
         XCTAssertThrowsError(try LoyaltyStore.shared.lookup(phone: "2065559999"))
     }
 
