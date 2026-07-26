@@ -27,110 +27,141 @@
         </div>
       </header>
 
-      <section class="panel">
-        <div class="editor-toolbar">
-          <h2>Overview</h2>
-          <div class="toolbar-actions">
+      <div class="editor-toolbar analytics-page-toolbar">
+        <a id="analytics-back-link" href="/analytics.html" hidden>&larr; All analytics</a>
+        <div class="toolbar-actions">
+          <label class="hint" style="display: flex; align-items: center; gap: 0.4rem;">
+            Range
             <select id="range-select">
               <option value="7">Last 7 days</option>
               <option value="30" selected>Last 30 days</option>
               <option value="90">Last 90 days</option>
             </select>
-          </div>
+          </label>
         </div>
+      </div>
+
+      <section class="panel">
+        <h2>Overview</h2>
         <div id="overview" class="hint">Loading...</div>
       </section>
 
-      <section class="panel">
-        <h2>Views by Day</h2>
-        <div id="daily-chart-summary" class="loyalty-card-summary"></div>
-        <div id="daily-chart"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Top Pages</h2>
-        <div id="top-pages-summary" class="loyalty-card-summary"></div>
-        <div id="top-pages"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Device Breakdown</h2>
-        <p class="hint">Classified from the browser's user-agent — no cookies, no individual tracking.</p>
-        <div id="device-breakdown-summary" class="loyalty-card-summary"></div>
-        <div id="device-breakdown"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Operating System</h2>
-        <p class="hint">Also classified from the user-agent — same privacy footing as Device Breakdown above.</p>
-        <div id="os-breakdown-summary" class="loyalty-card-summary"></div>
-        <div id="os-breakdown"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Browser</h2>
-        <div id="browser-breakdown-summary" class="loyalty-card-summary"></div>
-        <div id="browser-breakdown"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Android Device Models</h2>
-        <p class="hint">Best-effort, parsed only when a browser's user-agent happens to include it — most commonly stock Android browsers. iOS never exposes a specific hardware model (every iPhone/iPad reports the same generic string), so there's no equivalent list for Apple devices.</p>
-        <div id="device-model-breakdown-summary" class="loyalty-card-summary"></div>
-        <div id="device-model-breakdown"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Most-Viewed Menu Items</h2>
-        <p class="hint">Counts times a menu item's detail popup was opened — a proxy for interest, not a sales figure (this site doesn't have access to real order data; ordering happens through ChowNow).</p>
-        <div id="top-items-summary" class="loyalty-card-summary"></div>
-        <div id="top-items"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Average Time on Page</h2>
-        <p class="hint">Pages with at least 3 samples, sorted longest first.</p>
-        <div id="page-dwell-summary" class="loyalty-card-summary"></div>
-        <div id="page-dwell"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Table Order: Wait, Prep &amp; Delivery Times</h2>
-        <p class="hint">From real completed table orders — wait is order placed &rarr; staff entered it, prep is entered &rarr; delivered, total is placed &rarr; delivered. Items with too few completed orders to average are left off the list, but still count toward the overall averages.</p>
-        <div id="delivery-stats-summary" class="loyalty-card-summary"></div>
-        <div id="delivery-stats"></div>
-      </section>
-
-      <section class="panel" id="feedback">
-        <div class="editor-toolbar">
-          <h2>Customer Feedback</h2>
-          <div class="toolbar-actions">
-            <button id="acknowledge-feedback-btn" type="button" class="secondary">Mark All Read</button>
-            <button id="reload-feedback-btn" type="button" class="secondary">Reload</button>
+      <div id="analytics-sections" class="analytics-sections analytics-sections-grid">
+        <section class="panel analytics-section" data-section="daily-chart">
+          <a class="analytics-section-title" href="?section=daily-chart"><h2>Views by Day</h2></a>
+          <div id="daily-chart-summary" class="loyalty-card-summary"></div>
+          <div class="analytics-section-detail">
+            <div id="daily-chart"></div>
           </div>
-        </div>
-        <p class="hint">Submitted from the "Feedback" tab on any public page. A daily email summary also goes out to admins each morning for the previous day's submissions.</p>
-        <div id="feedback-summary" class="loyalty-card-summary"></div>
-        <div id="feedback-list"></div>
-      </section>
+        </section>
 
-      <section class="panel">
-        <div class="editor-toolbar">
-          <h2>Menu Items Missing a Price</h2>
-          <div class="toolbar-actions">
-            <button id="reload-menu-health-btn" type="button" class="secondary">Reload</button>
+        <section class="panel analytics-section" data-section="top-pages">
+          <a class="analytics-section-title" href="?section=top-pages"><h2>Top Pages</h2></a>
+          <div id="top-pages-summary" class="loyalty-card-summary"></div>
+          <div class="analytics-section-detail">
+            <div id="top-pages"></div>
           </div>
-        </div>
-        <p class="hint">Across the full menu, including Happy Hour and anything marked a special. Grouped by category, with a count at the top of each.</p>
-        <div id="missing-price-summary" class="loyalty-card-summary"></div>
-        <div id="missing-price-list"></div>
-      </section>
+        </section>
 
-      <section class="panel">
-        <h2>Menu Items Missing a Photo</h2>
-        <div id="missing-photo-summary" class="loyalty-card-summary"></div>
-        <div id="missing-photo-list"></div>
-      </section>
+        <section class="panel analytics-section" data-section="device-breakdown">
+          <a class="analytics-section-title" href="?section=device-breakdown"><h2>Device Breakdown</h2></a>
+          <div id="device-breakdown-summary" class="loyalty-card-summary"></div>
+          <div class="analytics-section-detail">
+            <p class="hint">Classified from the browser's user-agent — no cookies, no individual tracking.</p>
+            <div id="device-breakdown"></div>
+          </div>
+        </section>
+
+        <section class="panel analytics-section" data-section="os-breakdown">
+          <a class="analytics-section-title" href="?section=os-breakdown"><h2>Operating System</h2></a>
+          <div id="os-breakdown-summary" class="loyalty-card-summary"></div>
+          <div class="analytics-section-detail">
+            <p class="hint">Also classified from the user-agent — same privacy footing as Device Breakdown.</p>
+            <div id="os-breakdown"></div>
+          </div>
+        </section>
+
+        <section class="panel analytics-section" data-section="browser-breakdown">
+          <a class="analytics-section-title" href="?section=browser-breakdown"><h2>Browser</h2></a>
+          <div id="browser-breakdown-summary" class="loyalty-card-summary"></div>
+          <div class="analytics-section-detail">
+            <div id="browser-breakdown"></div>
+          </div>
+        </section>
+
+        <section class="panel analytics-section" data-section="device-model-breakdown">
+          <a class="analytics-section-title" href="?section=device-model-breakdown"><h2>Android Device Models</h2></a>
+          <div id="device-model-breakdown-summary" class="loyalty-card-summary"></div>
+          <div class="analytics-section-detail">
+            <p class="hint">Best-effort, parsed only when a browser's user-agent happens to include it — most commonly stock Android browsers. iOS never exposes a specific hardware model (every iPhone/iPad reports the same generic string), so there's no equivalent list for Apple devices.</p>
+            <div id="device-model-breakdown"></div>
+          </div>
+        </section>
+
+        <section class="panel analytics-section" data-section="top-items">
+          <a class="analytics-section-title" href="?section=top-items"><h2>Most-Viewed Menu Items</h2></a>
+          <div id="top-items-summary" class="loyalty-card-summary"></div>
+          <div class="analytics-section-detail">
+            <p class="hint">Counts times a menu item's detail popup was opened — a proxy for interest, not a sales figure (this site doesn't have access to real order data; ordering happens through ChowNow).</p>
+            <div id="top-items"></div>
+          </div>
+        </section>
+
+        <section class="panel analytics-section" data-section="page-dwell">
+          <a class="analytics-section-title" href="?section=page-dwell"><h2>Average Time on Page</h2></a>
+          <div id="page-dwell-summary" class="loyalty-card-summary"></div>
+          <div class="analytics-section-detail">
+            <p class="hint">Pages with at least 3 samples, sorted longest first.</p>
+            <div id="page-dwell"></div>
+          </div>
+        </section>
+
+        <section class="panel analytics-section" data-section="delivery-stats">
+          <a class="analytics-section-title" href="?section=delivery-stats"><h2>Table Order: Wait, Prep &amp; Delivery Times</h2></a>
+          <div id="delivery-stats-summary" class="loyalty-card-summary"></div>
+          <div class="analytics-section-detail">
+            <p class="hint">From real completed table orders — wait is order placed &rarr; staff entered it, prep is entered &rarr; delivered, total is placed &rarr; delivered. Items with too few completed orders to average are left off the list, but still count toward the overall averages.</p>
+            <div id="delivery-stats"></div>
+          </div>
+        </section>
+
+        <section class="panel analytics-section" data-section="feedback">
+          <div class="editor-toolbar">
+            <a class="analytics-section-title" href="?section=feedback"><h2>Customer Feedback</h2></a>
+            <div class="toolbar-actions">
+              <button id="acknowledge-feedback-btn" type="button" class="secondary">Mark All Read</button>
+              <button id="reload-feedback-btn" type="button" class="secondary">Reload</button>
+            </div>
+          </div>
+          <div id="feedback-summary" class="loyalty-card-summary"></div>
+          <div class="analytics-section-detail">
+            <p class="hint">Submitted from the "Feedback" tab on any public page. A daily email summary also goes out to admins each morning for the previous day's submissions.</p>
+            <div id="feedback-list"></div>
+          </div>
+        </section>
+
+        <section class="panel analytics-section" data-section="missing-price">
+          <div class="editor-toolbar">
+            <a class="analytics-section-title" href="?section=missing-price"><h2>Menu Items Missing a Price</h2></a>
+            <div class="toolbar-actions">
+              <button id="reload-menu-health-btn" type="button" class="secondary">Reload</button>
+            </div>
+          </div>
+          <div id="missing-price-summary" class="loyalty-card-summary"></div>
+          <div class="analytics-section-detail">
+            <p class="hint">Across the full menu, including Happy Hour and anything marked a special. Grouped by category, with a count at the top of each.</p>
+            <div id="missing-price-list"></div>
+          </div>
+        </section>
+
+        <section class="panel analytics-section" data-section="missing-photo">
+          <a class="analytics-section-title" href="?section=missing-photo"><h2>Menu Items Missing a Photo</h2></a>
+          <div id="missing-photo-summary" class="loyalty-card-summary"></div>
+          <div class="analytics-section-detail">
+            <div id="missing-photo-list"></div>
+          </div>
+        </section>
+      </div>
     </main>
 
     <script src="./staff-auth.js"></script>

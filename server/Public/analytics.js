@@ -1,3 +1,27 @@
+// Every section below Overview starts collapsed to a headline-only card in a
+// grid (see .analytics-sections-grid) — clicking one, or a notification link
+// like /analytics.html?section=feedback, expands just that section into a
+// single full-width detail view instead. This is what makes deep links land
+// exactly on the right section: only the active section's heavy content
+// (charts/tables) ever renders, so there's nothing above it that can grow
+// after the page loads and push it out of view.
+function initAnalyticsLayout() {
+  const container = document.getElementById('analytics-sections');
+  const backLink = document.getElementById('analytics-back-link');
+  const sections = Array.from(document.querySelectorAll('.analytics-section'));
+  const activeKey = new URLSearchParams(window.location.search).get('section');
+  const matched = activeKey && sections.some((s) => s.dataset.section === activeKey);
+
+  sections.forEach((s) => {
+    const isActive = matched && s.dataset.section === activeKey;
+    s.hidden = matched && !isActive;
+    s.classList.toggle('expanded', isActive);
+  });
+  container.classList.toggle('analytics-sections-grid', !matched);
+  container.classList.toggle('analytics-sections-detail', matched);
+  backLink.hidden = !matched;
+}
+
 function escapeHtmlAnalytics(value) {
   return String(value)
     .replaceAll('&', '&amp;')
@@ -399,6 +423,7 @@ document.getElementById('range-select').addEventListener('change', loadAnalytics
 document.getElementById('range-select').addEventListener('change', loadDeliveryStats);
 document.getElementById('reload-menu-health-btn').addEventListener('click', loadMenuHealthReports);
 
+initAnalyticsLayout();
 loadAnalytics();
 loadMenuHealthReports();
 loadDeliveryStats();

@@ -1882,6 +1882,88 @@ fieldset legend {
   margin-top: 0.75rem;
 }
 
+/* ---- Analytics: collapsible summary-card grid + single-section detail view ---- */
+
+.analytics-page-toolbar {
+  margin-bottom: 1.25rem;
+}
+
+#analytics-back-link {
+  color: var(--pink-text);
+  font-weight: 600;
+  text-decoration: none;
+  font-family: var(--font-ui);
+}
+
+#analytics-back-link:hover {
+  text-decoration: underline;
+}
+
+.analytics-sections-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.analytics-sections-grid .analytics-section {
+  margin-bottom: 0;
+}
+
+/* A couple of sections (Feedback, Missing Price) have toolbar buttons that
+   act on their detail content — irrelevant, and too cramped to lay out
+   next to the title, while the card is collapsed in the grid. */
+.analytics-sections-grid .analytics-section .editor-toolbar {
+  display: block;
+}
+
+.analytics-sections-grid .analytics-section .toolbar-actions {
+  display: none;
+}
+
+.analytics-section-title {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.editor-toolbar .analytics-section-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.analytics-section-title h2 {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.analytics-section-title h2::after {
+  content: "View details →";
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--pink-text);
+}
+
+.analytics-section-title:hover h2 {
+  text-decoration: underline;
+}
+
+.analytics-section.expanded .analytics-section-title h2::after {
+  content: "";
+}
+
+.analytics-section-detail {
+  display: none;
+  margin-top: 0.75rem;
+}
+
+.analytics-section.expanded .analytics-section-detail {
+  display: block;
+}
+
 .data-table {
   overflow-x: auto;
 }

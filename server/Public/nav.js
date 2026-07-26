@@ -90,7 +90,7 @@ function startStaffTableOrderAlerts() {
 // to the analytics page, where the feedback report lives.
 function startStaffFeedbackAlerts() {
   const alertEl = document.createElement('a');
-  alertEl.href = '/analytics.html#feedback';
+  alertEl.href = '/analytics.html?section=feedback';
   alertEl.className = 'staff-order-alert';
   alertEl.hidden = true;
   getStaffAlertsContainer().appendChild(alertEl);
