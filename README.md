@@ -228,7 +228,7 @@ actually shipped as of this README. Not in priority order.
 
 **Engagement & retention**
 - Email/SMS signup for specials
-- Order history, "reorder your last meal", and linking a customer account to the phone-based punch card (customer accounts exist now but are pure identity — no order data yet)
+- Order history and "reorder your last meal" — still nothing here since this site has no real order data (ordering happens through ChowNow); customer accounts can now link their phone-based punch card (see "Accounts" above), but that's status, not history.
 - Native delivery radius checking (delivery relies entirely on ChowNow's partners)
 
 **Technical**
