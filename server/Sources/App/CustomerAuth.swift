@@ -169,6 +169,13 @@ func registerCustomerAuthRoutes(_ app: Application) throws {
         return try CustomerUserStore.shared.updateLoyaltyPhone(id: customer.id, phone: body.phone)
     }
 
+    // A customer's own past table orders (only ones placed while signed in
+    // have a customerId — ordering never requires being logged in).
+    app.get("api", "customer", "order-history") { req throws -> [TableOrderEntry] in
+        let customer = try requireCustomerLogin(req)
+        return try TableOrdersStore.shared.ordersForCustomer(customerId: customer.id)
+    }
+
     app.get("api", "customer", "loyalty") { req throws -> CustomerLoyaltyView in
         let customer = try requireCustomerLogin(req)
         guard let phone = customer.loyaltyPhone else {

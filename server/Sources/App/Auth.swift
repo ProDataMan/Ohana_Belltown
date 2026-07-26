@@ -31,6 +31,14 @@ struct UpdateEmailRequest: Content {
     var email: String?
 }
 
+struct UpdateStaffBirthdayRequest: Content {
+    var birthday: String?
+}
+
+struct UpdateStaffPhoneRequest: Content {
+    var phone: String?
+}
+
 struct UpdateRoleRequest: Content {
     var role: UserRole
 }
@@ -122,6 +130,18 @@ func registerAuthRoutes(_ app: Application) throws {
         let user = try requireLogin(req)
         let body = try req.content.decode(UpdateEmailRequest.self)
         return try UserStore.shared.updateEmail(id: user.id, email: body.email)
+    }
+
+    app.post("api", "account", "birthday") { req throws -> StaffUserPublic in
+        let user = try requireLogin(req)
+        let body = try req.content.decode(UpdateStaffBirthdayRequest.self)
+        return try UserStore.shared.updateBirthday(id: user.id, birthday: body.birthday)
+    }
+
+    app.post("api", "account", "phone") { req throws -> StaffUserPublic in
+        let user = try requireLogin(req)
+        let body = try req.content.decode(UpdateStaffPhoneRequest.self)
+        return try UserStore.shared.updatePhone(id: user.id, phone: body.phone)
     }
 
     app.get("api", "users") { req throws -> [StaffUserPublic] in

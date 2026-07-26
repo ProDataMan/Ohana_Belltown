@@ -285,8 +285,60 @@ async function loadMenuHealthReports() {
   }
 }
 
+async function loadDeliveryStats() {
+  const summaryEl = document.getElementById('delivery-stats-summary');
+  const listEl = document.getElementById('delivery-stats');
+  const days = document.getElementById('range-select').value;
+
+  try {
+    const response = await staffFetch(`/api/table-orders/delivery-stats?days=${days}`);
+    if (!response.ok) throw new Error(`Unable to load delivery stats (${response.status}).`);
+    const stats = await response.json();
+
+    const fmt = (v) => (v == null ? '—' : `${Math.round(v)}m`);
+    renderSummaryPills(summaryEl, [
+      { label: `${stats.completedOrders} completed orders` },
+      { label: `Avg wait: ${fmt(stats.overallAvgWaitMinutes)}` },
+      { label: `Avg prep: ${fmt(stats.overallAvgPrepMinutes)}` },
+      { label: `Avg total: ${fmt(stats.overallAvgTotalMinutes)}`, cls: 'pill-approved' },
+    ]);
+
+    if (!stats.items.length) {
+      listEl.innerHTML = '<p class="hint">No completed table orders yet.</p>';
+      return;
+    }
+    listEl.innerHTML = `
+      <div class="data-table">
+        <table>
+          <thead><tr><th>Item</th><th>Orders</th><th>Avg Wait</th><th>Avg Prep</th><th>Avg Total</th></tr></thead>
+          <tbody>
+            ${stats.items
+              .map(
+                (i) => `
+              <tr>
+                <td>${escapeHtmlAnalytics(i.itemName)}</td>
+                <td>${i.samples}</td>
+                <td>${fmt(i.avgWaitMinutes)}</td>
+                <td>${fmt(i.avgPrepMinutes)}</td>
+                <td>${fmt(i.avgTotalMinutes)}</td>
+              </tr>
+            `
+              )
+              .join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (error) {
+    summaryEl.innerHTML = '';
+    listEl.innerHTML = `<p class="status status-error">${escapeHtmlAnalytics(error.message)}</p>`;
+  }
+}
+
 document.getElementById('range-select').addEventListener('change', loadAnalytics);
+document.getElementById('range-select').addEventListener('change', loadDeliveryStats);
 document.getElementById('reload-menu-health-btn').addEventListener('click', loadMenuHealthReports);
 
 loadAnalytics();
 loadMenuHealthReports();
+loadDeliveryStats();

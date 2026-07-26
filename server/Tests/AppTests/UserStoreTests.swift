@@ -167,4 +167,47 @@ final class UserStoreTests: XCTestCase {
             XCTAssertEqual(userError, .emailTaken)
         }
     }
+
+    func testBirthdayCanBeSetAndCleared() throws {
+        let admin = try bootstrapAdmin()
+        let set = try UserStore.shared.updateBirthday(id: admin.id, birthday: "07-26")
+        XCTAssertEqual(set.birthday, "07-26")
+
+        let cleared = try UserStore.shared.updateBirthday(id: admin.id, birthday: nil)
+        XCTAssertNil(cleared.birthday)
+    }
+
+    func testBirthdayRejectsInvalidFormat() throws {
+        let admin = try bootstrapAdmin()
+        XCTAssertThrowsError(try UserStore.shared.updateBirthday(id: admin.id, birthday: "not-a-date")) { error in
+            guard let userError = error as? UserError else { return XCTFail("wrong error type") }
+            XCTAssertEqual(userError, .invalidBirthdayFormat)
+        }
+    }
+
+    func testPhoneCanBeSetAndCleared() throws {
+        let admin = try bootstrapAdmin()
+        let set = try UserStore.shared.updatePhone(id: admin.id, phone: "206-555-0100")
+        XCTAssertEqual(set.phone, "206-555-0100")
+
+        let cleared = try UserStore.shared.updatePhone(id: admin.id, phone: "")
+        XCTAssertNil(cleared.phone)
+    }
+
+    func testLinkOAuthCapturesProfilePhoto() throws {
+        let admin = try bootstrapAdmin()
+        let linked = try UserStore.shared.linkOAuth(id: admin.id, provider: .google, providerId: "google-1", pictureURL: "https://example.com/photo.png")
+        XCTAssertEqual(linked.photoURL, "https://example.com/photo.png")
+    }
+
+    func testSetPhotoIfMissingBackfillsButDoesNotOverwrite() throws {
+        let admin = try bootstrapAdmin()
+        try UserStore.shared.linkOAuth(id: admin.id, provider: .google, providerId: "google-1")
+
+        let backfilled = try UserStore.shared.setPhotoIfMissing(id: admin.id, pictureURL: "https://example.com/first.png")
+        XCTAssertEqual(backfilled.photoURL, "https://example.com/first.png")
+
+        let unchanged = try UserStore.shared.setPhotoIfMissing(id: admin.id, pictureURL: "https://example.com/second.png")
+        XCTAssertEqual(unchanged.photoURL, "https://example.com/first.png")
+    }
 }

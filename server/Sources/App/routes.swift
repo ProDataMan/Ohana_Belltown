@@ -18,6 +18,14 @@ struct BonusReviewRequest: Content {
 struct TableOrderRequest: Content {
     var tableId: String
     var itemName: String
+    var itemId: String?
+    var section: String?
+}
+
+struct TableOrdersDashboard: Content {
+    var needsEntry: [TableOrderEntry]
+    var awaitingDelivery: [TableOrderEntry]
+    var readyCount: Int
 }
 
 struct WaitlistJoinRequest: Content {
@@ -220,6 +228,8 @@ func routes(_ app: Application) throws {
     // A "table order" just flags staff that a dine-in guest tapped Order next
     // to a menu item while scanned in from a numbered table — not routed
     // through ChowNow or any payment system, just a heads-up to go take it.
+    // Lifecycle: pending (just placed) -> entered (staff checked with the
+    // table and entered it into the order system) -> delivered.
     app.post("api", "table-orders") { req throws -> TableOrderEntry in
         let body = try req.content.decode(TableOrderRequest.self)
         let tableId = body.tableId.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -227,18 +237,50 @@ func routes(_ app: Application) throws {
         guard !tableId.isEmpty, !itemName.isEmpty else {
             throw Abort(.badRequest, reason: "Table ID and item name are required.")
         }
-        return try TableOrdersStore.shared.place(tableId: tableId, itemName: itemName)
+        let customerId = try? currentCustomer(req)?.id
+        return try TableOrdersStore.shared.place(
+            tableId: tableId, itemName: itemName, itemId: body.itemId, section: body.section, customerId: customerId
+        )
     }
 
-    app.get("api", "table-orders", "pending") { req throws -> [TableOrderEntry] in
+    app.get("api", "table-orders", "dashboard") { req throws -> TableOrdersDashboard in
         try requireLogin(req)
-        return try TableOrdersStore.shared.pending()
+        return try TableOrdersDashboard(
+            needsEntry: TableOrdersStore.shared.needsEntry(),
+            awaitingDelivery: TableOrdersStore.shared.awaitingDelivery(),
+            readyCount: TableOrdersStore.shared.readyForDeliveryCount()
+        )
     }
 
-    app.post("api", "table-orders", ":id", "acknowledge") { req throws -> TableOrderEntry in
+    app.post("api", "table-orders", ":id", "enter") { req throws -> TableOrderEntry in
         try requireLogin(req)
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
-        return try TableOrdersStore.shared.acknowledge(id: id)
+        let staffOnDuty = try StaffingStore.shared.get().staffOnDuty
+        return try TableOrdersStore.shared.markEntered(id: id, staffOnDuty: staffOnDuty)
+    }
+
+    // Public — either staff (from the admin queue) or the customer
+    // themselves (a "Mark Received" tap on the menu page) can confirm this.
+    app.post("api", "table-orders", ":id", "deliver") { req throws -> TableOrderEntry in
+        guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
+        return try TableOrdersStore.shared.markDelivered(id: id)
+    }
+
+    app.get("api", "table-orders", "delivery-stats") { req throws -> DeliveryStatsSummary in
+        try requireLogin(req)
+        let days = req.query[Int.self, at: "days"] ?? 30
+        return try TableOrdersStore.shared.deliveryStats(days: days)
+    }
+
+    app.get("api", "table-orders", "staffing") { req throws -> StaffingConfig in
+        try requireLogin(req)
+        return try StaffingStore.shared.get()
+    }
+
+    app.post("api", "table-orders", "staffing") { req throws -> StaffingConfig in
+        try requireLogin(req)
+        let body = try req.content.decode(StaffingConfig.self)
+        return try StaffingStore.shared.setStaffOnDuty(body.staffOnDuty)
     }
 
     func serveStatic(_ req: Request, file: String) async throws -> Response {

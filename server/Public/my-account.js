@@ -13,6 +13,12 @@ function setMyAccountStatus(el, message, isError) {
   el.classList.toggle('status-ok', !isError && Boolean(message));
 }
 
+function formatMonthDayMyAccount(monthDay) {
+  const [month, day] = monthDay.split('-').map(Number);
+  const date = new Date(2000, month - 1, day);
+  return date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
+}
+
 async function loadProfile() {
   const el = document.getElementById('profile-info');
   try {
@@ -23,10 +29,19 @@ async function loadProfile() {
     }
     if (!response.ok) throw new Error('Unable to load profile.');
     const customer = await response.json();
+
+    const signInMethods = [];
+    if (customer.googleLinked) signInMethods.push('Google');
+    if (customer.appleLinked) signInMethods.push('Apple');
+    if (customer.hasPassword) signInMethods.push('Password');
+
     el.innerHTML = `
       ${customer.photoURL ? `<img class="profile-avatar" src="${escapeHtmlMyAccount(customer.photoURL)}" alt="" />` : ''}
       <p><strong>${escapeHtmlMyAccount(customer.displayName)}</strong></p>
-      <p>${escapeHtmlMyAccount(customer.email)}</p>
+      <p>${escapeHtmlMyAccount(customer.email)}${customer.verified ? '' : ' (unverified)'}</p>
+      ${customer.birthday ? `<p>Birthday: ${escapeHtmlMyAccount(formatMonthDayMyAccount(customer.birthday))}</p>` : ''}
+      ${customer.loyaltyPhone ? `<p>Phone (Rewards): ${escapeHtmlMyAccount(customer.loyaltyPhone)}</p>` : ''}
+      ${signInMethods.length ? `<p class="hint">Signs in with: ${escapeHtmlMyAccount(signInMethods.join(', '))}</p>` : ''}
       ${!customer.verified ? '<p class="hint">Check your email to verify your account (a verification link was sent when you signed up).</p>' : ''}
     `;
     const birthdayInput = document.getElementById('birthday-input');
@@ -202,5 +217,51 @@ document.getElementById('deactivate-btn').addEventListener('click', async () => 
   }
 });
 
+function orderStatusLabel(order) {
+  if (order.status === 'delivered') return 'Delivered';
+  if (order.status === 'entered') return 'Being prepared';
+  return 'Sent to staff';
+}
+
+async function loadOrderHistory() {
+  const el = document.getElementById('order-history-list');
+  el.innerHTML = '<p class="hint">Loading...</p>';
+  try {
+    const response = await fetch('/api/customer/order-history');
+    if (!response.ok) throw new Error(`Unable to load order history (${response.status}).`);
+    const orders = await response.json();
+    if (!orders.length) {
+      el.innerHTML = '<p class="hint">No table orders yet.</p>';
+      return;
+    }
+    el.innerHTML = `
+      <div class="data-table">
+        <table>
+          <thead><tr><th>Item</th><th>Table</th><th>Status</th><th>Ordered</th></tr></thead>
+          <tbody>
+            ${orders
+              .map(
+                (o) => `
+              <tr>
+                <td>${escapeHtmlMyAccount(o.itemName)}</td>
+                <td>${escapeHtmlMyAccount(o.tableId)}</td>
+                <td><span class="pill ${o.status === 'delivered' ? 'pill-approved' : ''}">${orderStatusLabel(o)}</span></td>
+                <td>${new Date(o.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</td>
+              </tr>
+            `
+              )
+              .join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (error) {
+    el.innerHTML = `<p class="status status-error">${escapeHtmlMyAccount(error.message)}</p>`;
+  }
+}
+
+document.getElementById('reload-order-history-btn').addEventListener('click', loadOrderHistory);
+
 loadProfile();
 loadLoyalty();
+loadOrderHistory();

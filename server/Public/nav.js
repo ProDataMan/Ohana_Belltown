@@ -52,11 +52,15 @@ function startStaffTableOrderAlerts() {
 
   async function poll() {
     try {
-      const response = await fetch('/api/table-orders/pending');
+      const response = await fetch('/api/table-orders/dashboard');
       if (!response.ok) return;
-      const orders = await response.json();
-      if (orders.length) {
-        alertEl.textContent = `${orders.length} pending table order${orders.length === 1 ? '' : 's'}`;
+      const data = await response.json();
+      const attention = data.needsEntry.length + data.readyCount;
+      if (attention) {
+        const parts = [];
+        if (data.needsEntry.length) parts.push(`${data.needsEntry.length} new`);
+        if (data.readyCount) parts.push(`${data.readyCount} ready`);
+        alertEl.textContent = `${attention} table order${attention === 1 ? '' : 's'} (${parts.join(', ')})`;
         alertEl.hidden = false;
       } else {
         alertEl.hidden = true;

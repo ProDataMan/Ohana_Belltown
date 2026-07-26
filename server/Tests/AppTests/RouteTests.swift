@@ -23,6 +23,7 @@ final class RouteTests: XCTestCase {
         AnalyticsStore.shared.configure(dataDirectory: tempDir.path)
         WaitlistStore.shared.configure(dataDirectory: tempDir.path)
         TableOrdersStore.shared.configure(dataDirectory: tempDir.path)
+        StaffingStore.shared.configure(dataDirectory: tempDir.path)
     }
 
     override func tearDown() async throws {
@@ -53,8 +54,8 @@ final class RouteTests: XCTestCase {
         }
     }
 
-    func testTableOrderPlacementAndStaffAcknowledgeFlow() throws {
-        let orderBody = ByteBuffer(string: #"{"tableId":"5","itemName":"Spam Musubi"}"#)
+    func testTableOrderFullLifecycleFlow() throws {
+        let orderBody = ByteBuffer(string: #"{"tableId":"5","itemName":"Spam Musubi","section":"menu"}"#)
         var orderId: String?
         try app.test(.POST, "api/table-orders", headers: ["Content-Type": "application/json"], body: orderBody) { res in
             XCTAssertEqual(res.status, .ok)
@@ -65,7 +66,7 @@ final class RouteTests: XCTestCase {
         }
         guard let id = orderId else { return XCTFail("expected an order id") }
 
-        try app.test(.GET, "api/table-orders/pending") { res in
+        try app.test(.GET, "api/table-orders/dashboard") { res in
             XCTAssertEqual(res.status, .unauthorized)
         }
 
@@ -78,19 +79,63 @@ final class RouteTests: XCTestCase {
         }
         guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
 
-        try app.test(.GET, "api/table-orders/pending", headers: ["Cookie": cookie]) { res in
+        try app.test(.GET, "api/table-orders/dashboard", headers: ["Cookie": cookie]) { res in
             XCTAssertEqual(res.status, .ok)
-            let pending = try res.content.decode([TableOrderEntry].self)
-            XCTAssertEqual(pending.count, 1)
-            XCTAssertEqual(pending[0].id, id)
+            let dashboard = try res.content.decode(TableOrdersDashboard.self)
+            XCTAssertEqual(dashboard.needsEntry.map { $0.id }, [id])
+            XCTAssertTrue(dashboard.awaitingDelivery.isEmpty)
         }
 
-        try app.test(.POST, "api/table-orders/\(id)/acknowledge", headers: ["Cookie": cookie]) { res in
+        try app.test(.POST, "api/table-orders/\(id)/enter", headers: ["Cookie": cookie]) { res in
             XCTAssertEqual(res.status, .ok)
+            let entered = try res.content.decode(TableOrderEntry.self)
+            XCTAssertEqual(entered.status, "entered")
+            XCTAssertNotNil(entered.estimatedReadyAt)
         }
-        try app.test(.GET, "api/table-orders/pending", headers: ["Cookie": cookie]) { res in
-            let pending = try res.content.decode([TableOrderEntry].self)
-            XCTAssertTrue(pending.isEmpty)
+        try app.test(.GET, "api/table-orders/dashboard", headers: ["Cookie": cookie]) { res in
+            let dashboard = try res.content.decode(TableOrdersDashboard.self)
+            XCTAssertTrue(dashboard.needsEntry.isEmpty)
+            XCTAssertEqual(dashboard.awaitingDelivery.map { $0.id }, [id])
+        }
+
+        // Delivery confirmation is public — no cookie needed, since a
+        // customer can tap "Mark Received" themselves.
+        try app.test(.POST, "api/table-orders/\(id)/deliver") { res in
+            XCTAssertEqual(res.status, .ok)
+            let delivered = try res.content.decode(TableOrderEntry.self)
+            XCTAssertEqual(delivered.status, "delivered")
+        }
+        try app.test(.GET, "api/table-orders/dashboard", headers: ["Cookie": cookie]) { res in
+            let dashboard = try res.content.decode(TableOrdersDashboard.self)
+            XCTAssertTrue(dashboard.awaitingDelivery.isEmpty)
+        }
+
+        try app.test(.GET, "api/table-orders/delivery-stats", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+            let stats = try res.content.decode(DeliveryStatsSummary.self)
+            XCTAssertEqual(stats.completedOrders, 1)
+        }
+    }
+
+    func testStaffingCanBeReadAndUpdated() throws {
+        let bootstrapBody = ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"], body: bootstrapBody) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        try app.test(.GET, "api/table-orders/staffing", headers: ["Cookie": cookie]) { res in
+            let config = try res.content.decode(StaffingConfig.self)
+            XCTAssertEqual(config.staffOnDuty, StaffingStore.defaultStaffOnDuty)
+        }
+
+        let updateBody = ByteBuffer(string: #"{"staffOnDuty":5}"#)
+        try app.test(.POST, "api/table-orders/staffing", headers: ["Content-Type": "application/json", "Cookie": cookie], body: updateBody) { res in
+            let config = try res.content.decode(StaffingConfig.self)
+            XCTAssertEqual(config.staffOnDuty, 5)
         }
     }
 
@@ -98,6 +143,37 @@ final class RouteTests: XCTestCase {
         let orderBody = ByteBuffer(string: #"{"tableId":"","itemName":"Spam Musubi"}"#)
         try app.test(.POST, "api/table-orders", headers: ["Content-Type": "application/json"], body: orderBody) { res in
             XCTAssertEqual(res.status, .badRequest)
+        }
+    }
+
+    func testCustomerOrderHistoryReflectsOrdersPlacedWhileSignedIn() throws {
+        let registerBody = ByteBuffer(string: #"{"email":"guest@example.com","displayName":"Guest","password":"guestpass1"}"#)
+        var sessionCookie: String?
+        try app.test(.POST, "api/customer/register", headers: ["Content-Type": "application/json"], body: registerBody) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from register") }
+
+        try app.test(.GET, "api/customer/order-history") { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+
+        let orderBody = ByteBuffer(string: #"{"tableId":"5","itemName":"Spam Musubi"}"#)
+        try app.test(.POST, "api/table-orders", headers: ["Content-Type": "application/json", "Cookie": cookie], body: orderBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+        // Placed anonymously (no customer cookie) — shouldn't show up in this customer's history.
+        let anonBody = ByteBuffer(string: #"{"tableId":"5","itemName":"Someone Else's Order"}"#)
+        try app.test(.POST, "api/table-orders", headers: ["Content-Type": "application/json"], body: anonBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+
+        try app.test(.GET, "api/customer/order-history", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+            let orders = try res.content.decode([TableOrderEntry].self)
+            XCTAssertEqual(orders.map { $0.itemName }, ["Spam Musubi"])
         }
     }
 

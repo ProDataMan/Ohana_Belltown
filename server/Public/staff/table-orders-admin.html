@@ -14,8 +14,11 @@
         <h1>Table Orders</h1>
         <p>
           Guests tap "Order" next to a menu item after scanning their table's QR code — this isn't
-          routed through ChowNow or any payment system, just a heads-up to go take it. Entries
-          older than 4 hours drop off automatically.
+          routed through ChowNow or any payment system yet, just a heads-up to go check with the
+          table and enter it. Tap <strong>Confirm Entered</strong> once you've actually entered it
+          into the order system — the order then moves to "Awaiting Delivery" until someone taps
+          <strong>Confirm Delivered</strong> (a guest can also confirm it themselves from the menu
+          page). That full order-to-delivery time feeds the prep-time estimates and analytics.
         </p>
         <p class="admin-link"><a href="/menu">&larr; Back to menu</a></p>
         <div class="staff-tools-nav">
@@ -33,12 +36,31 @@
 
       <section class="panel">
         <div class="editor-toolbar">
-          <h2>Pending Orders</h2>
+          <h2>Staff On Duty</h2>
+        </div>
+        <p class="hint">Feeds the prep-time estimate below — more occupied tables than staff on duty slows the estimate down.</p>
+        <form id="staffing-form" class="cta-row">
+          <label>Staff on duty right now
+            <input type="number" id="staffing-input" min="1" max="50" style="width: 5rem;" />
+          </label>
+          <button type="submit">Update</button>
+          <p id="staffing-status" class="status"></p>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="editor-toolbar">
+          <h2>Needs Entry</h2>
           <div class="toolbar-actions">
             <button id="reload-table-orders-btn" type="button" class="secondary">Reload</button>
           </div>
         </div>
-        <div id="table-orders-list"></div>
+        <div id="needs-entry-list"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Awaiting Delivery</h2>
+        <div id="awaiting-delivery-list"></div>
       </section>
     </main>
 

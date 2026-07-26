@@ -201,6 +201,11 @@ h1 {
   cursor: default;
 }
 
+.order-btn-active {
+  background: var(--gold);
+  color: var(--ink);
+}
+
 .reviews-widget {
   display: flex;
   flex-wrap: wrap;

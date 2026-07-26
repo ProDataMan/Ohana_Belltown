@@ -16,17 +16,25 @@ struct StaffUser: Codable {
     var role: UserRole
     var mustChangePassword: Bool
     var active: Bool
+    /// Profile photo URL, extracted from Google on link/login — Apple never
+    /// supplies one, and there's no manual-upload path.
+    var photoURL: String?
+    /// Month and day only, formatted "MM-DD" — never the birth year.
+    var birthday: String?
+    var phone: String?
     var createdAt: String
     var updatedAt: String
 
     enum CodingKeys: String, CodingKey {
-        case id, username, displayName, passwordHash, email, googleId, appleId, role, mustChangePassword, active, createdAt, updatedAt
+        case id, username, displayName, passwordHash, email, googleId, appleId, role, mustChangePassword, active
+        case photoURL, birthday, phone, createdAt, updatedAt
     }
 
     init(
         id: String, username: String, displayName: String, passwordHash: String,
         googleId: String?, appleId: String?, role: UserRole, mustChangePassword: Bool,
-        active: Bool = true, createdAt: String, updatedAt: String, email: String? = nil
+        active: Bool = true, photoURL: String? = nil, birthday: String? = nil, phone: String? = nil,
+        createdAt: String, updatedAt: String, email: String? = nil
     ) {
         self.id = id
         self.username = username
@@ -38,6 +46,9 @@ struct StaffUser: Codable {
         self.role = role
         self.mustChangePassword = mustChangePassword
         self.active = active
+        self.photoURL = photoURL
+        self.birthday = birthday
+        self.phone = phone
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -54,6 +65,9 @@ struct StaffUser: Codable {
         role = try container.decode(UserRole.self, forKey: .role)
         mustChangePassword = try container.decode(Bool.self, forKey: .mustChangePassword)
         active = try container.decodeIfPresent(Bool.self, forKey: .active) ?? true
+        photoURL = try container.decodeIfPresent(String.self, forKey: .photoURL)
+        birthday = try container.decodeIfPresent(String.self, forKey: .birthday)
+        phone = try container.decodeIfPresent(String.self, forKey: .phone)
         createdAt = try container.decode(String.self, forKey: .createdAt)
         updatedAt = try container.decode(String.self, forKey: .updatedAt)
     }
@@ -69,6 +83,9 @@ struct StaffUserPublic: Content {
     var googleLinked: Bool
     var appleLinked: Bool
     var active: Bool
+    var photoURL: String?
+    var birthday: String?
+    var phone: String?
 
     init(_ user: StaffUser) {
         id = user.id
@@ -80,6 +97,9 @@ struct StaffUserPublic: Content {
         googleLinked = user.googleId != nil
         appleLinked = user.appleId != nil
         active = user.active
+        photoURL = user.photoURL
+        birthday = user.birthday
+        phone = user.phone
     }
 }
 
@@ -95,6 +115,7 @@ enum UserError: Error, Equatable {
     case cannotDeactivateSelf
     case cannotDeactivateLastAdmin
     case emailTaken
+    case invalidBirthdayFormat
 }
 
 extension UserError: AbortError {
@@ -104,6 +125,7 @@ extension UserError: AbortError {
         case .invalidCredentials, .wrongCurrentPassword, .accountDeactivated: return .unauthorized
         case .notFound, .oauthNotLinked: return .notFound
         case .alreadyBootstrapped, .cannotDeactivateSelf, .cannotDeactivateLastAdmin: return .forbidden
+        case .invalidBirthdayFormat: return .badRequest
         }
     }
 
@@ -120,6 +142,7 @@ extension UserError: AbortError {
         case .cannotDeactivateSelf: return "You can't deactivate your own account."
         case .cannotDeactivateLastAdmin: return "Can't deactivate the last active admin."
         case .emailTaken: return "That email is already in use by another account."
+        case .invalidBirthdayFormat: return "Birthday must be in MM-DD format."
         }
     }
 }
@@ -304,7 +327,7 @@ final class UserStore: @unchecked Sendable {
     }
 
     @discardableResult
-    func linkOAuth(id: String, provider: OAuthProvider, providerId: String) throws -> StaffUserPublic {
+    func linkOAuth(id: String, provider: OAuthProvider, providerId: String, pictureURL: String? = nil) throws -> StaffUserPublic {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
@@ -315,6 +338,72 @@ final class UserStore: @unchecked Sendable {
             throw UserError.notFound
         }
         provider.setId(providerId, on: &users[idx])
+        if let pictureURL, users[idx].photoURL == nil {
+            users[idx].photoURL = pictureURL
+        }
+        users[idx].updatedAt = now()
+        try persist()
+        return StaffUserPublic(users[idx])
+    }
+
+    /// Backfills a profile photo for an account that linked Google before
+    /// this field existed — called on every OAuth sign-in, not just linking,
+    /// but only ever fills a gap, never overwrites an existing photo.
+    @discardableResult
+    func setPhotoIfMissing(id: String, pictureURL: String) throws -> StaffUserPublic {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard let idx = users.firstIndex(where: { $0.id == id }) else {
+            throw UserError.notFound
+        }
+        if users[idx].photoURL == nil {
+            users[idx].photoURL = pictureURL
+            users[idx].updatedAt = now()
+            try persist()
+        }
+        return StaffUserPublic(users[idx])
+    }
+
+    /// `birthday` is "MM-DD" (e.g. "07-26"), or nil/empty to clear it.
+    @discardableResult
+    func updateBirthday(id: String, birthday: String?) throws -> StaffUserPublic {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard let idx = users.firstIndex(where: { $0.id == id }) else {
+            throw UserError.notFound
+        }
+        if let birthday, !birthday.isEmpty {
+            guard Self.isValidMonthDay(birthday) else {
+                throw UserError.invalidBirthdayFormat
+            }
+            users[idx].birthday = birthday
+        } else {
+            users[idx].birthday = nil
+        }
+        users[idx].updatedAt = now()
+        try persist()
+        return StaffUserPublic(users[idx])
+    }
+
+    private static func isValidMonthDay(_ value: String) -> Bool {
+        let parts = value.split(separator: "-")
+        guard parts.count == 2, let month = Int(parts[0]), let day = Int(parts[1]) else { return false }
+        return (1...12).contains(month) && (1...31).contains(day)
+    }
+
+    /// Self-service, optional — pass nil or an empty string to clear it.
+    @discardableResult
+    func updatePhone(id: String, phone: String?) throws -> StaffUserPublic {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard let idx = users.firstIndex(where: { $0.id == id }) else {
+            throw UserError.notFound
+        }
+        let trimmed = phone?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        users[idx].phone = trimmed.isEmpty ? nil : trimmed
         users[idx].updatedAt = now()
         try persist()
         return StaffUserPublic(users[idx])

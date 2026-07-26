@@ -41,20 +41,68 @@ function getTableId() {
   return sessionStorage.getItem('ohana_table_id');
 }
 
+/// Orders placed this session that haven't been marked received yet, keyed
+/// by item name — lets the "Order" button turn into "Mark Received" and
+/// stay that way across a re-render (e.g. navigating to another menu page).
+function getActiveOrders() {
+  try {
+    return JSON.parse(sessionStorage.getItem('ohana_active_orders') || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function setActiveOrder(itemName, orderId) {
+  const active = getActiveOrders();
+  active[itemName] = orderId;
+  sessionStorage.setItem('ohana_active_orders', JSON.stringify(active));
+}
+
+function clearActiveOrder(itemName) {
+  const active = getActiveOrders();
+  delete active[itemName];
+  sessionStorage.setItem('ohana_active_orders', JSON.stringify(active));
+}
+
 async function placeTableOrder(button) {
   const tableId = getTableId();
   if (!tableId) return;
   const itemName = button.dataset.itemName;
+  const itemId = button.dataset.itemId || null;
   button.disabled = true;
   button.textContent = 'Sending...';
   try {
     const response = await fetch('/api/table-orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tableId, itemName }),
+      body: JSON.stringify({ tableId, itemName, itemId, section: window.MENU_SECTION }),
     });
     if (!response.ok) throw new Error();
-    button.textContent = 'Sent to staff!';
+    const entry = await response.json();
+    setActiveOrder(itemName, entry.id);
+    button.dataset.orderId = entry.id;
+    button.textContent = 'Mark Received';
+    button.classList.add('order-btn-active');
+    button.disabled = false;
+  } catch {
+    button.textContent = 'Failed — tap to retry';
+    button.disabled = false;
+  }
+}
+
+async function markOrderDelivered(button) {
+  const orderId = button.dataset.orderId;
+  const itemName = button.dataset.itemName;
+  button.disabled = true;
+  button.textContent = 'Confirming...';
+  try {
+    const response = await fetch(`/api/table-orders/${encodeURIComponent(orderId)}/deliver`, { method: 'POST' });
+    if (!response.ok) throw new Error();
+    clearActiveOrder(itemName);
+    delete button.dataset.orderId;
+    button.textContent = 'Order';
+    button.classList.remove('order-btn-active');
+    button.disabled = false;
   } catch {
     button.textContent = 'Failed — tap to retry';
     button.disabled = false;
@@ -189,6 +237,7 @@ function renderMenu(data) {
 
   itemsByIndex = [];
   const tableId = getTableId();
+  const activeOrders = tableId ? getActiveOrders() : {};
 
   menuContainer.innerHTML = categories
     .map((category) => {
@@ -214,9 +263,10 @@ function renderMenu(data) {
           const editLink = item.id
             ? `<a class="staff-edit-link" href="/edit-item.html?id=${encodeURIComponent(item.id)}" hidden>Edit</a>`
             : '';
+          const activeOrderId = activeOrders[item.name];
           const orderButton =
             tableId && !soldOut
-              ? `<button type="button" class="order-btn" data-item-name="${escapeHtml(item.name)}">Order</button>`
+              ? `<button type="button" class="order-btn${activeOrderId ? ' order-btn-active' : ''}" data-item-name="${escapeHtml(item.name)}" data-item-id="${escapeHtml(item.id || '')}"${activeOrderId ? ` data-order-id="${escapeHtml(activeOrderId)}"` : ''}>${activeOrderId ? 'Mark Received' : 'Order'}</button>`
               : '';
           return `
             <article class="item${soldOut ? ' item-sold-out' : ''}" data-search="${escapeHtml(searchText)}" data-index="${index}" data-tags="${escapeHtml(tags.join(','))}">
@@ -389,7 +439,11 @@ async function openItemModal(index) {
 menuContainer.addEventListener('click', (event) => {
   const orderBtn = event.target.closest('.order-btn');
   if (orderBtn) {
-    placeTableOrder(orderBtn);
+    if (orderBtn.dataset.orderId) {
+      markOrderDelivered(orderBtn);
+    } else {
+      placeTableOrder(orderBtn);
+    }
     return;
   }
   if (event.target.closest('.staff-edit-link')) {

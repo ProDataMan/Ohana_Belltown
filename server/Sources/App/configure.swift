@@ -21,6 +21,7 @@ func configure(_ app: Application) throws {
     AnalyticsStore.shared.configure(dataDirectory: dataDirectory)
     WaitlistStore.shared.configure(dataDirectory: dataDirectory)
     TableOrdersStore.shared.configure(dataDirectory: dataDirectory)
+    StaffingStore.shared.configure(dataDirectory: dataDirectory)
 
     app.routes.defaultMaxBodySize = "10mb"
 

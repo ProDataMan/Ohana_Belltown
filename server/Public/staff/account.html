@@ -36,6 +36,33 @@
       </section>
 
       <section class="panel">
+        <h2>Birthday</h2>
+        <p class="hint">Optional — just the month and day, no year needed.</p>
+        <form id="birthday-form">
+          <label>Birthday
+            <input type="date" id="birthday-input" />
+          </label>
+          <div class="cta-row">
+            <button type="submit">Save</button>
+            <button id="clear-birthday-btn" type="button" class="secondary">Clear</button>
+          </div>
+          <p id="birthday-status" class="status"></p>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2>Phone</h2>
+        <p class="hint">Optional — a way to reach you directly if needed.</p>
+        <form id="phone-form">
+          <label>Phone number
+            <input type="tel" id="phone-input" placeholder="(206) 555-0100" />
+          </label>
+          <button type="submit">Save Phone</button>
+          <p id="phone-status" class="status"></p>
+        </form>
+      </section>
+
+      <section class="panel">
         <h2>Email</h2>
         <p class="hint">Optional — lets you log in with your email instead of your username, and is where we'd send account notifications. Not required.</p>
         <form id="email-form">
