@@ -7,10 +7,43 @@ function escapeHtmlAnalytics(value) {
     .replaceAll("'", '&#39;');
 }
 
+function renderHbarTable(el, rows, { labelHeader, valueHeader, formatValue = (v) => v }) {
+  if (!rows.length) {
+    el.innerHTML = '<p class="hint">No data yet.</p>';
+    return;
+  }
+  const maxValue = Math.max(...rows.map((r) => r.value));
+  el.innerHTML = `
+    <div class="data-table">
+      <table>
+        <thead><tr><th>${labelHeader}</th><th>${valueHeader}</th><th></th></tr></thead>
+        <tbody>
+          ${rows
+            .map(
+              (r) => `
+            <tr>
+              <td>${escapeHtmlAnalytics(r.label)}</td>
+              <td>${formatValue(r.value)}</td>
+              <td style="width: 40%;">
+                <div class="analytics-hbar" style="width: ${Math.max(4, Math.round((r.value / maxValue) * 100))}%"></div>
+              </td>
+            </tr>
+          `
+            )
+            .join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 async function loadAnalytics() {
   const overviewEl = document.getElementById('overview');
   const chartEl = document.getElementById('daily-chart');
   const topPagesEl = document.getElementById('top-pages');
+  const deviceEl = document.getElementById('device-breakdown');
+  const topItemsEl = document.getElementById('top-items');
+  const dwellEl = document.getElementById('page-dwell');
   const days = document.getElementById('range-select').value;
 
   overviewEl.textContent = 'Loading...';
@@ -21,10 +54,15 @@ async function loadAnalytics() {
 
     const dayCount = summary.days.length || 1;
     const avgPerDay = Math.round(summary.totalViews / dayCount);
+    const totalDeviceViews = summary.deviceBreakdown.reduce((sum, d) => sum + d.count, 0);
+    const mobilePct = totalDeviceViews
+      ? Math.round(((summary.deviceBreakdown.find((d) => d.device === 'mobile')?.count || 0) / totalDeviceViews) * 100)
+      : null;
     overviewEl.innerHTML = `
       <div class="loyalty-card-summary">
         <span class="pill pill-approved">${summary.totalViews} total views</span>
         <span class="pill">${avgPerDay}/day average</span>
+        ${mobilePct !== null ? `<span class="pill">${mobilePct}% mobile</span>` : ''}
       </div>
     `;
 
@@ -47,33 +85,33 @@ async function loadAnalytics() {
       </div>
     `;
 
-    if (!summary.topPages.length) {
-      topPagesEl.innerHTML = '<p class="hint">No data yet.</p>';
-    } else {
-      const maxPageCount = summary.topPages[0].count;
-      topPagesEl.innerHTML = `
-        <div class="data-table">
-          <table>
-            <thead><tr><th>Page</th><th>Views</th><th></th></tr></thead>
-            <tbody>
-              ${summary.topPages
-                .map(
-                  (p) => `
-                <tr>
-                  <td>${escapeHtmlAnalytics(p.path)}</td>
-                  <td>${p.count}</td>
-                  <td style="width: 40%;">
-                    <div class="analytics-hbar" style="width: ${Math.max(4, Math.round((p.count / maxPageCount) * 100))}%"></div>
-                  </td>
-                </tr>
-              `
-                )
-                .join('')}
-            </tbody>
-          </table>
-        </div>
-      `;
-    }
+    renderHbarTable(
+      topPagesEl,
+      summary.topPages.map((p) => ({ label: p.path, value: p.count })),
+      { labelHeader: 'Page', valueHeader: 'Views' }
+    );
+
+    renderHbarTable(
+      deviceEl,
+      summary.deviceBreakdown.map((d) => ({ label: d.device, value: d.count })),
+      { labelHeader: 'Device', valueHeader: 'Views' }
+    );
+
+    renderHbarTable(
+      topItemsEl,
+      summary.topItems.map((i) => ({ label: i.name, value: i.count })),
+      { labelHeader: 'Item', valueHeader: 'Detail views' }
+    );
+
+    renderHbarTable(
+      dwellEl,
+      summary.pageDwell.map((d) => ({ label: d.path, value: d.avgSeconds, samples: d.samples })),
+      {
+        labelHeader: 'Page',
+        valueHeader: 'Avg. time on page',
+        formatValue: (v) => `${Math.round(v)}s`,
+      }
+    );
   } catch (error) {
     overviewEl.innerHTML = `<p class="status status-error">${escapeHtmlAnalytics(error.message)}</p>`;
   }
