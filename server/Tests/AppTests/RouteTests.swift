@@ -145,6 +145,14 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testPlaceReviewsReturnsEmptyWithoutAPIConfigured() throws {
+        try app.test(.GET, "api/place-reviews") { res in
+            XCTAssertEqual(res.status, .ok)
+            let summary = try res.content.decode(PlaceReviewsSummary.self)
+            XCTAssertTrue(summary.reviews.isEmpty)
+        }
+    }
+
     func testMenuAPIReturnsSeedMenuWithoutAuth() throws {
         try app.test(.GET, "api/menu") { res in
             XCTAssertEqual(res.status, .ok)

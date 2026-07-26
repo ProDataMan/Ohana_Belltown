@@ -5,8 +5,19 @@ struct GooglePhotoRef: Codable {
     let html_attributions: [String]
 }
 
+struct GoogleReview: Codable {
+    let author_name: String
+    let profile_photo_url: String?
+    let rating: Int?
+    let relative_time_description: String?
+    let text: String?
+}
+
 struct GooglePlaceDetailsResult: Codable {
     let photos: [GooglePhotoRef]?
+    let reviews: [GoogleReview]?
+    let rating: Double?
+    let user_ratings_total: Int?
 }
 
 struct GooglePlaceDetailsResponse: Codable {
@@ -18,6 +29,20 @@ struct FeaturedPhoto: Content {
     let url: String
     let attributionName: String
     let attributionUrl: String?
+}
+
+struct PlaceReview: Content {
+    var authorName: String
+    var profilePhotoUrl: String?
+    var rating: Int
+    var relativeTime: String
+    var text: String
+}
+
+struct PlaceReviewsSummary: Content {
+    var reviews: [PlaceReview]
+    var overallRating: Double?
+    var totalRatings: Int?
 }
 
 extension String {
@@ -51,8 +76,8 @@ final class PlacesPhotoCache: @unchecked Sendable {
     static let shared = PlacesPhotoCache()
 
     private let lock = NSLock()
-    private var cachedRefs: [GooglePhotoRef] = []
-    private var refsFetchedAt: Date?
+    private var cachedDetails: GooglePlaceDetailsResult?
+    private var detailsFetchedAt: Date?
     private var cacheDirectory = "Data/places-cache/"
     private let refsTTL: TimeInterval = 6 * 3600
     private let imageTTL: TimeInterval = 24 * 3600
@@ -84,27 +109,33 @@ final class PlacesPhotoCache: @unchecked Sendable {
         return Date().timeIntervalSince(modified) < imageTTL
     }
 
-    func getPhotoRefs(client: Client, apiKey: String, placeId: String) async throws -> [GooglePhotoRef] {
+    /// Photos and reviews both come off the same Place Details call (Google
+    /// bills per call, not per field), so they share one 6-hour cache instead
+    /// of hitting the API twice.
+    func getDetails(client: Client, apiKey: String, placeId: String) async throws -> GooglePlaceDetailsResult {
         lock.lock()
-        let isFresh = refsFetchedAt.map { Date().timeIntervalSince($0) < refsTTL } ?? false
-        if isFresh {
-            let refs = cachedRefs
+        let isFresh = detailsFetchedAt.map { Date().timeIntervalSince($0) < refsTTL } ?? false
+        if isFresh, let cached = cachedDetails {
             lock.unlock()
-            return refs
+            return cached
         }
         lock.unlock()
 
-        let uri = URI(string: "https://maps.googleapis.com/maps/api/place/details/json?place_id=\(placeId)&fields=photos&key=\(apiKey)")
+        let uri = URI(string: "https://maps.googleapis.com/maps/api/place/details/json?place_id=\(placeId)&fields=photos,reviews,rating,user_ratings_total&key=\(apiKey)")
         let response = try await client.get(uri).get()
         let decoded = try response.content.decode(GooglePlaceDetailsResponse.self)
-        let refs = decoded.result?.photos ?? []
+        let result = decoded.result ?? GooglePlaceDetailsResult(photos: nil, reviews: nil, rating: nil, user_ratings_total: nil)
 
         lock.lock()
-        cachedRefs = refs
-        refsFetchedAt = Date()
+        cachedDetails = result
+        detailsFetchedAt = Date()
         lock.unlock()
 
-        return refs
+        return result
+    }
+
+    func getPhotoRefs(client: Client, apiKey: String, placeId: String) async throws -> [GooglePhotoRef] {
+        try await getDetails(client: client, apiKey: apiKey, placeId: placeId).photos ?? []
     }
 }
 
@@ -128,6 +159,27 @@ func registerPlacesPhotoRoutes(_ app: Application) {
                 attributionUrl: link
             )
         }
+    }
+
+    // Real Google reviews, embedded on-site instead of just linked out —
+    // same Place Details data already fetched for photos, so no extra quota.
+    app.get("api", "place-reviews") { req async throws -> PlaceReviewsSummary in
+        guard let apiKey = Environment.get("GOOGLE_PLACES_API_KEY"),
+              let placeId = Environment.get("GOOGLE_PLACE_ID") else {
+            return PlaceReviewsSummary(reviews: [], overallRating: nil, totalRatings: nil)
+        }
+
+        let details = try await PlacesPhotoCache.shared.getDetails(client: req.client, apiKey: apiKey, placeId: placeId)
+        let reviews = (details.reviews ?? []).map { review in
+            PlaceReview(
+                authorName: review.author_name,
+                profilePhotoUrl: review.profile_photo_url,
+                rating: review.rating ?? 0,
+                relativeTime: review.relative_time_description ?? "",
+                text: review.text ?? ""
+            )
+        }
+        return PlaceReviewsSummary(reviews: reviews, overallRating: details.rating, totalRatings: details.user_ratings_total)
     }
 
     app.get("places-photo", "**") { req async throws -> Response in
