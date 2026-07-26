@@ -85,6 +85,7 @@ now historical background rather than the current plan.
 - Full real menu — 216 items across Food/Sushi/Drinks/Happy Hour, transcribed from the current printed menu
 - 204/216 items have written descriptions; brand-name drinks researched and described
 - Home, About, Local, Contact, Catering pages with real copy, ported from the old Weebly site
+- Catering page now also covers Private Events &mdash; booking Ohana's own space for a large party, distinct from off-site catering
 - Legacy `.html` URL redirects preserved for SEO
 - HTTPS + persistent storage (Azure Files-backed menu data and photos)
 
