@@ -58,6 +58,17 @@
           <div class="tags-grid" id="item-tags-grid"></div>
         </details>
 
+        <div class="modifiers-section">
+          <h3>Add-Ons &amp; Upgrades</h3>
+          <p class="hint">Optional extras a customer can check when placing a table order — e.g. "Add Katsu" or "Yosh Size", priced as the extra amount added to this item's price.</p>
+          <div id="modifiers-list"></div>
+          <div class="cta-row">
+            <input type="text" id="new-modifier-name" placeholder="e.g. Yosh Size" style="flex: 2;" />
+            <input type="number" id="new-modifier-price" step="0.01" placeholder="+$" style="flex: 1;" />
+            <button type="button" id="add-modifier-btn" class="secondary">Add</button>
+          </div>
+        </div>
+
         <div class="save-row">
           <button id="save-btn" type="button">Save changes</button>
           <button id="delete-btn" type="button" class="secondary">Delete item</button>

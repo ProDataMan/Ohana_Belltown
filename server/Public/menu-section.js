@@ -69,13 +69,16 @@ async function placeTableOrder(button) {
   if (!tableId) return;
   const itemName = button.dataset.itemName;
   const itemId = button.dataset.itemId || null;
+  const articleEl = button.closest('.item');
+  const modifierCheckboxes = articleEl ? Array.from(articleEl.querySelectorAll('.item-modifiers input')) : [];
+  const modifiers = modifierCheckboxes.filter((cb) => cb.checked).map((cb) => cb.dataset.modifierName);
   button.disabled = true;
   button.textContent = 'Sending...';
   try {
     const response = await fetch('/api/table-orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tableId, itemName, itemId, section: window.MENU_SECTION }),
+      body: JSON.stringify({ tableId, itemName, itemId, section: window.MENU_SECTION, modifiers }),
     });
     if (!response.ok) throw new Error();
     const entry = await response.json();
@@ -84,6 +87,7 @@ async function placeTableOrder(button) {
     button.textContent = 'Mark Received';
     button.classList.add('order-btn-active');
     button.disabled = false;
+    modifierCheckboxes.forEach((cb) => { cb.disabled = true; });
   } catch {
     button.textContent = 'Failed — tap to retry';
     button.disabled = false;
@@ -93,6 +97,7 @@ async function placeTableOrder(button) {
 async function markOrderDelivered(button) {
   const orderId = button.dataset.orderId;
   const itemName = button.dataset.itemName;
+  const articleEl = button.closest('.item');
   button.disabled = true;
   button.textContent = 'Confirming...';
   try {
@@ -103,6 +108,12 @@ async function markOrderDelivered(button) {
     button.textContent = 'Order';
     button.classList.remove('order-btn-active');
     button.disabled = false;
+    if (articleEl) {
+      articleEl.querySelectorAll('.item-modifiers input').forEach((cb) => {
+        cb.disabled = false;
+        cb.checked = false;
+      });
+    }
   } catch {
     button.textContent = 'Failed — tap to retry';
     button.disabled = false;
@@ -268,6 +279,22 @@ function renderMenu(data) {
             tableId && !soldOut
               ? `<button type="button" class="order-btn${activeOrderId ? ' order-btn-active' : ''}" data-item-name="${escapeHtml(item.name)}" data-item-id="${escapeHtml(item.id || '')}"${activeOrderId ? ` data-order-id="${escapeHtml(activeOrderId)}"` : ''}>${activeOrderId ? 'Mark Received' : 'Order'}</button>`
               : '';
+          const modifiers = item.modifiers || [];
+          const modifiersMarkup =
+            tableId && !soldOut && modifiers.length
+              ? `<div class="item-modifiers">
+                  ${modifiers
+                    .map(
+                      (m) => `
+                    <label class="item-modifier-checkbox">
+                      <input type="checkbox" data-modifier-name="${escapeHtml(m.name)}" ${activeOrderId ? 'disabled' : ''} />
+                      ${escapeHtml(m.name)} (+$${Number(m.priceDelta).toFixed(2)})
+                    </label>
+                  `
+                    )
+                    .join('')}
+                </div>`
+              : '';
           return `
             <article class="item${soldOut ? ' item-sold-out' : ''}" data-search="${escapeHtml(searchText)}" data-index="${index}" data-tags="${escapeHtml(tags.join(','))}">
               ${imageMarkup}
@@ -276,6 +303,7 @@ function renderMenu(data) {
                 <h3>${escapeHtml(item.name)}</h3>
                 ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ''}
                 ${tagsMarkup}
+                ${modifiersMarkup}
               </div>
               ${priceMarkup}
               ${orderButton}
@@ -447,6 +475,9 @@ menuContainer.addEventListener('click', (event) => {
     return;
   }
   if (event.target.closest('.staff-edit-link')) {
+    return;
+  }
+  if (event.target.closest('.item-modifiers')) {
     return;
   }
   const photo = event.target.closest('.item-photo');

@@ -18,6 +18,35 @@ final class MenuTests: XCTestCase {
         XCTAssertTrue(item.available, "items should default to available when the field predates the sold-out toggle")
         XCTAssertFalse(item.happyHour, "items should default to not-happy-hour when the field predates that flag")
         XCTAssertFalse(item.id.isEmpty, "a pre-existing item without a persisted id should still get a usable one")
+        XCTAssertEqual(item.modifiers, [], "items predating modifiers should default to none")
+    }
+
+    func testDecodesModifiersWhenPresent() throws {
+        let json = """
+        {
+            "name": "Chicken Teriyaki",
+            "price": 28,
+            "modifiers": [{ "id": "m1", "name": "Yosh Size", "priceDelta": 25.20 }]
+        }
+        """
+        let item = try JSONDecoder().decode(MenuItem.self, from: Data(json.utf8))
+        XCTAssertEqual(item.modifiers.count, 1)
+        XCTAssertEqual(item.modifiers[0].name, "Yosh Size")
+        XCTAssertEqual(item.modifiers[0].priceDelta, 25.20)
+    }
+
+    func testModifiersRoundTripEncodeDecode() throws {
+        let item = MenuItem(
+            name: "Yakisoba", price: 23,
+            modifiers: [
+                MenuItemModifier(name: "Extra Tofu", priceDelta: 3),
+                MenuItemModifier(name: "With Chicken", priceDelta: 4),
+            ]
+        )
+        let data = try JSONEncoder().encode(item)
+        let decoded = try JSONDecoder().decode(MenuItem.self, from: data)
+        XCTAssertEqual(decoded.modifiers.map { $0.name }, ["Extra Tofu", "With Chicken"])
+        XCTAssertEqual(decoded.modifiers.map { $0.priceDelta }, [3, 4])
     }
 
     func testItemWithoutPersistedIdGetsAFreshOneEachDecode() throws {

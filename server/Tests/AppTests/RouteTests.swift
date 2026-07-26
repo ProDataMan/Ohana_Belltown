@@ -139,6 +139,15 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testTableOrderCapturesSelectedModifiers() throws {
+        let orderBody = ByteBuffer(string: #"{"tableId":"5","itemName":"Chicken Teriyaki","modifiers":["Yosh Size","Add Katsu"]}"#)
+        try app.test(.POST, "api/table-orders", headers: ["Content-Type": "application/json"], body: orderBody) { res in
+            XCTAssertEqual(res.status, .ok)
+            let entry = try res.content.decode(TableOrderEntry.self)
+            XCTAssertEqual(entry.modifiers, ["Yosh Size", "Add Katsu"])
+        }
+    }
+
     func testTableOrderRejectsEmptyFields() throws {
         let orderBody = ByteBuffer(string: #"{"tableId":"","itemName":"Spam Musubi"}"#)
         try app.test(.POST, "api/table-orders", headers: ["Content-Type": "application/json"], body: orderBody) { res in
@@ -286,6 +295,17 @@ final class RouteTests: XCTestCase {
             XCTAssertEqual(updated.price, 16)
             XCTAssertTrue(updated.featured)
             XCTAssertTrue(updated.happyHour)
+            XCTAssertEqual(updated.modifiers, [], "a PATCH body omitting modifiers shouldn't error — older clients haven't sent this field yet")
+        }
+
+        let patchWithModifiersBody = ByteBuffer(string: #"""
+        {"name":"Volcano Roll","description":"Now spicier","price":16,"images":[],"tags":[],"featured":true,"available":true,"happyHour":true,"modifiers":[{"id":"m1","name":"Yosh Size","priceDelta":25.2}]}
+        """#)
+        try app.test(.PATCH, "api/menu/items/item-1", headers: ["Content-Type": "application/json", "Cookie": cookie], body: patchWithModifiersBody) { res in
+            XCTAssertEqual(res.status, .ok)
+            let updated = try res.content.decode(MenuItem.self)
+            XCTAssertEqual(updated.modifiers.map { $0.name }, ["Yosh Size"])
+            XCTAssertEqual(updated.modifiers.map { $0.priceDelta }, [25.2])
         }
 
         try app.test(.DELETE, "api/menu/items/item-1") { res in

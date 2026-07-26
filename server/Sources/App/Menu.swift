@@ -1,5 +1,21 @@
 import Vapor
 
+/// A customer-selectable add-on/upgrade — e.g. "Add Katsu +$6", "Yosh Size
+/// +$25.20" — priced as a delta added to the item's base price, since that's
+/// how staff already describe these in the menu ("YOSH size: $53.20" on a
+/// $28 item becomes a +$25.20 modifier here).
+struct MenuItemModifier: Codable, Content, Equatable {
+    var id: String
+    var name: String
+    var priceDelta: Double
+
+    init(id: String = UUID().uuidString, name: String, priceDelta: Double) {
+        self.id = id
+        self.name = name
+        self.priceDelta = priceDelta
+    }
+}
+
 struct MenuItem: Codable, Content {
     var id: String
     var name: String
@@ -12,9 +28,12 @@ struct MenuItem: Codable, Content {
     /// Whether this item is offered during Happy Hour — independent of
     /// which category/section it's filed under.
     var happyHour: Bool
+    /// Optional add-ons/upgrades a customer can check when placing a table
+    /// order (see TableOrders.swift) — empty for the vast majority of items.
+    var modifiers: [MenuItemModifier]
 
     enum CodingKeys: String, CodingKey {
-        case id, name, description, price, images, image, tags, featured, available, happyHour
+        case id, name, description, price, images, image, tags, featured, available, happyHour, modifiers
     }
 
     init(
@@ -26,7 +45,8 @@ struct MenuItem: Codable, Content {
         tags: [String] = [],
         featured: Bool = false,
         available: Bool = true,
-        happyHour: Bool = false
+        happyHour: Bool = false,
+        modifiers: [MenuItemModifier] = []
     ) {
         self.id = id
         self.name = name
@@ -37,6 +57,7 @@ struct MenuItem: Codable, Content {
         self.featured = featured
         self.available = available
         self.happyHour = happyHour
+        self.modifiers = modifiers
     }
 
     init(from decoder: Decoder) throws {
@@ -59,6 +80,7 @@ struct MenuItem: Codable, Content {
         featured = try container.decodeIfPresent(Bool.self, forKey: .featured) ?? false
         available = try container.decodeIfPresent(Bool.self, forKey: .available) ?? true
         happyHour = try container.decodeIfPresent(Bool.self, forKey: .happyHour) ?? false
+        modifiers = try container.decodeIfPresent([MenuItemModifier].self, forKey: .modifiers) ?? []
     }
 
     func encode(to encoder: Encoder) throws {
@@ -72,6 +94,7 @@ struct MenuItem: Codable, Content {
         try container.encode(featured, forKey: .featured)
         try container.encode(available, forKey: .available)
         try container.encode(happyHour, forKey: .happyHour)
+        try container.encode(modifiers, forKey: .modifiers)
     }
 }
 

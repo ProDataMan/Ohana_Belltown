@@ -20,6 +20,7 @@ struct TableOrderRequest: Content {
     var itemName: String
     var itemId: String?
     var section: String?
+    var modifiers: [String]?
 }
 
 struct TableOrdersDashboard: Content {
@@ -53,6 +54,7 @@ struct MenuItemUpdateRequest: Content {
     var featured: Bool
     var available: Bool
     var happyHour: Bool
+    var modifiers: [MenuItemModifier]?
 }
 
 func routes(_ app: Application) throws {
@@ -102,6 +104,7 @@ func routes(_ app: Application) throws {
             item.tags = body.tags
             item.featured = body.featured
             item.available = body.available
+            item.modifiers = body.modifiers ?? []
             item.happyHour = body.happyHour
         }
     }
@@ -239,7 +242,8 @@ func routes(_ app: Application) throws {
         }
         let customerId = try? currentCustomer(req)?.id
         return try TableOrdersStore.shared.place(
-            tableId: tableId, itemName: itemName, itemId: body.itemId, section: body.section, customerId: customerId
+            tableId: tableId, itemName: itemName, itemId: body.itemId, section: body.section, customerId: customerId,
+            modifiers: body.modifiers ?? []
         )
     }
 

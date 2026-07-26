@@ -17,6 +17,12 @@ function minutesAgoTableOrder(timestamp) {
 const needsEntryEl = document.getElementById('needs-entry-list');
 const awaitingDeliveryEl = document.getElementById('awaiting-delivery-list');
 
+function itemDisplayName(order) {
+  const base = escapeHtmlTableOrders(order.itemName);
+  if (!order.modifiers || !order.modifiers.length) return base;
+  return `${base} <span class="hint">+ ${order.modifiers.map(escapeHtmlTableOrders).join(', ')}</span>`;
+}
+
 function renderNeedsEntry(orders) {
   if (!orders.length) {
     needsEntryEl.innerHTML = '<p class="hint">Nothing needs entering right now.</p>';
@@ -32,7 +38,7 @@ function renderNeedsEntry(orders) {
               (o) => `
             <tr data-id="${o.id}">
               <td><span class="pill pill-approved">Table ${escapeHtmlTableOrders(o.tableId)}</span></td>
-              <td>${escapeHtmlTableOrders(o.itemName)}</td>
+              <td>${itemDisplayName(o)}</td>
               <td>${minutesAgoTableOrder(o.createdAt)}</td>
               <td><button type="button" class="secondary enter-btn">Confirm Entered</button></td>
             </tr>

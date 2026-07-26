@@ -24,16 +24,22 @@ struct TableOrderEntry: Codable, Content {
     /// Set when marked "entered" — a heuristic estimate of when the dish
     /// should be ready, used to proactively notify staff. See PrepTimeEstimator.
     var estimatedReadyAt: String?
+    /// Names of any selected add-ons/upgrades (e.g. "Add Katsu", "Yosh Size")
+    /// — just names for staff to read, not priced here; this isn't a payment
+    /// system, so the extra charge still gets rung up wherever the order
+    /// actually gets paid for.
+    var modifiers: [String]
 
     enum CodingKeys: String, CodingKey {
         case id, tableId, itemName, itemId, section, customerId, status, createdAt, updatedAt
-        case enteredAt, deliveredAt, estimatedReadyAt
+        case enteredAt, deliveredAt, estimatedReadyAt, modifiers
     }
 
     init(
         id: String, tableId: String, itemName: String, itemId: String? = nil, section: String? = nil,
         customerId: String? = nil, status: String, createdAt: String, updatedAt: String,
-        enteredAt: String? = nil, deliveredAt: String? = nil, estimatedReadyAt: String? = nil
+        enteredAt: String? = nil, deliveredAt: String? = nil, estimatedReadyAt: String? = nil,
+        modifiers: [String] = []
     ) {
         self.id = id
         self.tableId = tableId
@@ -47,6 +53,7 @@ struct TableOrderEntry: Codable, Content {
         self.enteredAt = enteredAt
         self.deliveredAt = deliveredAt
         self.estimatedReadyAt = estimatedReadyAt
+        self.modifiers = modifiers
     }
 
     init(from decoder: Decoder) throws {
@@ -67,6 +74,7 @@ struct TableOrderEntry: Codable, Content {
         enteredAt = try container.decodeIfPresent(String.self, forKey: .enteredAt)
         deliveredAt = try container.decodeIfPresent(String.self, forKey: .deliveredAt)
         estimatedReadyAt = try container.decodeIfPresent(String.self, forKey: .estimatedReadyAt)
+        modifiers = try container.decodeIfPresent([String].self, forKey: .modifiers) ?? []
     }
 }
 
@@ -135,14 +143,15 @@ final class TableOrdersStore: @unchecked Sendable {
     }
 
     @discardableResult
-    func place(tableId: String, itemName: String, itemId: String?, section: String?, customerId: String?) throws -> TableOrderEntry {
+    func place(tableId: String, itemName: String, itemId: String?, section: String?, customerId: String?, modifiers: [String] = []) throws -> TableOrderEntry {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
         let timestamp = now()
         let entry = TableOrderEntry(
             id: UUID().uuidString, tableId: tableId, itemName: itemName, itemId: itemId, section: section,
-            customerId: customerId, status: "pending", createdAt: timestamp, updatedAt: timestamp
+            customerId: customerId, status: "pending", createdAt: timestamp, updatedAt: timestamp,
+            modifiers: modifiers
         )
         entries.append(entry)
         try persist()

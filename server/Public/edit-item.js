@@ -27,6 +27,54 @@ const itemId = new URLSearchParams(window.location.search).get('id');
 const statusEl = document.getElementById('status');
 const panelEl = document.getElementById('editor-panel');
 let currentImages = [];
+let currentModifiers = [];
+
+function renderModifiersList() {
+  const el = document.getElementById('modifiers-list');
+  if (!currentModifiers.length) {
+    el.innerHTML = '<p class="hint">No add-ons yet.</p>';
+    return;
+  }
+  el.innerHTML = `
+    <div class="data-table">
+      <table>
+        <thead><tr><th>Add-on</th><th>Extra price</th><th></th></tr></thead>
+        <tbody>
+          ${currentModifiers
+            .map(
+              (m, i) => `
+            <tr>
+              <td>${escapeAttrItem(m.name)}</td>
+              <td>+$${Number(m.priceDelta).toFixed(2)}</td>
+              <td><button type="button" class="secondary remove-modifier-btn" data-index="${i}" style="padding: 0.35rem 0.7rem; font-size: 0.82rem;">Remove</button></td>
+            </tr>
+          `
+            )
+            .join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+  el.querySelectorAll('.remove-modifier-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      currentModifiers.splice(Number(btn.dataset.index), 1);
+      renderModifiersList();
+    });
+  });
+}
+
+function addModifier() {
+  const nameInput = document.getElementById('new-modifier-name');
+  const priceInput = document.getElementById('new-modifier-price');
+  const name = nameInput.value.trim();
+  const priceDelta = Number.parseFloat(priceInput.value);
+  if (!name || Number.isNaN(priceDelta)) return;
+  currentModifiers.push({ id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`, name, priceDelta });
+  renderModifiersList();
+  nameInput.value = '';
+  priceInput.value = '';
+  nameInput.focus();
+}
 
 function renderThumbGallery() {
   const gallery = document.getElementById('item-thumb-gallery');
@@ -171,6 +219,9 @@ async function loadItem() {
     currentImages = item.images || [];
     renderThumbGallery();
 
+    currentModifiers = item.modifiers || [];
+    renderModifiersList();
+
     const tagsGrid = document.getElementById('item-tags-grid');
     tagsGrid.innerHTML = TAGS.map(
       (t) => `
@@ -204,6 +255,7 @@ async function saveItem() {
     featured: document.getElementById('item-featured-input').checked,
     available: !document.getElementById('item-sold-out-input').checked,
     happyHour: document.getElementById('item-happy-hour-input').checked,
+    modifiers: currentModifiers,
   };
 
   document.getElementById('save-btn').disabled = true;
@@ -238,6 +290,7 @@ async function deleteItem() {
   }
 }
 
+document.getElementById('add-modifier-btn').addEventListener('click', addModifier);
 document.getElementById('item-image-input').addEventListener('change', uploadItemImage);
 document.getElementById('photo-google-btn').addEventListener('click', openGooglePhotoPicker);
 document.getElementById('save-btn').addEventListener('click', saveItem);

@@ -87,6 +87,9 @@ function itemRow(item) {
   row.dataset.itemId = item.id || (window.crypto && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
   const initialImages = item.images || (item.image ? [item.image] : []);
   row.dataset.images = JSON.stringify(initialImages);
+  // Modifiers (add-ons like "Yosh Size") aren't editable from this bulk
+  // editor — stashed here just so a bulk save doesn't wipe them out.
+  row.dataset.modifiers = JSON.stringify(item.modifiers || []);
   const priceValue = item.price != null ? Number(item.price).toFixed(2) : '';
   row.innerHTML = `
     <div class="edit-item-photo">
@@ -384,7 +387,13 @@ function collectMenuData() {
       const available = !row.querySelector('.item-sold-out').checked;
       const happyHour = row.querySelector('.item-happy-hour').checked;
       const tags = Array.from(row.querySelectorAll('.item-tag:checked')).map((cb) => cb.value);
-      items.push({ id: row.dataset.itemId, name: itemName, description, price, images, tags, featured, available, happyHour });
+      let modifiers = [];
+      try {
+        modifiers = JSON.parse(row.dataset.modifiers || '[]');
+      } catch {
+        modifiers = [];
+      }
+      items.push({ id: row.dataset.itemId, name: itemName, description, price, images, tags, featured, available, happyHour, modifiers });
     }
 
     categories.push({ section, name, note, items });

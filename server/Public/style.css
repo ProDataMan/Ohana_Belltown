@@ -774,6 +774,17 @@ button.secondary:hover {
   margin-top: 0.6rem;
 }
 
+.modifiers-section {
+  margin: 1.25rem 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--panel-border);
+}
+
+.modifiers-section h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
 .tag-checkbox {
   display: flex;
   align-items: center;
@@ -1411,6 +1422,26 @@ select {
   background: #f3ecee;
   color: var(--text-muted);
   font-family: var(--font-ui);
+}
+
+.item-modifiers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 10px;
+  background: #f9f5f7;
+}
+
+.item-modifier-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-family: var(--font-ui);
+  color: var(--ink-soft);
+  cursor: pointer;
 }
 
 .special-badge {
