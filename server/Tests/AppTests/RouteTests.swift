@@ -527,6 +527,32 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testStaffCanLogTheirOwnActivityButNotAllCategories() throws {
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        let logBody = ByteBuffer(string: #"{"category":"social","note":"Posted a reel"}"#)
+        try app.test(.POST, "api/staff-rewards/log", headers: ["Content-Type": "application/json"], body: logBody) { res in
+            XCTAssertEqual(res.status, .unauthorized, "logging your own activity still requires being logged in")
+        }
+        try app.test(.POST, "api/staff-rewards/log", headers: ["Content-Type": "application/json", "Cookie": cookie], body: logBody) { res in
+            XCTAssertEqual(res.status, .ok)
+            let status = try res.content.decode(StaffRewardStatus.self)
+            XCTAssertEqual(status.punches, 1)
+        }
+
+        let claimedPhotoBody = ByteBuffer(string: #"{"category":"photo","note":"totally added a photo, trust me"}"#)
+        try app.test(.POST, "api/staff-rewards/log", headers: ["Content-Type": "application/json", "Cookie": cookie], body: claimedPhotoBody) { res in
+            XCTAssertEqual(res.status, .badRequest, "photo/price/special/event can only be earned by actually doing the edit")
+        }
+    }
+
     func testTableMapIsPublicAndCoversAllSections() throws {
         try app.test(.GET, "api/table-map") { res in
             XCTAssertEqual(res.status, .ok)

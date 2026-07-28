@@ -83,8 +83,22 @@
 
       <section class="panel">
         <h2>My Rewards</h2>
-        <p class="hint">Earned automatically for adding a photo, updating a price, or marking a special on the menu — or awarded by an admin for anything else, like a social media post.</p>
+        <p class="hint">Earned automatically for adding a photo, updating a price, or marking a special on the menu — or log it yourself below for anything that can't be detected automatically, like a social media post.</p>
+        <p class="hint">10 punches = your choice of one Classic Ohana Roll or one Happy Hour appetizer (see the <a href="/happy-hour">Happy Hour menu</a>), on the house. Ask an admin to redeem it once you're there.</p>
         <div id="rewards-status" class="loyalty-card-summary"></div>
+        <form id="log-activity-form" style="margin-top: 1rem;">
+          <label>What did you do?
+            <select id="log-activity-category">
+              <option value="social">Posted on social media</option>
+              <option value="other">Something else</option>
+            </select>
+          </label>
+          <label>Note (optional)
+            <input type="text" id="log-activity-note" placeholder="e.g. Instagram story about the new roll" />
+          </label>
+          <button type="submit">Log It</button>
+          <p id="log-activity-status" class="status"></p>
+        </form>
       </section>
     </main>
 

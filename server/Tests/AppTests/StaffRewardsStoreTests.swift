@@ -31,6 +31,27 @@ final class StaffRewardsStoreTests: XCTestCase {
         XCTAssertThrowsError(try StaffRewardsStore.shared.award(staffId: "staff-1", category: "bogus", note: nil, awardedBy: nil))
     }
 
+    func testSelfReportAcceptsOnlyUnverifiableCategories() throws {
+        let status = try StaffRewardsStore.shared.selfReport(staffId: "staff-1", category: "social", note: "Instagram post")
+        XCTAssertEqual(status.punches, 1)
+
+        XCTAssertThrowsError(try StaffRewardsStore.shared.selfReport(staffId: "staff-1", category: "photo", note: nil)) { error in
+            guard let rewardError = error as? StaffRewardError else { return XCTFail("wrong error type") }
+            XCTAssertEqual(rewardError, .invalidCategory)
+        }
+        XCTAssertThrowsError(try StaffRewardsStore.shared.selfReport(staffId: "staff-1", category: "price", note: nil))
+        XCTAssertThrowsError(try StaffRewardsStore.shared.selfReport(staffId: "staff-1", category: "special", note: nil))
+        XCTAssertThrowsError(try StaffRewardsStore.shared.selfReport(staffId: "staff-1", category: "event", note: nil))
+    }
+
+    func testSelfReportedPunchesCountAgainstTheDailyAutoAwardCap() throws {
+        for _ in 1...StaffRewardsStore.maxAutoAwardsPerDay {
+            try StaffRewardsStore.shared.selfReport(staffId: "staff-1", category: "other", note: nil)
+        }
+        let capped = try StaffRewardsStore.shared.selfReport(staffId: "staff-1", category: "social", note: nil)
+        XCTAssertEqual(capped.punches, StaffRewardsStore.maxAutoAwardsPerDay, "self-reports shouldn't bypass the daily cap the way admin grants do")
+    }
+
     func testTenPunchesMakeRewardReady() throws {
         // Manual grants (awardedBy set) aren't subject to the daily auto-award cap.
         for _ in 1...10 {

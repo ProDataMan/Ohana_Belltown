@@ -52,7 +52,7 @@ struct StaffRewardStatus: Content {
     var totalRedeemed: Int
 }
 
-enum StaffRewardError: Error {
+enum StaffRewardError: Error, Equatable {
     case cardNotFound
     case noRewardAvailable
     case invalidCategory
@@ -80,6 +80,11 @@ final class StaffRewardsStore: @unchecked Sendable {
     static let shared = StaffRewardsStore()
     static let punchesNeeded = 10
     static let categories = ["photo", "price", "special", "event", "social", "other"]
+    /// Categories a staff member can log for themselves, without an admin —
+    /// only the ones that can't be auto-detected from a real edit. Letting
+    /// someone self-report "photo"/"price"/"special"/"event" would let them
+    /// claim credit without actually doing the edit that's supposed to earn it.
+    static let selfReportableCategories = ["social", "other"]
     /// Only auto-awarded punches (from a staff member's own edits, not a
     /// manual admin grant) count against this — caps how many times a day
     /// repeatedly editing the same item can earn a punch, without limiting
@@ -224,6 +229,16 @@ final class StaffRewardsStore: @unchecked Sendable {
         }
         guard !categories.isEmpty else { return }
         try? awardBatch(staffId: staffId, categories: categories, note: nil, awardedBy: nil)
+    }
+
+    /// A staff member logging their own activity (e.g. "posted on
+    /// Instagram") rather than an admin granting it. Still subject to the
+    /// shared daily auto-award cap, same as system-detected punches — it's
+    /// unverified, so it shouldn't be able to farm unlimited punches.
+    @discardableResult
+    func selfReport(staffId: String, category: String, note: String?) throws -> StaffRewardStatus {
+        guard Self.selfReportableCategories.contains(category) else { throw StaffRewardError.invalidCategory }
+        return try award(staffId: staffId, category: category, note: note, awardedBy: nil)
     }
 
     @discardableResult

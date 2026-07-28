@@ -78,6 +78,33 @@ async function loadRewards() {
   }
 }
 
+document.getElementById('log-activity-form')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const statusEl = document.getElementById('log-activity-status');
+  const category = document.getElementById('log-activity-category').value;
+  const noteInput = document.getElementById('log-activity-note');
+  statusEl.textContent = 'Logging...';
+  statusEl.classList.remove('status-error', 'status-ok');
+  try {
+    const response = await staffFetch('/api/staff-rewards/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category, note: noteInput.value.trim() || null }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.reason || `Failed (${response.status}).`);
+    }
+    statusEl.textContent = 'Logged — punch added!';
+    statusEl.classList.add('status-ok');
+    noteInput.value = '';
+    await loadRewards();
+  } catch (error) {
+    statusEl.textContent = error.message;
+    statusEl.classList.add('status-error');
+  }
+});
+
 document.getElementById('logout-btn').addEventListener('click', async () => {
   await fetch('/api/auth/logout', { method: 'POST' });
   window.location.href = '/login';

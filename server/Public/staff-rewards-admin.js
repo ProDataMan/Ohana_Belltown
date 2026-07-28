@@ -17,6 +17,16 @@ const categoryLabels = {
   redeemed: 'Redeemed',
 };
 
+// Only self-reporting can produce these categories with no admin attached —
+// the auto-detected ones (photo/price/special/event) never go through here.
+const selfReportableCategories = ['social', 'other'];
+
+function grantedByLabel(e) {
+  if (e.awardedBy) return escapeHtmlRewards(staffName(e.awardedBy));
+  if (selfReportableCategories.includes(e.category)) return '<span class="hint">self-reported</span>';
+  return '<span class="hint">auto</span>';
+}
+
 let staffById = {};
 
 async function loadStaffOptions() {
@@ -131,7 +141,7 @@ async function loadEvents() {
                 <td>${escapeHtmlRewards(staffName(e.staffId))}</td>
                 <td><span class="pill ${e.category === 'redeemed' ? 'pill-approved' : ''}">${escapeHtmlRewards(categoryLabels[e.category] || e.category)}</span></td>
                 <td>${escapeHtmlRewards(e.note || '')}</td>
-                <td>${e.awardedBy ? escapeHtmlRewards(staffName(e.awardedBy)) : '<span class="hint">auto</span>'}</td>
+                <td>${grantedByLabel(e)}</td>
               </tr>
             `
               )

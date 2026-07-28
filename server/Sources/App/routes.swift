@@ -35,6 +35,11 @@ struct StaffRewardAwardRequest: Content {
     var note: String?
 }
 
+struct StaffRewardSelfReportRequest: Content {
+    var category: String
+    var note: String?
+}
+
 struct FeedbackSubmission: Content {
     var category: String
     var rating: Int?
@@ -224,6 +229,12 @@ func routes(_ app: Application) throws {
         try requireAdmin(req)
         let limit = req.query[Int.self, at: "limit"] ?? 50
         return try StaffRewardsStore.shared.recentEvents(limit: limit)
+    }
+
+    app.post("api", "staff-rewards", "log") { req throws -> StaffRewardStatus in
+        let staff = try requireLogin(req)
+        let body = try req.content.decode(StaffRewardSelfReportRequest.self)
+        return try StaffRewardsStore.shared.selfReport(staffId: staff.id, category: body.category, note: body.note)
     }
 
     app.post("api", "staff-rewards", "award") { req throws -> StaffRewardStatus in
