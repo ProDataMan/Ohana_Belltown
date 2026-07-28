@@ -117,6 +117,16 @@ final class RouteTests: XCTestCase {
             let stats = try res.content.decode(DeliveryStatsSummary.self)
             XCTAssertEqual(stats.completedOrders, 1)
         }
+
+        try app.test(.GET, "api/table-orders/occupancy-stats") { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+        try app.test(.GET, "api/table-orders/occupancy-stats", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+            let stats = try res.content.decode(TableOccupancyStatsSummary.self)
+            XCTAssertEqual(stats.sessions, 1)
+            XCTAssertFalse(stats.isBaselineOnly)
+        }
     }
 
     func testStaffingCanBeReadAndUpdated() throws {

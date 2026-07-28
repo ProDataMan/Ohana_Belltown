@@ -446,6 +446,12 @@ func routes(_ app: Application) throws {
         return try TableOrdersStore.shared.deliveryStats(days: days)
     }
 
+    app.get("api", "table-orders", "occupancy-stats") { req throws -> TableOccupancyStatsSummary in
+        try requireLogin(req)
+        let days = req.query[Int.self, at: "days"] ?? 30
+        return try TableOrdersStore.shared.tableOccupancyStats(days: days)
+    }
+
     app.get("api", "table-orders", "staffing") { req throws -> StaffingConfig in
         try requireLogin(req)
         return try StaffingStore.shared.get()

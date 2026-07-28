@@ -134,4 +134,99 @@ final class TableOrdersStoreTests: XCTestCase {
         XCTAssertEqual(stats.completedOrders, 0)
         XCTAssertTrue(stats.items.isEmpty)
     }
+
+    private func iso(_ date: Date) -> String {
+        ISO8601DateFormatter().string(from: date)
+    }
+
+    private func seedEntries(_ entries: [TableOrderEntry]) throws {
+        try JSONEncoder().encode(entries).write(to: tempDir.appendingPathComponent("table-orders.json"))
+        TableOrdersStore.shared.configure(dataDirectory: tempDir.path)
+    }
+
+    func testOccupancyStatsReturnsALabeledBaselineExampleWhenNoSessionsHaveCompleted() throws {
+        let stats = try TableOrdersStore.shared.tableOccupancyStats(days: 30)
+        XCTAssertEqual(stats.sessions, 0)
+        XCTAssertTrue(stats.isBaselineOnly)
+        XCTAssertGreaterThan(stats.averageWaitPlusPrepMinutes, 0, "baseline case should still report the generic number it used, not zero")
+        XCTAssertGreaterThan(stats.averageEstimatedOccupancyMinutes, 0, "should still show a real (if generic) example estimate, not zero")
+    }
+
+    func testOccupancyStatsUsesRealMeasuredTimeForACompletedSession() throws {
+        let created = Date().addingTimeInterval(-3600)
+        let entered = created.addingTimeInterval(2 * 60)
+        let delivered = created.addingTimeInterval(14 * 60)
+        try seedEntries([
+            TableOrderEntry(
+                id: "a", tableId: "5", itemName: "Loco Moco", section: "menu", status: "delivered",
+                createdAt: iso(created), updatedAt: iso(delivered), enteredAt: iso(entered), deliveredAt: iso(delivered)
+            )
+        ])
+
+        let stats = try TableOrdersStore.shared.tableOccupancyStats(days: 30)
+        XCTAssertEqual(stats.sessions, 1)
+        XCTAssertFalse(stats.isBaselineOnly)
+        XCTAssertEqual(stats.averageWaitPlusPrepMinutes, 14, accuracy: 0.01)
+        XCTAssertEqual(
+            stats.averageEstimatedOccupancyMinutes,
+            DiningTimeEstimator.arrivalToOrderMinutes + 14 + stats.averageEstimatedEatingMinutes + DiningTimeEstimator.socialOverheadMinutes,
+            accuracy: 0.01
+        )
+    }
+
+    func testOccupancyStatsGroupsCloseTogetherOrdersAtTheSameTableIntoOneSession() throws {
+        let firstCreated = Date().addingTimeInterval(-3600)
+        let secondCreated = firstCreated.addingTimeInterval(10 * 60)
+        let firstDelivered = firstCreated.addingTimeInterval(15 * 60)
+        let secondDelivered = firstCreated.addingTimeInterval(25 * 60)
+        try seedEntries([
+            TableOrderEntry(
+                id: "a", tableId: "5", itemName: "Loco Moco", section: "menu", status: "delivered",
+                createdAt: iso(firstCreated), updatedAt: iso(firstDelivered), enteredAt: iso(firstCreated), deliveredAt: iso(firstDelivered)
+            ),
+            TableOrderEntry(
+                id: "b", tableId: "5", itemName: "Mai Tai", section: "drinks", status: "delivered",
+                createdAt: iso(secondCreated), updatedAt: iso(secondDelivered), enteredAt: iso(secondCreated), deliveredAt: iso(secondDelivered)
+            ),
+        ])
+
+        let stats = try TableOrdersStore.shared.tableOccupancyStats(days: 30)
+        XCTAssertEqual(stats.sessions, 1, "orders 10 minutes apart at the same table should be one dining session, not two")
+        // The whole session's measured time is earliest created -> latest delivered = 25 minutes.
+        XCTAssertEqual(stats.averageWaitPlusPrepMinutes, 25, accuracy: 0.01)
+    }
+
+    func testOccupancyStatsTreatsALargeGapAsSeparateDiningSessions() throws {
+        let firstCreated = Date().addingTimeInterval(-4 * 3600)
+        let firstDelivered = firstCreated.addingTimeInterval(15 * 60)
+        let secondCreated = Date().addingTimeInterval(-3600) // well past the same-session gap
+        let secondDelivered = secondCreated.addingTimeInterval(15 * 60)
+        try seedEntries([
+            TableOrderEntry(
+                id: "a", tableId: "5", itemName: "Loco Moco", section: "menu", status: "delivered",
+                createdAt: iso(firstCreated), updatedAt: iso(firstDelivered), enteredAt: iso(firstCreated), deliveredAt: iso(firstDelivered)
+            ),
+            TableOrderEntry(
+                id: "b", tableId: "5", itemName: "Loco Moco", section: "menu", status: "delivered",
+                createdAt: iso(secondCreated), updatedAt: iso(secondDelivered), enteredAt: iso(secondCreated), deliveredAt: iso(secondDelivered)
+            ),
+        ])
+
+        let stats = try TableOrdersStore.shared.tableOccupancyStats(days: 30)
+        XCTAssertEqual(stats.sessions, 2, "orders hours apart at the same table are two separate dining parties")
+    }
+
+    func testOccupancyStatsExcludesSessionsWithAnyOrderStillInProgress() throws {
+        let created = Date().addingTimeInterval(-1800)
+        try seedEntries([
+            TableOrderEntry(
+                id: "a", tableId: "5", itemName: "Loco Moco", section: "menu", status: "entered",
+                createdAt: iso(created), updatedAt: iso(created), enteredAt: iso(created)
+            )
+        ])
+
+        let stats = try TableOrdersStore.shared.tableOccupancyStats(days: 30)
+        XCTAssertEqual(stats.sessions, 0, "a session isn't over until every order in it has actually been delivered")
+        XCTAssertTrue(stats.isBaselineOnly)
+    }
 }

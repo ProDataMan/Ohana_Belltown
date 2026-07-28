@@ -94,6 +94,24 @@ struct DeliveryStatsSummary: Content {
     var completedOrders: Int
 }
 
+/// See DiningTimeEstimator for how this is computed and why. `isBaselineOnly`
+/// is true when there aren't any completed dining sessions yet in the
+/// requested window — the numbers are still a real (if generic) estimate,
+/// just not informed by any of this restaurant's own completed orders yet.
+struct TableOccupancyStatsSummary: Content {
+    var sessions: Int
+    var averageEstimatedOccupancyMinutes: Double
+    /// The real average when `isBaselineOnly` is false; the same generic
+    /// baseline used to compute `averageEstimatedOccupancyMinutes` otherwise
+    /// — never nil, so callers never have to separately reconstruct what
+    /// baseline number was actually used.
+    var averageWaitPlusPrepMinutes: Double
+    var averageEstimatedEatingMinutes: Double
+    var arrivalToOrderMinutes: Double
+    var socialOverheadMinutes: Double
+    var isBaselineOnly: Bool
+}
+
 enum TableOrderError: Error, Equatable {
     case entryNotFound
 }
@@ -325,6 +343,87 @@ final class TableOrdersStore: @unchecked Sendable {
             overallAvgPrepMinutes: average(allSamples.compactMap { $0.prep }),
             overallAvgTotalMinutes: average(allSamples.map { $0.total }),
             completedOrders: allSamples.count
+        )
+    }
+
+    /// Estimated table turnover time — see DiningTimeEstimator for the model.
+    /// Orders at the same table are grouped into "dining sessions" (a big
+    /// gap between orders means a new party sat down), and only sessions
+    /// where every order actually completed give a real measured wait+prep
+    /// time to combine with the eating/social-overhead estimate.
+    func tableOccupancyStats(days: Int) throws -> TableOccupancyStatsSummary {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        let formatter = ISO8601DateFormatter()
+        let cutoff = Calendar(identifier: .gregorian).date(byAdding: .day, value: -days, to: Date()) ?? .distantPast
+
+        let byTable = Dictionary(grouping: entries, by: { $0.tableId })
+        var sessions: [[TableOrderEntry]] = []
+        for (_, orders) in byTable {
+            let sorted = orders.sorted { $0.createdAt < $1.createdAt }
+            var current: [TableOrderEntry] = []
+            var lastCreated: Date?
+            for order in sorted {
+                guard let created = formatter.date(from: order.createdAt) else { continue }
+                if let last = lastCreated, created.timeIntervalSince(last) > DiningTimeEstimator.sameSessionGapSeconds {
+                    if !current.isEmpty { sessions.append(current) }
+                    current = []
+                }
+                current.append(order)
+                lastCreated = created
+            }
+            if !current.isEmpty { sessions.append(current) }
+        }
+
+        struct Estimate {
+            var occupancyMinutes: Double
+            var waitPlusPrepMinutes: Double
+            var eatingMinutes: Double
+        }
+        var estimates: [Estimate] = []
+        for session in sessions {
+            guard session.allSatisfy({ $0.status == "delivered" }) else { continue }
+            let createdDates = session.compactMap { formatter.date(from: $0.createdAt) }
+            let deliveredDates = session.compactMap { $0.deliveredAt.flatMap { formatter.date(from: $0) } }
+            guard let earliestCreated = createdDates.min(), let latestDelivered = deliveredDates.max(),
+                  latestDelivered >= cutoff else { continue }
+
+            let waitPlusPrep = latestDelivered.timeIntervalSince(earliestCreated) / 60
+            let dishSections = session.map { $0.section }
+            let eating = DiningTimeEstimator.estimatedEatingMinutes(dishSections: dishSections)
+            let occupancy = DiningTimeEstimator.estimatedOccupancyMinutes(waitPlusPrepMinutes: waitPlusPrep, dishSections: dishSections)
+            estimates.append(Estimate(occupancyMinutes: occupancy, waitPlusPrepMinutes: waitPlusPrep, eatingMinutes: eating))
+        }
+
+        func average(_ values: [Double]) -> Double? {
+            guard !values.isEmpty else { return nil }
+            return values.reduce(0, +) / Double(values.count)
+        }
+
+        guard !estimates.isEmpty else {
+            // No completed dining sessions yet — show a clearly-labeled
+            // example (a single food-section dish) instead of an empty stat.
+            let exampleWaitPlusPrep = PrepTimeEstimator.baselineMinutes(section: "menu")
+            return TableOccupancyStatsSummary(
+                sessions: 0,
+                averageEstimatedOccupancyMinutes: DiningTimeEstimator.estimatedOccupancyMinutes(waitPlusPrepMinutes: exampleWaitPlusPrep, dishSections: ["menu"]),
+                averageWaitPlusPrepMinutes: exampleWaitPlusPrep,
+                averageEstimatedEatingMinutes: DiningTimeEstimator.estimatedEatingMinutes(dishSections: ["menu"]),
+                arrivalToOrderMinutes: DiningTimeEstimator.arrivalToOrderMinutes,
+                socialOverheadMinutes: DiningTimeEstimator.socialOverheadMinutes,
+                isBaselineOnly: true
+            )
+        }
+
+        return TableOccupancyStatsSummary(
+            sessions: estimates.count,
+            averageEstimatedOccupancyMinutes: average(estimates.map { $0.occupancyMinutes }) ?? 0,
+            averageWaitPlusPrepMinutes: average(estimates.map { $0.waitPlusPrepMinutes }) ?? 0,
+            averageEstimatedEatingMinutes: average(estimates.map { $0.eatingMinutes }) ?? 0,
+            arrivalToOrderMinutes: DiningTimeEstimator.arrivalToOrderMinutes,
+            socialOverheadMinutes: DiningTimeEstimator.socialOverheadMinutes,
+            isBaselineOnly: false
         )
     }
 

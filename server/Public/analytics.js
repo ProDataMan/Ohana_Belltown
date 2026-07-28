@@ -359,6 +359,47 @@ async function loadDeliveryStats() {
   }
 }
 
+async function loadOccupancyStats() {
+  const summaryEl = document.getElementById('table-occupancy-summary');
+  const detailEl = document.getElementById('table-occupancy');
+  const days = document.getElementById('range-select').value;
+
+  try {
+    const response = await staffFetch(`/api/table-orders/occupancy-stats?days=${days}`);
+    if (!response.ok) throw new Error(`Unable to load table occupancy estimates (${response.status}).`);
+    const stats = await response.json();
+
+    const fmt = (v) => `${Math.round(v)}m`;
+    renderSummaryPills(summaryEl, [
+      { label: stats.isBaselineOnly ? 'No completed sessions yet' : `${stats.sessions} dining session${stats.sessions === 1 ? '' : 's'}` },
+      { label: `Est. table occupancy: ${fmt(stats.averageEstimatedOccupancyMinutes)}`, cls: 'pill-approved' },
+    ]);
+
+    const waitPlusPrepLabel = stats.isBaselineOnly
+      ? `~${fmt(stats.averageWaitPlusPrepMinutes)} (no completed orders yet — generic baseline)`
+      : `${fmt(stats.averageWaitPlusPrepMinutes)} (real average from completed orders)`;
+
+    detailEl.innerHTML = `
+      ${stats.isBaselineOnly ? '<p class="hint">Showing a generic single-entree example — this will switch to your own restaurant\'s real data once dining sessions complete.</p>' : ''}
+      <div class="data-table">
+        <table>
+          <thead><tr><th>What's driving the estimate</th><th>Minutes</th></tr></thead>
+          <tbody>
+            <tr><td>Deciding what to order before the first order is placed</td><td>${fmt(stats.arrivalToOrderMinutes)}</td></tr>
+            <tr><td>Wait + kitchen prep time</td><td>${waitPlusPrepLabel}</td></tr>
+            <tr><td>Eating/drinking what was ordered</td><td>${fmt(stats.averageEstimatedEatingMinutes)}</td></tr>
+            <tr><td>Conversation, paying, and getting up to leave</td><td>${fmt(stats.socialOverheadMinutes)}</td></tr>
+            <tr><td><strong>Total estimated table occupancy</strong></td><td><strong>${fmt(stats.averageEstimatedOccupancyMinutes)}</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (error) {
+    summaryEl.innerHTML = '';
+    detailEl.innerHTML = `<p class="status status-error">${escapeHtmlAnalytics(error.message)}</p>`;
+  }
+}
+
 function categoryLabel(category) {
   return { website: 'Website', food: 'Food', service: 'Service', other: 'Other' }[category] || category;
 }
@@ -421,10 +462,12 @@ document.getElementById('reload-feedback-btn').addEventListener('click', loadFee
 
 document.getElementById('range-select').addEventListener('change', loadAnalytics);
 document.getElementById('range-select').addEventListener('change', loadDeliveryStats);
+document.getElementById('range-select').addEventListener('change', loadOccupancyStats);
 document.getElementById('reload-menu-health-btn').addEventListener('click', loadMenuHealthReports);
 
 initAnalyticsLayout();
 loadAnalytics();
 loadMenuHealthReports();
 loadDeliveryStats();
+loadOccupancyStats();
 loadFeedback();
