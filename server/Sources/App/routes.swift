@@ -157,6 +157,29 @@ func routes(_ app: Application) throws {
         return try await req.fileio.asyncStreamFile(at: Uploads.directory + filename)
     }
 
+    app.on(.DELETE, "api", "uploads", ":filename") { req throws -> HTTPStatus in
+        try requireLogin(req)
+        guard let filename = req.parameters.get("filename"), !filename.contains("..") else {
+            throw Abort(.badRequest)
+        }
+        // Refuse to delete a photo still in use — callers must repoint every
+        // referencing menu item at a replacement first (see MenuStore.get()).
+        let url = "/uploads/\(filename)"
+        let menu = try MenuStore.shared.get()
+        let stillReferenced = menu.categories.contains { category in
+            category.items.contains { $0.images.contains(url) }
+        }
+        guard !stillReferenced else {
+            throw Abort(.conflict, reason: "This photo is still used by a menu item — remove or repoint it first.")
+        }
+        let path = Uploads.directory + filename
+        guard FileManager.default.fileExists(atPath: path) else {
+            throw Abort(.notFound)
+        }
+        try FileManager.default.removeItem(atPath: path)
+        return .noContent
+    }
+
     registerPlacesPhotoRoutes(app)
 
     app.get("api", "events") { _ throws -> EventsList in

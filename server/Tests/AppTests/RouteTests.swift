@@ -394,6 +394,65 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testDeleteUploadRefusesWhileReferencedThenSucceedsOnceFreed() throws {
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        let path = Uploads.directory + "dup.jpg"
+        try Data("fake image bytes".utf8).write(to: URL(fileURLWithPath: path))
+
+        let menuBody = ByteBuffer(string: #"""
+        {"restaurant":"Ohana","lastUpdated":"now","categories":[
+          {"section":"menu","name":"Rolls","note":null,"items":[
+            {"id":"item-1","name":"Volcano Roll","description":null,"price":14,"images":["/uploads/dup.jpg"],"tags":[],"featured":false,"available":true,"happyHour":false}
+          ]}
+        ]}
+        """#)
+        try app.test(.PUT, "api/menu", headers: ["Content-Type": "application/json", "Cookie": cookie], body: menuBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+
+        try app.test(.DELETE, "api/uploads/dup.jpg", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .conflict, "still referenced by item-1, shouldn't delete out from under it")
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: path))
+
+        let freedMenuBody = ByteBuffer(string: #"""
+        {"restaurant":"Ohana","lastUpdated":"now","categories":[
+          {"section":"menu","name":"Rolls","note":null,"items":[
+            {"id":"item-1","name":"Volcano Roll","description":null,"price":14,"images":[],"tags":[],"featured":false,"available":true,"happyHour":false}
+          ]}
+        ]}
+        """#)
+        try app.test(.PUT, "api/menu", headers: ["Content-Type": "application/json", "Cookie": cookie], body: freedMenuBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+
+        try app.test(.DELETE, "api/uploads/dup.jpg") { res in
+            XCTAssertEqual(res.status, .unauthorized, "deleting an upload requires a logged-in employee")
+        }
+        try app.test(.DELETE, "api/uploads/dup.jpg", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .noContent)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: path))
+
+        try app.test(.DELETE, "api/uploads/dup.jpg", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .notFound, "already deleted")
+        }
+
+        try app.test(.DELETE, "api/uploads/..%2F..%2Fetc%2Fpasswd", headers: ["Cookie": cookie]) { res in
+            // Vapor's router rejects the encoded ".." segments before this
+            // route's own ".." guard ever runs — still blocked either way.
+            XCTAssertEqual(res.status, .forbidden, "path traversal attempt")
+        }
+    }
+
     func testEventsWriteRequiresAdmin() throws {
         let body = ByteBuffer(string: #"{"events":[]}"#)
         try app.test(.PUT, "api/events", headers: ["Content-Type": "application/json"], body: body) { res in
