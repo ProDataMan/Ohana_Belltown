@@ -12,17 +12,20 @@
       <header class="hero">
         <p class="eyebrow">Ohana Belltown — Staff</p>
         <h1>Staff Rewards</h1>
+        <p style="font-size: 1.1rem;"><strong>100 points ≈ $1 of reward value.</strong></p>
         <p>
           A points card for keeping the site itself up to date — points are scaled to effort:
-          marking a special or updating a price is worth 1 point, adding a photo or an event is
-          worth 2, and a social media post is worth 3 (roughly $1 of reward per point). Editing a
-          menu item auto-awards the relevant points; adding an event does too. Staff can log their
-          own unverifiable activity (like a social post) from <a href="/account.html">My Account</a>,
-          or award points by hand below for anything else worth recognizing.
+          marking a special or updating a price is worth 100 points, adding a photo or an event is
+          worth 200, and a social media post is worth 300. Editing a menu item auto-awards the
+          relevant points; adding an event does too. Staff can log unverifiable "other" activity
+          from <a href="/account.html">My Account</a> instantly, but a social media post needs a
+          link and goes to the <strong>Social Media Requests</strong> queue below for approval
+          first — those points aren't credited until you approve it.
         </p>
         <p>
-          <strong>10 points = one free Classic Ohana Roll or Happy Hour appetizer</strong> (see the
-          <a href="/happy-hour">Happy Hour menu</a>) — redeem it below once a staff member gets there.
+          Points are redeemed from the <strong>Reward Catalog</strong> below — food items are priced
+          against the <a href="/happy-hour">Happy Hour menu</a>; swag is listed but not yet
+          redeemable until it has a real point cost.
         </p>
         <p class="admin-link"><a href="/menu">&larr; Back to menu</a></p>
         <div class="staff-tools-nav">
@@ -40,6 +43,17 @@
       </header>
 
       <section class="panel">
+        <div class="editor-toolbar">
+          <h2>Social Media Requests</h2>
+          <div class="toolbar-actions">
+            <button id="reload-social-requests-btn" type="button" class="secondary">Reload</button>
+          </div>
+        </div>
+        <p class="hint">Staff submit a link when they post about Ohana — approve to credit the points (300), deny to skip it.</p>
+        <div id="social-requests-list"></div>
+      </section>
+
+      <section class="panel">
         <h2>Award Points</h2>
         <form id="award-form">
           <label>Staff member
@@ -47,12 +61,12 @@
           </label>
           <label>Reason
             <select id="award-category-select">
-              <option value="social">Social media post (3 points)</option>
-              <option value="photo">Added a photo (2 points)</option>
-              <option value="price">Updated a price (1 point)</option>
-              <option value="special">Marked a special (1 point)</option>
-              <option value="event">Added an event (2 points)</option>
-              <option value="other">Other (2 points)</option>
+              <option value="social">Social media post (300 points)</option>
+              <option value="photo">Added a photo (200 points)</option>
+              <option value="price">Updated a price (100 points)</option>
+              <option value="special">Marked a special (100 points)</option>
+              <option value="event">Added an event (200 points)</option>
+              <option value="other">Other (200 points)</option>
             </select>
           </label>
           <label>Note (optional)
@@ -61,6 +75,26 @@
           <button type="submit">Award Points</button>
           <p id="award-status" class="status"></p>
         </form>
+      </section>
+
+      <section class="panel">
+        <div class="editor-toolbar">
+          <h2>Reward Catalog</h2>
+          <div class="toolbar-actions">
+            <button id="reload-catalog-btn" type="button" class="secondary">Reload</button>
+          </div>
+        </div>
+        <p class="hint">Leave a point cost blank for a placeholder item (like swag waiting on a real price) — it'll show up here but can't be redeemed until priced.</p>
+        <div id="catalog-list"></div>
+        <form id="catalog-form" style="margin-top: 1rem;">
+          <div class="cta-row">
+            <input type="text" id="new-catalog-name-input" placeholder="Item name (e.g. Ohana Koozie)" />
+            <input type="number" id="new-catalog-cost-input" min="1" placeholder="Point cost (optional)" style="max-width: 10rem;" />
+            <button type="submit" class="secondary">Add Item</button>
+          </div>
+        </form>
+        <button id="save-catalog-btn" type="button" style="margin-top: 0.75rem;">Save Catalog</button>
+        <p id="catalog-status" class="status"></p>
       </section>
 
       <section class="panel">

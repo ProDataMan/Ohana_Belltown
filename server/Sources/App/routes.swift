@@ -40,6 +40,20 @@ struct StaffRewardSelfReportRequest: Content {
     var note: String?
 }
 
+struct StaffRewardRedeemRequest: Content {
+    var catalogItemId: String
+    var note: String?
+}
+
+struct StaffSocialRequestSubmission: Content {
+    var link: String
+    var note: String?
+}
+
+struct StaffRewardReviewRequest: Content {
+    var approve: Bool
+}
+
 struct FeedbackSubmission: Content {
     var category: String
     var rating: Int?
@@ -231,10 +245,46 @@ func routes(_ app: Application) throws {
         return try StaffRewardsStore.shared.recentEvents(limit: limit)
     }
 
+    // The reward catalog — what points can actually be redeemed for. Staff
+    // can see it (so they know what they're saving toward); only an admin
+    // can change what's in it or set/update a point cost.
+    app.get("api", "staff-rewards", "catalog") { req throws -> [RewardCatalogItem] in
+        try requireLogin(req)
+        return try StaffRewardsStore.shared.catalog()
+    }
+
+    app.put("api", "staff-rewards", "catalog") { req throws -> [RewardCatalogItem] in
+        try requireAdmin(req)
+        let items = try req.content.decode([RewardCatalogItem].self)
+        return try StaffRewardsStore.shared.saveCatalog(items)
+    }
+
     app.post("api", "staff-rewards", "log") { req throws -> StaffRewardStatus in
         let staff = try requireLogin(req)
         let body = try req.content.decode(StaffRewardSelfReportRequest.self)
         return try StaffRewardsStore.shared.selfReport(staffId: staff.id, category: body.category, note: body.note)
+    }
+
+    // Social media posts can't be auto-detected, so instead of an instant
+    // self-report they go through a request/approval queue (mirroring the
+    // customer loyalty bonus-request flow above) — a link is required, and
+    // no points land until an admin approves it.
+    app.post("api", "staff-rewards", "social-requests") { req throws -> StaffSocialRequest in
+        let staff = try requireLogin(req)
+        let body = try req.content.decode(StaffSocialRequestSubmission.self)
+        return try StaffRewardsStore.shared.submitSocialRequest(staffId: staff.id, link: body.link, note: body.note)
+    }
+
+    app.get("api", "staff-rewards", "social-requests") { req throws -> [StaffSocialRequest] in
+        try requireAdmin(req)
+        return try StaffRewardsStore.shared.allSocialRequests()
+    }
+
+    app.post("api", "staff-rewards", "social-requests", ":id", "review") { req throws -> StaffSocialRequest in
+        let admin = try requireAdmin(req)
+        guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
+        let body = try req.content.decode(StaffRewardReviewRequest.self)
+        return try StaffRewardsStore.shared.reviewSocialRequest(id: id, approve: body.approve, reviewerId: admin.id)
     }
 
     app.post("api", "staff-rewards", "award") { req throws -> StaffRewardStatus in
@@ -248,7 +298,8 @@ func routes(_ app: Application) throws {
     app.post("api", "staff-rewards", ":staffId", "redeem") { req throws -> StaffRewardStatus in
         try requireAdmin(req)
         guard let staffId = req.parameters.get("staffId") else { throw Abort(.badRequest) }
-        return try StaffRewardsStore.shared.redeem(staffId: staffId, note: req.query[String.self, at: "note"])
+        let body = try req.content.decode(StaffRewardRedeemRequest.self)
+        return try StaffRewardsStore.shared.redeem(staffId: staffId, catalogItemId: body.catalogItemId, note: body.note)
     }
 
     app.post("api", "loyalty", "lookup") { req throws -> LoyaltyStatus in

@@ -17,60 +17,115 @@ final class StaffRewardsStoreTests: XCTestCase {
     func testStatusCreatesZeroPointCardForNewStaff() throws {
         let status = try StaffRewardsStore.shared.status(staffId: "staff-1")
         XCTAssertEqual(status.points, 0)
-        XCTAssertEqual(status.pointsNeeded, 10)
+        // Default catalog's only priced item ("roll-or-appetizer") costs 1000;
+        // hat/tshirt are unpriced placeholders and don't count.
+        XCTAssertEqual(status.pointsNeeded, 1000)
         XCTAssertFalse(status.rewardReady)
     }
 
     func testAwardAccumulatesPointsByCategoryValue() throws {
-        // photo = 2 points, price = 1 point.
+        // photo = 200 points, price = 100 points.
         try StaffRewardsStore.shared.award(staffId: "staff-1", category: "photo", note: nil, awardedBy: nil)
         let status = try StaffRewardsStore.shared.award(staffId: "staff-1", category: "price", note: nil, awardedBy: "admin-1")
-        XCTAssertEqual(status.points, 3)
+        XCTAssertEqual(status.points, 300)
     }
 
     func testAwardRejectsUnknownCategory() throws {
         XCTAssertThrowsError(try StaffRewardsStore.shared.award(staffId: "staff-1", category: "bogus", note: nil, awardedBy: nil))
     }
 
-    func testSelfReportAcceptsOnlyUnverifiableCategories() throws {
-        // social = 3 points.
-        let status = try StaffRewardsStore.shared.selfReport(staffId: "staff-1", category: "social", note: "Instagram post")
-        XCTAssertEqual(status.points, 3)
+    func testSelfReportOnlyAcceptsOther() throws {
+        // "other" = 200 points, credited instantly.
+        let status = try StaffRewardsStore.shared.selfReport(staffId: "staff-1", category: "other", note: "Helped set up the patio")
+        XCTAssertEqual(status.points, 200)
 
-        XCTAssertThrowsError(try StaffRewardsStore.shared.selfReport(staffId: "staff-1", category: "photo", note: nil)) { error in
+        // "social" now goes through submitSocialRequest instead — self-reporting it directly is rejected.
+        XCTAssertThrowsError(try StaffRewardsStore.shared.selfReport(staffId: "staff-1", category: "social", note: nil)) { error in
             guard let rewardError = error as? StaffRewardError else { return XCTFail("wrong error type") }
             XCTAssertEqual(rewardError, .invalidCategory)
         }
+        XCTAssertThrowsError(try StaffRewardsStore.shared.selfReport(staffId: "staff-1", category: "photo", note: nil))
         XCTAssertThrowsError(try StaffRewardsStore.shared.selfReport(staffId: "staff-1", category: "price", note: nil))
         XCTAssertThrowsError(try StaffRewardsStore.shared.selfReport(staffId: "staff-1", category: "special", note: nil))
         XCTAssertThrowsError(try StaffRewardsStore.shared.selfReport(staffId: "staff-1", category: "event", note: nil))
     }
 
-    func testSelfReportedPointsCountAgainstTheDailyAutoAwardCap() throws {
-        // "other" = 2 points; 5 self-reports exactly reach the 10-point daily cap.
+    func testSubmitSocialRequestRequiresANonEmptyLink() throws {
+        XCTAssertThrowsError(try StaffRewardsStore.shared.submitSocialRequest(staffId: "staff-1", link: "   ", note: nil)) { error in
+            guard let rewardError = error as? StaffRewardError else { return XCTFail("wrong error type") }
+            XCTAssertEqual(rewardError, .linkRequired)
+        }
+    }
+
+    func testSocialRequestGrantsNoPointsUntilApproved() throws {
+        let request = try StaffRewardsStore.shared.submitSocialRequest(staffId: "staff-1", link: "https://instagram.com/p/abc", note: "New roll")
+        XCTAssertEqual(request.status, "pending")
+
+        let statusBeforeReview = try StaffRewardsStore.shared.status(staffId: "staff-1")
+        XCTAssertEqual(statusBeforeReview.points, 0)
+
+        let reviewed = try StaffRewardsStore.shared.reviewSocialRequest(id: request.id, approve: true, reviewerId: "admin-1")
+        XCTAssertEqual(reviewed.status, "approved")
+
+        let statusAfterReview = try StaffRewardsStore.shared.status(staffId: "staff-1")
+        XCTAssertEqual(statusAfterReview.points, 300, "approving credits the social point value")
+    }
+
+    func testDeniedSocialRequestGrantsNoPoints() throws {
+        let request = try StaffRewardsStore.shared.submitSocialRequest(staffId: "staff-1", link: "https://instagram.com/p/abc", note: nil)
+        try StaffRewardsStore.shared.reviewSocialRequest(id: request.id, approve: false, reviewerId: "admin-1")
+        let status = try StaffRewardsStore.shared.status(staffId: "staff-1")
+        XCTAssertEqual(status.points, 0)
+    }
+
+    func testSocialRequestCannotBeReviewedTwice() throws {
+        let request = try StaffRewardsStore.shared.submitSocialRequest(staffId: "staff-1", link: "https://instagram.com/p/abc", note: nil)
+        try StaffRewardsStore.shared.reviewSocialRequest(id: request.id, approve: true, reviewerId: "admin-1")
+        XCTAssertThrowsError(try StaffRewardsStore.shared.reviewSocialRequest(id: request.id, approve: true, reviewerId: "admin-1")) { error in
+            guard let rewardError = error as? StaffRewardError else { return XCTFail("wrong error type") }
+            XCTAssertEqual(rewardError, .socialRequestAlreadyReviewed)
+        }
+    }
+
+    func testApprovedSocialRequestIsExemptFromTheDailyAutoAwardCap() throws {
+        // Fill the daily cap with "other" self-reports first.
         for _ in 1...5 {
             try StaffRewardsStore.shared.selfReport(staffId: "staff-1", category: "other", note: nil)
         }
         let atCap = try StaffRewardsStore.shared.status(staffId: "staff-1")
         XCTAssertEqual(atCap.points, StaffRewardsStore.maxAutoPointsPerDay)
 
-        let stillCapped = try StaffRewardsStore.shared.selfReport(staffId: "staff-1", category: "social", note: nil)
+        let request = try StaffRewardsStore.shared.submitSocialRequest(staffId: "staff-1", link: "https://instagram.com/p/abc", note: nil)
+        try StaffRewardsStore.shared.reviewSocialRequest(id: request.id, approve: true, reviewerId: "admin-1")
+        let afterApproval = try StaffRewardsStore.shared.status(staffId: "staff-1")
+        XCTAssertEqual(afterApproval.points, StaffRewardsStore.maxAutoPointsPerDay + 300, "an admin-approved request isn't capped by the daily auto-award limit")
+    }
+
+    func testSelfReportedPointsCountAgainstTheDailyAutoAwardCap() throws {
+        // "other" = 200 points; 5 self-reports exactly reach the 1000-point daily cap.
+        for _ in 1...5 {
+            try StaffRewardsStore.shared.selfReport(staffId: "staff-1", category: "other", note: nil)
+        }
+        let atCap = try StaffRewardsStore.shared.status(staffId: "staff-1")
+        XCTAssertEqual(atCap.points, StaffRewardsStore.maxAutoPointsPerDay)
+
+        let stillCapped = try StaffRewardsStore.shared.selfReport(staffId: "staff-1", category: "other", note: nil)
         XCTAssertEqual(stillCapped.points, StaffRewardsStore.maxAutoPointsPerDay, "self-reports shouldn't bypass the daily cap the way admin grants do")
     }
 
-    func testTenPointsMakeRewardReady() throws {
+    func testEnoughPointsMakeRewardReady() throws {
         // Manual grants (awardedBy set) aren't subject to the daily auto-award cap.
-        // "other" = 2 points, so 5 grants reach the 10-point threshold.
+        // "other" = 200 points, so 5 grants reach the 1000-point threshold.
         for _ in 1...5 {
             try StaffRewardsStore.shared.award(staffId: "staff-1", category: "other", note: nil, awardedBy: "admin-1")
         }
         let status = try StaffRewardsStore.shared.status(staffId: "staff-1")
         XCTAssertTrue(status.rewardReady)
-        XCTAssertEqual(status.points, 10)
+        XCTAssertEqual(status.points, 1000)
     }
 
     func testAutoAwardsCapAtDailyLimitButManualGrantsDoNot() throws {
-        // "photo" = 2 points each; the 10-point cap is hit after 5 of the 8 attempts.
+        // "photo" = 200 points each; the 1000-point cap is hit after 5 of the 8 attempts.
         for _ in 1...8 {
             try StaffRewardsStore.shared.award(staffId: "staff-1", category: "photo", note: nil, awardedBy: nil)
         }
@@ -78,22 +133,64 @@ final class StaffRewardsStoreTests: XCTestCase {
         XCTAssertEqual(status.points, StaffRewardsStore.maxAutoPointsPerDay, "auto-awards should stop at the daily cap")
 
         let afterManual = try StaffRewardsStore.shared.award(staffId: "staff-1", category: "social", note: "Instagram post", awardedBy: "admin-1")
-        XCTAssertEqual(afterManual.points, StaffRewardsStore.maxAutoPointsPerDay + 3, "a manual grant (social = 3 points) should still land past the auto cap")
+        XCTAssertEqual(afterManual.points, StaffRewardsStore.maxAutoPointsPerDay + 300, "a manual grant (social = 300 points) should still land past the auto cap")
     }
 
-    func testRedeemRequiresTenPointsAndResetsCount() throws {
-        // "price" = 1 point each, for simple exact-total math.
+    func testRedeemRequiresEnoughPointsForTheChosenCatalogItem() throws {
+        // "price" = 100 points each; the default "roll-or-appetizer" item costs 1000.
         for _ in 1...5 {
             try StaffRewardsStore.shared.award(staffId: "staff-1", category: "price", note: nil, awardedBy: "admin-1")
         }
-        XCTAssertThrowsError(try StaffRewardsStore.shared.redeem(staffId: "staff-1", note: nil))
+        XCTAssertThrowsError(try StaffRewardsStore.shared.redeem(staffId: "staff-1", catalogItemId: "roll-or-appetizer", note: nil))
 
         for _ in 1...5 {
             try StaffRewardsStore.shared.award(staffId: "staff-1", category: "price", note: nil, awardedBy: "admin-1")
         }
-        let redeemed = try StaffRewardsStore.shared.redeem(staffId: "staff-1", note: "Free roll")
+        let redeemed = try StaffRewardsStore.shared.redeem(staffId: "staff-1", catalogItemId: "roll-or-appetizer", note: "Free roll")
         XCTAssertEqual(redeemed.points, 0)
         XCTAssertEqual(redeemed.totalRedeemed, 1)
+    }
+
+    func testRedeemRejectsUnknownCatalogItem() throws {
+        try StaffRewardsStore.shared.award(staffId: "staff-1", category: "other", note: nil, awardedBy: "admin-1")
+        XCTAssertThrowsError(try StaffRewardsStore.shared.redeem(staffId: "staff-1", catalogItemId: "bogus-item", note: nil)) { error in
+            guard let rewardError = error as? StaffRewardError else { return XCTFail("wrong error type") }
+            XCTAssertEqual(rewardError, .catalogItemNotFound)
+        }
+    }
+
+    func testRedeemRejectsAnUnpricedCatalogItem() throws {
+        // 10000 points is plenty, but "hat" is a placeholder with no price yet.
+        for _ in 1...50 {
+            try StaffRewardsStore.shared.award(staffId: "staff-1", category: "social", note: nil, awardedBy: "admin-1")
+        }
+        XCTAssertThrowsError(try StaffRewardsStore.shared.redeem(staffId: "staff-1", catalogItemId: "hat", note: nil)) { error in
+            guard let rewardError = error as? StaffRewardError else { return XCTFail("wrong error type") }
+            XCTAssertEqual(rewardError, .catalogItemNotPriced)
+        }
+    }
+
+    func testDefaultCatalogSeedsFoodRewardPricedAndSwagAsPlaceholders() throws {
+        let items = try StaffRewardsStore.shared.catalog()
+        let byId = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+        XCTAssertEqual(byId["roll-or-appetizer"]?.pointCost, 1000)
+        XCTAssertNotNil(byId["hat"], "hat should exist as a placeholder")
+        XCTAssertNil(byId["hat"]?.pointCost, "hat shouldn't have a price yet")
+        XCTAssertNotNil(byId["tshirt"], "tshirt should exist as a placeholder")
+        XCTAssertNil(byId["tshirt"]?.pointCost, "tshirt shouldn't have a price yet")
+    }
+
+    func testSaveCatalogReplacesItemsAndAffectsPointsNeeded() throws {
+        try StaffRewardsStore.shared.saveCatalog([
+            RewardCatalogItem(id: "sticker", name: "Ohana Sticker", pointCost: 50),
+            RewardCatalogItem(id: "hat", name: "Ohana Hat", pointCost: 800),
+        ])
+        let items = try StaffRewardsStore.shared.catalog()
+        XCTAssertEqual(items.count, 2)
+
+        // pointsNeeded should now reflect the cheapest priced item (50), not the old default (1000).
+        let status = try StaffRewardsStore.shared.status(staffId: "staff-1")
+        XCTAssertEqual(status.pointsNeeded, 50)
     }
 
     func testAwardForMenuEditDetectsPhotoAndPriceAndSpecial() throws {
@@ -106,8 +203,8 @@ final class StaffRewardsStoreTests: XCTestCase {
         StaffRewardsStore.shared.awardForMenuEdit(staffId: "staff-1", before: before, after: after)
 
         let status = try StaffRewardsStore.shared.status(staffId: "staff-1")
-        // photo (2) + price (1) + special (1) = 4.
-        XCTAssertEqual(status.points, 4, "photo added, price set, and marked featured should each earn their category's points")
+        // photo (200) + price (100) + special (100) = 400.
+        XCTAssertEqual(status.points, 400, "photo added, price set, and marked featured should each earn their category's points")
     }
 
     func testAwardForMenuEditIgnoresUnchangedFields() throws {
@@ -140,6 +237,6 @@ final class StaffRewardsStoreTests: XCTestCase {
     func testEventsRecordThePointValueTheyWereWorth() throws {
         try StaffRewardsStore.shared.award(staffId: "staff-1", category: "social", note: nil, awardedBy: "admin-1")
         let events = try StaffRewardsStore.shared.recentEvents(limit: 10)
-        XCTAssertEqual(events.first?.points, 3)
+        XCTAssertEqual(events.first?.points, 300)
     }
 }

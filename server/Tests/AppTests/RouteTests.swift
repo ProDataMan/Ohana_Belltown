@@ -475,7 +475,7 @@ final class RouteTests: XCTestCase {
             XCTAssertEqual(res.status, .ok)
         }
 
-        // Adds a photo (2 pts), sets a price (1 pt), and marks it featured (1 pt) all in one edit — 4 points total.
+        // Adds a photo (200 pts), sets a price (100 pts), and marks it featured (100 pts) — 400 points total.
         let patchBody = ByteBuffer(string: #"""
         {"name":"Volcano Roll","description":null,"price":18,"images":["/uploads/a.jpg"],"tags":[],"featured":true,"available":true,"happyHour":false}
         """#)
@@ -486,7 +486,8 @@ final class RouteTests: XCTestCase {
         try app.test(.GET, "api/staff-rewards/me", headers: ["Cookie": cookie]) { res in
             XCTAssertEqual(res.status, .ok)
             let status = try res.content.decode(StaffRewardStatus.self)
-            XCTAssertEqual(status.points, 4)
+            // photo (200) + price (100) + special (100) = 400.
+            XCTAssertEqual(status.points, 400)
         }
     }
 
@@ -507,7 +508,7 @@ final class RouteTests: XCTestCase {
         try app.test(.POST, "api/staff-rewards/award", headers: ["Content-Type": "application/json", "Cookie": cookie], body: awardBody) { res in
             XCTAssertEqual(res.status, .ok)
             let status = try res.content.decode(StaffRewardStatus.self)
-            XCTAssertEqual(status.points, 3, "social = 3 points")
+            XCTAssertEqual(status.points, 300, "social = 300 points")
         }
 
         try app.test(.GET, "api/staff-rewards") { res in
@@ -519,15 +520,16 @@ final class RouteTests: XCTestCase {
             XCTAssertEqual(cards.count, 1)
         }
 
-        try app.test(.POST, "api/staff-rewards/admin1/redeem") { res in
+        let redeemBody = ByteBuffer(string: #"{"catalogItemId":"roll-or-appetizer","note":null}"#)
+        try app.test(.POST, "api/staff-rewards/admin1/redeem", headers: ["Content-Type": "application/json"], body: redeemBody) { res in
             XCTAssertEqual(res.status, .unauthorized)
         }
-        try app.test(.POST, "api/staff-rewards/admin1/redeem", headers: ["Cookie": cookie]) { res in
-            XCTAssertEqual(res.status, .badRequest, "only 3 points so far, needs 10")
+        try app.test(.POST, "api/staff-rewards/admin1/redeem", headers: ["Content-Type": "application/json", "Cookie": cookie], body: redeemBody) { res in
+            XCTAssertEqual(res.status, .badRequest, "only 300 points so far, needs 1000 for the default reward")
         }
     }
 
-    func testStaffCanLogTheirOwnActivityButNotAllCategories() throws {
+    func testStaffCanLogOtherActivityInstantlyButNotAutoDetectedOrSocialCategories() throws {
         var sessionCookie: String?
         try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
                       body: ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)) { res in
@@ -537,19 +539,120 @@ final class RouteTests: XCTestCase {
         }
         guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
 
-        let logBody = ByteBuffer(string: #"{"category":"social","note":"Posted a reel"}"#)
+        let logBody = ByteBuffer(string: #"{"category":"other","note":"Helped set up the patio"}"#)
         try app.test(.POST, "api/staff-rewards/log", headers: ["Content-Type": "application/json"], body: logBody) { res in
             XCTAssertEqual(res.status, .unauthorized, "logging your own activity still requires being logged in")
         }
         try app.test(.POST, "api/staff-rewards/log", headers: ["Content-Type": "application/json", "Cookie": cookie], body: logBody) { res in
             XCTAssertEqual(res.status, .ok)
             let status = try res.content.decode(StaffRewardStatus.self)
-            XCTAssertEqual(status.points, 3, "social = 3 points")
+            XCTAssertEqual(status.points, 200, "other = 200 points, credited instantly")
         }
 
         let claimedPhotoBody = ByteBuffer(string: #"{"category":"photo","note":"totally added a photo, trust me"}"#)
         try app.test(.POST, "api/staff-rewards/log", headers: ["Content-Type": "application/json", "Cookie": cookie], body: claimedPhotoBody) { res in
             XCTAssertEqual(res.status, .badRequest, "photo/price/special/event can only be earned by actually doing the edit")
+        }
+
+        let claimedSocialBody = ByteBuffer(string: #"{"category":"social","note":"trust me"}"#)
+        try app.test(.POST, "api/staff-rewards/log", headers: ["Content-Type": "application/json", "Cookie": cookie], body: claimedSocialBody) { res in
+            XCTAssertEqual(res.status, .badRequest, "social posts go through the request/review queue instead of instant self-report")
+        }
+    }
+
+    func testSocialRequestNeedsALinkAndOnlyCreditsPointsOnceApproved() throws {
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        let emptyLinkBody = ByteBuffer(string: #"{"link":"","note":null}"#)
+        try app.test(.POST, "api/staff-rewards/social-requests", headers: ["Content-Type": "application/json", "Cookie": cookie], body: emptyLinkBody) { res in
+            XCTAssertEqual(res.status, .badRequest, "a link is required")
+        }
+
+        var requestId: String?
+        let submitBody = ByteBuffer(string: #"{"link":"https://instagram.com/p/abc123","note":"New roll post"}"#)
+        try app.test(.POST, "api/staff-rewards/social-requests", headers: ["Content-Type": "application/json"], body: submitBody) { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+        try app.test(.POST, "api/staff-rewards/social-requests", headers: ["Content-Type": "application/json", "Cookie": cookie], body: submitBody) { res in
+            XCTAssertEqual(res.status, .ok)
+            let request = try res.content.decode(StaffSocialRequest.self)
+            XCTAssertEqual(request.status, "pending")
+            requestId = request.id
+        }
+        guard let id = requestId else { return XCTFail("expected a request id") }
+
+        // No points yet — still pending.
+        try app.test(.GET, "api/staff-rewards/me", headers: ["Cookie": cookie]) { res in
+            let status = try res.content.decode(StaffRewardStatus.self)
+            XCTAssertEqual(status.points, 0)
+        }
+
+        try app.test(.GET, "api/staff-rewards/social-requests") { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+        try app.test(.GET, "api/staff-rewards/social-requests", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+            let requests = try res.content.decode([StaffSocialRequest].self)
+            XCTAssertEqual(requests.count, 1)
+        }
+
+        let approveBody = ByteBuffer(string: #"{"approve":true}"#)
+        try app.test(.POST, "api/staff-rewards/social-requests/\(id)/review", headers: ["Content-Type": "application/json"], body: approveBody) { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+        try app.test(.POST, "api/staff-rewards/social-requests/\(id)/review", headers: ["Content-Type": "application/json", "Cookie": cookie], body: approveBody) { res in
+            XCTAssertEqual(res.status, .ok)
+            let request = try res.content.decode(StaffSocialRequest.self)
+            XCTAssertEqual(request.status, "approved")
+        }
+
+        try app.test(.GET, "api/staff-rewards/me", headers: ["Cookie": cookie]) { res in
+            let status = try res.content.decode(StaffRewardStatus.self)
+            XCTAssertEqual(status.points, 300, "approval credits the social point value")
+        }
+
+        // Reviewing again should fail — it's already been decided.
+        try app.test(.POST, "api/staff-rewards/social-requests/\(id)/review", headers: ["Content-Type": "application/json", "Cookie": cookie], body: approveBody) { res in
+            XCTAssertEqual(res.status, .badRequest)
+        }
+    }
+
+    func testRewardCatalogRequiresLoginToViewAndAdminToEdit() throws {
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        try app.test(.GET, "api/staff-rewards/catalog") { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+        try app.test(.GET, "api/staff-rewards/catalog", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+            let items = try res.content.decode([RewardCatalogItem].self)
+            XCTAssertTrue(items.contains { $0.id == "roll-or-appetizer" && $0.pointCost == 1000 })
+            XCTAssertTrue(items.contains { $0.id == "hat" && $0.pointCost == nil })
+            XCTAssertTrue(items.contains { $0.id == "tshirt" && $0.pointCost == nil })
+        }
+
+        let newCatalogBody = ByteBuffer(string: #"[{"id":"hat","name":"Ohana Hat","pointCost":750}]"#)
+        try app.test(.PUT, "api/staff-rewards/catalog", headers: ["Content-Type": "application/json"], body: newCatalogBody) { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+        try app.test(.PUT, "api/staff-rewards/catalog", headers: ["Content-Type": "application/json", "Cookie": cookie], body: newCatalogBody) { res in
+            XCTAssertEqual(res.status, .ok)
+            let items = try res.content.decode([RewardCatalogItem].self)
+            XCTAssertEqual(items, [RewardCatalogItem(id: "hat", name: "Ohana Hat", pointCost: 750)])
         }
     }
 

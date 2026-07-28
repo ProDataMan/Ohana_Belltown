@@ -83,22 +83,29 @@
 
       <section class="panel">
         <h2>My Rewards</h2>
-        <p class="hint">Earned automatically for keeping the site up to date — marking a special or updating a price (1 point each), or adding a photo (2 points) — or log it yourself below for anything that can't be detected automatically.</p>
-        <p class="hint">10 points = your choice of one Classic Ohana Roll or one Happy Hour appetizer (see the <a href="/happy-hour">Happy Hour menu</a>), on the house — roughly 1 point per dollar of the reward. Ask an admin to redeem it once you're there.</p>
+        <p class="hint"><strong>100 points ≈ $1 of reward value.</strong> Earned automatically for keeping the site up to date — marking a special or updating a price (100 points each), or adding a photo (200 points) — or log it yourself below for anything that can't be detected automatically.</p>
         <div id="rewards-status" class="loyalty-card-summary"></div>
         <form id="log-activity-form" style="margin-top: 1rem;">
           <label>What did you do?
             <select id="log-activity-category">
-              <option value="social">Posted on social media (3 points)</option>
-              <option value="other">Something else (2 points)</option>
+              <option value="social">Posted on social media (300 points)</option>
+              <option value="other">Something else (200 points)</option>
             </select>
+          </label>
+          <label id="social-link-label">Link to your post (required)
+            <input type="url" id="log-activity-link" placeholder="https://instagram.com/..." />
           </label>
           <label>Note (optional)
             <input type="text" id="log-activity-note" placeholder="e.g. Instagram story about the new roll" />
           </label>
           <button type="submit">Log It</button>
+          <p class="hint" id="log-activity-hint">Social media posts go to an admin for a quick approval before the points are credited — everything else is instant.</p>
           <p id="log-activity-status" class="status"></p>
         </form>
+        <div style="margin-top: 1.25rem;">
+          <h3 style="margin-bottom: 0.5rem;">What points can get you</h3>
+          <div id="catalog-view"></div>
+        </div>
       </section>
     </main>
 

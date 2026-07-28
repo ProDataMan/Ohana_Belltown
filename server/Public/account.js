@@ -78,27 +78,103 @@ async function loadRewards() {
   }
 }
 
+async function loadCatalogView() {
+  const el = document.getElementById('catalog-view');
+  if (!el) return;
+  try {
+    const [catalogResponse, statusResponse] = await Promise.all([
+      staffFetch('/api/staff-rewards/catalog'),
+      staffFetch('/api/staff-rewards/me'),
+    ]);
+    if (!catalogResponse.ok) throw new Error('Unable to load the reward catalog.');
+    const items = await catalogResponse.json();
+    const myPoints = statusResponse.ok ? (await statusResponse.json()).points : 0;
+
+    if (!items.length) {
+      el.innerHTML = '<p class="hint">Nothing in the catalog yet.</p>';
+      return;
+    }
+
+    el.innerHTML = `
+      <div class="loyalty-card-summary">
+        ${items
+          .map((item) => {
+            if (!item.pointCost) {
+              return `<span class="pill">${escapeHtmlAccount(item.name)} — price coming soon</span>`;
+            }
+            const canAfford = myPoints >= item.pointCost;
+            return `<span class="pill ${canAfford ? 'pill-approved' : ''}">${escapeHtmlAccount(item.name)} — ${item.pointCost} pts</span>`;
+          })
+          .join('')}
+      </div>
+    `;
+  } catch (error) {
+    el.textContent = error.message;
+  }
+}
+
+const logActivityCategorySelect = document.getElementById('log-activity-category');
+const socialLinkLabel = document.getElementById('social-link-label');
+const logActivityLinkInput = document.getElementById('log-activity-link');
+const logActivityHint = document.getElementById('log-activity-hint');
+
+function updateLogActivityFormForCategory() {
+  if (!logActivityCategorySelect) return;
+  const isSocial = logActivityCategorySelect.value === 'social';
+  if (socialLinkLabel) socialLinkLabel.hidden = !isSocial;
+  if (logActivityLinkInput) logActivityLinkInput.required = isSocial;
+  if (logActivityHint) {
+    logActivityHint.textContent = isSocial
+      ? 'Goes to an admin for a quick approval before the points are credited.'
+      : 'Credited instantly.';
+  }
+}
+logActivityCategorySelect?.addEventListener('change', updateLogActivityFormForCategory);
+updateLogActivityFormForCategory();
+
 document.getElementById('log-activity-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
   const statusEl = document.getElementById('log-activity-status');
-  const category = document.getElementById('log-activity-category').value;
+  const category = logActivityCategorySelect.value;
   const noteInput = document.getElementById('log-activity-note');
-  statusEl.textContent = 'Logging...';
+  statusEl.textContent = 'Submitting...';
   statusEl.classList.remove('status-error', 'status-ok');
   try {
-    const response = await staffFetch('/api/staff-rewards/log', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ category, note: noteInput.value.trim() || null }),
-    });
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
-      throw new Error(body.reason || `Failed (${response.status}).`);
+    if (category === 'social') {
+      const link = logActivityLinkInput.value.trim();
+      if (!link) {
+        statusEl.textContent = 'A link to your post is required.';
+        statusEl.classList.add('status-error');
+        return;
+      }
+      const response = await staffFetch('/api/staff-rewards/social-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ link, note: noteInput.value.trim() || null }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.reason || `Failed (${response.status}).`);
+      }
+      statusEl.textContent = 'Submitted — an admin will review it soon.';
+      statusEl.classList.add('status-ok');
+      logActivityLinkInput.value = '';
+    } else {
+      const response = await staffFetch('/api/staff-rewards/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category, note: noteInput.value.trim() || null }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.reason || `Failed (${response.status}).`);
+      }
+      statusEl.textContent = 'Logged — points added!';
+      statusEl.classList.add('status-ok');
+      await loadRewards();
+      await loadCatalogView();
     }
-    statusEl.textContent = 'Logged — points added!';
-    statusEl.classList.add('status-ok');
     noteInput.value = '';
-    await loadRewards();
   } catch (error) {
     statusEl.textContent = error.message;
     statusEl.classList.add('status-error');
@@ -213,3 +289,4 @@ document.getElementById('phone-form').addEventListener('submit', async (event) =
 
 loadProfile();
 loadRewards();
+loadCatalogView();

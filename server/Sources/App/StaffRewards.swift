@@ -3,9 +3,9 @@ import Vapor
 /// A staff member's running point balance toward a reward — same mechanic
 /// as the customer loyalty card, but earned by keeping the site itself up
 /// to date (photos, prices, specials, events) rather than by ordering food.
-/// 1 point = roughly $1 of reward value (see `StaffRewardsStore.pointValue`)
-/// — 10 points redeems one free Classic Ohana Roll or Happy Hour appetizer,
-/// which average ~$9.83 across both lists as of 2026-07-28.
+/// 100 points ≈ $1 of reward value (see `StaffRewardsStore.pointValues`) —
+/// deliberately big numbers rather than a 1:1 dollar ratio, so progress
+/// feels substantial even for small everyday actions.
 struct StaffRewardCard: Codable, Content {
     var staffId: String
     var points: Int
@@ -15,8 +15,9 @@ struct StaffRewardCard: Codable, Content {
 
     /// "punches" is the pre-2026-07-28 key name, back when every action was
     /// worth a flat 1 regardless of effort — decoding it straight into
-    /// `points` is a reasonable reinterpretation since those flat values
-    /// sat within the same 1-3 range the new per-category values use.
+    /// `points` is a reasonable reinterpretation, even though it now reads
+    /// as a tiny balance under the rescaled 100:1 system (an admin can
+    /// manually top up anyone whose history got flattened this way).
     enum CodingKeys: String, CodingKey {
         case staffId, points, punches, totalRedeemed, createdAt, updatedAt
     }
@@ -58,16 +59,16 @@ struct StaffRewardEvent: Codable, Content {
     var id: String
     var staffId: String
     /// "photo", "price", "special", "event" (auto-detected from editing
-    /// actions) or "social"/"other" (always manual — there's no API to
-    /// verify a social media post actually happened).
+    /// actions), "social"/"other" (always manual — there's no API to
+    /// verify a social media post actually happened), or "redeemed".
     var category: String
     var note: String?
     /// The admin's staff id who manually granted this, or nil if it was
     /// auto-awarded/self-reported.
     var awardedBy: String?
-    /// Points this specific event was worth at the time — stored rather
-    /// than recomputed from category, so the log stays accurate even if
-    /// point values are retuned later.
+    /// Points this specific event was worth at the time (negative for a
+    /// redemption) — stored rather than recomputed from category/catalog,
+    /// so the log stays accurate even if values are retuned later.
     var points: Int
     var createdAt: String
 
@@ -99,9 +100,58 @@ struct StaffRewardEvent: Codable, Content {
     }
 }
 
+/// Something points can be redeemed for. `pointCost` is nil for a
+/// placeholder item whose real-world cost hasn't been set yet (e.g. swag
+/// waiting on a supplier quote) — it shows up in the catalog so staff can
+/// see what's coming, but can't actually be redeemed until priced.
+struct RewardCatalogItem: Codable, Content, Equatable {
+    var id: String
+    var name: String
+    var pointCost: Int?
+
+    init(id: String = UUID().uuidString, name: String, pointCost: Int?) {
+        self.id = id
+        self.name = name
+        self.pointCost = pointCost
+    }
+}
+
+/// A staff member's request for credit on a social media post — unlike
+/// photo/price/special/event, there's no way to auto-verify a post
+/// happened, so it needs a link and an admin's approval before the points
+/// land, rather than being instant like `selfReport`'s "other" category.
+struct StaffSocialRequest: Codable, Content {
+    var id: String
+    var staffId: String
+    var link: String
+    var note: String?
+    var status: String
+    var createdAt: String
+    var reviewedAt: String?
+
+    init(id: String = UUID().uuidString, staffId: String, link: String, note: String?, status: String, createdAt: String, reviewedAt: String? = nil) {
+        self.id = id
+        self.staffId = staffId
+        self.link = link
+        self.note = note
+        self.status = status
+        self.createdAt = createdAt
+        self.reviewedAt = reviewedAt
+    }
+}
+
 struct StaffRewardsData: Codable {
     var cards: [StaffRewardCard]
     var events: [StaffRewardEvent]
+    var catalog: [RewardCatalogItem]?
+    var socialRequests: [StaffSocialRequest]?
+
+    init(cards: [StaffRewardCard], events: [StaffRewardEvent], catalog: [RewardCatalogItem]? = nil, socialRequests: [StaffSocialRequest]? = nil) {
+        self.cards = cards
+        self.events = events
+        self.catalog = catalog
+        self.socialRequests = socialRequests
+    }
 }
 
 struct StaffRewardStatus: Content {
@@ -116,6 +166,11 @@ enum StaffRewardError: Error, Equatable {
     case cardNotFound
     case noRewardAvailable
     case invalidCategory
+    case catalogItemNotFound
+    case catalogItemNotPriced
+    case linkRequired
+    case socialRequestNotFound
+    case socialRequestAlreadyReviewed
 }
 
 extension StaffRewardError: AbortError {
@@ -124,49 +179,70 @@ extension StaffRewardError: AbortError {
         case .cardNotFound: return .notFound
         case .noRewardAvailable: return .badRequest
         case .invalidCategory: return .badRequest
+        case .catalogItemNotFound: return .notFound
+        case .catalogItemNotPriced: return .badRequest
+        case .linkRequired: return .badRequest
+        case .socialRequestNotFound: return .notFound
+        case .socialRequestAlreadyReviewed: return .badRequest
         }
     }
 
     var reason: String {
         switch self {
         case .cardNotFound: return "No rewards card found for that staff member."
-        case .noRewardAvailable: return "This staff member doesn't have enough points for a reward yet."
+        case .noRewardAvailable: return "This staff member doesn't have enough points for that yet."
         case .invalidCategory: return "Unknown reward category."
+        case .catalogItemNotFound: return "That reward item doesn't exist."
+        case .catalogItemNotPriced: return "That reward's point cost hasn't been set yet."
+        case .linkRequired: return "A link to the post is required."
+        case .socialRequestNotFound: return "That request doesn't exist."
+        case .socialRequestAlreadyReviewed: return "That request has already been reviewed."
         }
     }
 }
 
 final class StaffRewardsStore: @unchecked Sendable {
     static let shared = StaffRewardsStore()
-    /// 10 points ≈ $9.83, the average cost across the Classic Ohana Rolls
-    /// ($8.90 avg) and Happy Hour appetizers ($11.00 avg) that make up the
-    /// reward — a deliberate ~$1/point anchor, not an arbitrary count.
-    static let pointsNeeded = 10
+    /// Fallback target for the progress bar if the catalog is ever empty or
+    /// entirely unpriced — otherwise `statusFor` uses the cheapest priced
+    /// catalog item instead, so the target always reflects something
+    /// actually redeemable.
+    static let pointsNeeded = 1000
     /// Points awarded per category, scaled to real effort and business
-    /// value rather than a flat amount per action:
+    /// value rather than a flat amount per action — at a 100:1 points-to-
+    /// dollar ratio (100 points ≈ $1):
     ///   - marking a special / updating a price: trivial data-entry effort
     ///   - adding a photo / adding an event: real content-creation effort
     ///   - a social media post: the most effort (shoot, write, post) and
     ///     the most marketing value, so it's worth the most
     static let pointValues: [String: Int] = [
-        "special": 1,
-        "price": 1,
-        "photo": 2,
-        "event": 2,
-        "other": 2,
-        "social": 3,
+        "special": 100,
+        "price": 100,
+        "photo": 200,
+        "event": 200,
+        "other": 200,
+        "social": 300,
     ]
     static var categories: [String] { Array(pointValues.keys) }
-    /// Categories a staff member can log for themselves, without an admin —
-    /// only the ones that can't be auto-detected from a real edit. Letting
-    /// someone self-report "photo"/"price"/"special"/"event" would let them
-    /// claim credit without actually doing the edit that's supposed to earn it.
-    static let selfReportableCategories = ["social", "other"]
+    /// Categories a staff member can log for themselves and have credited
+    /// instantly, without an admin. "social" is deliberately excluded —
+    /// unlike "other", it goes through `submitSocialRequest` instead, since
+    /// it needs a link and an admin's approval before the points land.
+    static let selfReportableCategories = ["other"]
     /// Only auto-awarded/self-reported points (not a manual admin grant)
     /// count against this — caps how many points a day repeatedly editing
     /// the same item (or repeatedly self-reporting) can earn, without
     /// limiting genuine deliberate recognition from an admin.
-    static let maxAutoPointsPerDay = 10
+    static let maxAutoPointsPerDay = 1000
+
+    /// Seeded the first time the catalog is loaded — the base food reward
+    /// (priced against real Happy Hour menu costs) plus swag placeholders
+    /// with no price yet, pending real supplier quotes.
+    static let defaultCatalog: [RewardCatalogItem] = [
+        RewardCatalogItem(id: "roll-or-appetizer", name: "Classic Ohana Roll or Happy Hour Appetizer", pointCost: 1000),
+        RewardCatalogItem(id: "hat", name: "Ohana Hat", pointCost: nil),
+        RewardCatalogItem(id: "tshirt", name: "Ohana T-Shirt", pointCost: nil),
+    ]
 
     private let lock = NSLock()
     private var fileURL = URL(fileURLWithPath: "Data/staff-rewards.json")
@@ -193,19 +269,20 @@ final class StaffRewardsStore: @unchecked Sendable {
     }
 
     private func statusFor(_ card: StaffRewardCard) -> StaffRewardStatus {
-        StaffRewardStatus(
+        let cheapestCost = (data.catalog ?? []).compactMap(\.pointCost).filter { $0 > 0 }.min() ?? Self.pointsNeeded
+        return StaffRewardStatus(
             staffId: card.staffId,
             points: card.points,
-            pointsNeeded: Self.pointsNeeded,
-            rewardReady: card.points >= Self.pointsNeeded,
+            pointsNeeded: cheapestCost,
+            rewardReady: card.points >= cheapestCost,
             totalRedeemed: card.totalRedeemed
         )
     }
 
     /// Finds a staff member's card, creating a fresh zero-point one if this
     /// is their first ever award — unlike customer loyalty cards, every
-    /// staff member should be able to see a "0/10" status right away rather
-    /// than a 404. Assumes the lock is already held.
+    /// staff member should be able to see a "0/1000" status right away
+    /// rather than a 404. Assumes the lock is already held.
     private func findOrCreateCardIndex(staffId: String) -> Int {
         if let idx = data.cards.firstIndex(where: { $0.staffId == staffId }) {
             return idx
@@ -214,6 +291,21 @@ final class StaffRewardsStore: @unchecked Sendable {
         let card = StaffRewardCard(staffId: staffId, points: 0, totalRedeemed: 0, createdAt: timestamp, updatedAt: timestamp)
         data.cards.append(card)
         return data.cards.count - 1
+    }
+
+    /// Adds points and logs the event — the shared core of every
+    /// point-granting path (auto-award, self-report, and approving a social
+    /// request). Assumes the lock is already held; callers that also need
+    /// to persist/return a status do so themselves, since NSLock isn't
+    /// reentrant and this may run from inside another locked method.
+    @discardableResult
+    private func creditPoints(staffId: String, category: String, note: String?, awardedBy: String?, pointValue: Int) -> Int {
+        let idx = findOrCreateCardIndex(staffId: staffId)
+        let timestamp = now()
+        data.events.append(StaffRewardEvent(staffId: staffId, category: category, note: note, awardedBy: awardedBy, points: pointValue, createdAt: timestamp))
+        data.cards[idx].points += pointValue
+        data.cards[idx].updatedAt = timestamp
+        return idx
     }
 
     func status(staffId: String) throws -> StaffRewardStatus {
@@ -237,6 +329,23 @@ final class StaffRewardsStore: @unchecked Sendable {
         defer { lock.unlock() }
         try loadIfNeeded()
         return data.events.reversed().sorted { $0.createdAt > $1.createdAt }.prefix(limit).map { $0 }
+    }
+
+    func catalog() throws -> [RewardCatalogItem] {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        return data.catalog ?? []
+    }
+
+    @discardableResult
+    func saveCatalog(_ items: [RewardCatalogItem]) throws -> [RewardCatalogItem] {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        data.catalog = items
+        try persist()
+        return items
     }
 
     /// Awards points for one category. `awardedBy` nil means the system
@@ -284,10 +393,7 @@ final class StaffRewardsStore: @unchecked Sendable {
                 guard autoPointsToday < Self.maxAutoPointsPerDay else { continue }
                 autoPointsToday += pointValue
             }
-            let timestamp = now()
-            data.events.append(StaffRewardEvent(staffId: staffId, category: category, note: note, awardedBy: awardedBy, points: pointValue, createdAt: timestamp))
-            data.cards[idx].points += pointValue
-            data.cards[idx].updatedAt = timestamp
+            creditPoints(staffId: staffId, category: category, note: note, awardedBy: awardedBy, pointValue: pointValue)
             awardedAny = true
         }
         if awardedAny {
@@ -326,21 +432,81 @@ final class StaffRewardsStore: @unchecked Sendable {
         return try award(staffId: staffId, category: category, note: note, awardedBy: nil)
     }
 
+    /// A staff member requesting credit for a social media post — always
+    /// needs a link, and never grants points directly; an admin has to
+    /// approve it first via `reviewSocialRequest`.
     @discardableResult
-    func redeem(staffId: String, note: String?) throws -> StaffRewardStatus {
+    func submitSocialRequest(staffId: String, link: String, note: String?) throws -> StaffSocialRequest {
+        let trimmedLink = link.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedLink.isEmpty else { throw StaffRewardError.linkRequired }
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
+        let request = StaffSocialRequest(staffId: staffId, link: trimmedLink, note: note, status: "pending", createdAt: now())
+        data.socialRequests = (data.socialRequests ?? []) + [request]
+        try persist()
+        return request
+    }
+
+    func allSocialRequests() throws -> [StaffSocialRequest] {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        return (data.socialRequests ?? []).sorted { $0.createdAt > $1.createdAt }
+    }
+
+    /// Approving credits the "social" point value to the requester,
+    /// attributed to the reviewing admin — exempt from the daily
+    /// auto-award cap, same as any other manual grant, since a human has
+    /// now verified it actually happened.
+    @discardableResult
+    func reviewSocialRequest(id: String, approve: Bool, reviewerId: String) throws -> StaffSocialRequest {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard var requests = data.socialRequests, let idx = requests.firstIndex(where: { $0.id == id }) else {
+            throw StaffRewardError.socialRequestNotFound
+        }
+        guard requests[idx].status == "pending" else {
+            throw StaffRewardError.socialRequestAlreadyReviewed
+        }
+        requests[idx].status = approve ? "approved" : "denied"
+        requests[idx].reviewedAt = now()
+        if approve {
+            let pointValue = Self.pointValues["social"] ?? 300
+            creditPoints(staffId: requests[idx].staffId, category: "social", note: requests[idx].link, awardedBy: reviewerId, pointValue: pointValue)
+        }
+        data.socialRequests = requests
+        try persist()
+        return requests[idx]
+    }
+
+    /// Redeems one catalog item for a staff member — an admin action, since
+    /// it means physically handing over food or swag. Fails if the item
+    /// doesn't exist, hasn't been priced yet, or the staff member doesn't
+    /// have enough points.
+    @discardableResult
+    func redeem(staffId: String, catalogItemId: String, note: String?) throws -> StaffRewardStatus {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard let item = (data.catalog ?? []).first(where: { $0.id == catalogItemId }) else {
+            throw StaffRewardError.catalogItemNotFound
+        }
+        guard let cost = item.pointCost, cost > 0 else {
+            throw StaffRewardError.catalogItemNotPriced
+        }
         guard let idx = data.cards.firstIndex(where: { $0.staffId == staffId }) else {
             throw StaffRewardError.cardNotFound
         }
-        guard data.cards[idx].points >= Self.pointsNeeded else {
+        guard data.cards[idx].points >= cost else {
             throw StaffRewardError.noRewardAvailable
         }
-        data.cards[idx].points -= Self.pointsNeeded
+        data.cards[idx].points -= cost
         data.cards[idx].totalRedeemed += 1
         data.cards[idx].updatedAt = now()
-        data.events.append(StaffRewardEvent(staffId: staffId, category: "redeemed", note: note, awardedBy: nil, points: -Self.pointsNeeded, createdAt: now()))
+        let combinedNote = [item.name, note].compactMap { $0 }.joined(separator: " — ")
+        data.events.append(StaffRewardEvent(staffId: staffId, category: "redeemed", note: combinedNote, awardedBy: nil, points: -cost, createdAt: now()))
         try persist()
         return statusFor(data.cards[idx])
     }
@@ -353,8 +519,11 @@ final class StaffRewardsStore: @unchecked Sendable {
             data = try JSONDecoder().decode(StaffRewardsData.self, from: raw)
         } else {
             data = StaffRewardsData(cards: [], events: [])
-            try persist()
         }
+        if data.catalog == nil {
+            data.catalog = Self.defaultCatalog
+        }
+        try persist()
         loaded = true
     }
 
