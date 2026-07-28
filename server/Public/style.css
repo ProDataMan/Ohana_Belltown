@@ -159,9 +159,16 @@ h1 {
 
 .price {
   font-weight: 800;
-  white-space: nowrap;
   color: var(--gold-text);
   font-family: var(--font-ui);
+  /* Short by default ("$28.00"), but can grow into a full breakdown once
+     add-ons are checked ("$58.70 ($28.00 + Bacon $5.50, Yosh Size $25.20)")
+     — needs to wrap onto its own lines on a narrow screen instead of
+     forcing the row wider than the viewport. min-width: 0 lets it actually
+     shrink inside the flex row rather than being held to its unwrapped width. */
+  white-space: normal;
+  overflow-wrap: break-word;
+  min-width: 0;
 }
 
 .staff-edit-link {
