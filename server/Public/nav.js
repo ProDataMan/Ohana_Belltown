@@ -119,6 +119,14 @@ function startStaffTableOrderAlerts() {
         if (data.readyCount) parts.push(`${data.readyCount} ready`);
         alertEl.textContent = `${attention} table order${attention === 1 ? '' : 's'} (${parts.join(', ')})`;
         alertEl.hidden = false;
+
+        // Jump straight to the section of whichever table needs attention
+        // first (oldest new order, or else the oldest one awaiting delivery)
+        // instead of always landing on the Dining tab.
+        const oldest = data.needsEntry[0] || data.awaitingDelivery[0];
+        alertEl.href = oldest
+          ? await getTableSection(oldest.tableId).then((section) => (section ? `/table-orders-admin.html?section=${section}` : '/table-orders-admin.html'))
+          : '/table-orders-admin.html';
       } else {
         alertEl.hidden = true;
       }

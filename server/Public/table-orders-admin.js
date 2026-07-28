@@ -116,7 +116,10 @@ async function loadTableOrders() {
 const sectionLabels = { dining: 'Dining', bar: 'Bar', sushi: 'Sushi', deck: 'Deck' };
 const sectionOrder = ['dining', 'bar', 'sushi', 'deck'];
 let floorMapEntries = [];
-let activeFloorMapSection = 'dining';
+// A link (e.g. the site-wide "N table orders" alert) can jump straight to the
+// section that needs attention via ?section=deck instead of always landing on Dining.
+const requestedFloorMapSection = new URLSearchParams(window.location.search).get('section');
+let activeFloorMapSection = sectionOrder.includes(requestedFloorMapSection) ? requestedFloorMapSection : 'dining';
 
 function renderFloorMapCanvas() {
   const canvas = document.getElementById('floor-map-canvas');
@@ -159,6 +162,24 @@ function updateFloorMapFlashing(needsEntry, awaitingDelivery) {
     const id = el.dataset.tableId;
     el.classList.toggle('flash-needs', needsIds.has(id));
     el.classList.toggle('flash-awaiting', !needsIds.has(id) && awaitingIds.has(id));
+  });
+
+  // A table in a section other than the one currently shown can't flash on
+  // the canvas (it isn't rendered), so flash that section's tab instead.
+  const tableSection = {};
+  floorMapEntries.forEach((entry) => {
+    tableSection[entry.id] = entry.section;
+  });
+  const sectionsWithNeeds = new Set(needsEntry.map((o) => tableSection[o.tableId]).filter(Boolean));
+  const sectionsWithAwaiting = new Set(awaitingDelivery.map((o) => tableSection[o.tableId]).filter(Boolean));
+  document.querySelectorAll('#floor-map-tabs button').forEach((btn) => {
+    const section = btn.dataset.section;
+    if (section === activeFloorMapSection) {
+      btn.classList.remove('tab-flash-needs', 'tab-flash-awaiting');
+      return;
+    }
+    btn.classList.toggle('tab-flash-needs', sectionsWithNeeds.has(section));
+    btn.classList.toggle('tab-flash-awaiting', !sectionsWithNeeds.has(section) && sectionsWithAwaiting.has(section));
   });
 }
 

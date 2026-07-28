@@ -1483,6 +1483,14 @@ select {
   50% { background: var(--pink); border-color: var(--pink); color: #fff; }
 }
 
+.floor-map-tabs button.tab-flash-needs {
+  animation: floorMapFlashNeeds 1s ease-in-out infinite;
+}
+
+.floor-map-tabs button.tab-flash-awaiting {
+  animation: floorMapFlashAwaiting 1.6s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .floor-map-table.flash-needs {
     animation: none;
@@ -1493,6 +1501,20 @@ select {
   .floor-map-table.flash-awaiting {
     animation: none;
     background: var(--pink);
+    color: #fff;
+  }
+
+  .floor-map-tabs button.tab-flash-needs {
+    animation: none;
+    background: var(--gold-bright);
+    border-color: var(--gold-bright);
+    color: #fff;
+  }
+
+  .floor-map-tabs button.tab-flash-awaiting {
+    animation: none;
+    background: var(--pink);
+    border-color: var(--pink);
     color: #fff;
   }
 }
