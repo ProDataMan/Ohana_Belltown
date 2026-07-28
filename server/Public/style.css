@@ -297,6 +297,24 @@ h1 {
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
 }
 
+.staff-alert-mute-toggle {
+  background: var(--panel);
+  color: var(--text-muted);
+  border: 1px solid var(--panel-border);
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.78rem;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.staff-alert-mute-toggle[aria-pressed="true"] {
+  color: var(--pink-text);
+  border-color: var(--pink);
+}
+
 .feedback-tab-btn {
   position: fixed;
   bottom: 1.5rem;
@@ -1426,6 +1444,10 @@ select {
   background: var(--gold-bright);
 }
 
+.floor-map-dot-processing {
+  background: var(--purple-bright);
+}
+
 .floor-map-dot-awaiting {
   background: var(--pink);
 }
@@ -1463,6 +1485,12 @@ select {
 
 .floor-map-table.shape-square {
   border-radius: 10px;
+}
+
+.floor-map-table.processing {
+  background: var(--purple-bright);
+  border-color: var(--purple-bright);
+  color: #fff;
 }
 
 .floor-map-table.flash-needs {

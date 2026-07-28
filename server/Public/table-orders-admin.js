@@ -194,11 +194,15 @@ function tablesEligibleForAwaitingFlash(awaitingDelivery) {
 
 function updateFloorMapFlashing(needsEntry, awaitingDelivery) {
   const needsIds = new Set(needsEntry.map((o) => o.tableId));
-  const awaitingIds = tablesEligibleForAwaitingFlash(awaitingDelivery);
+  const allAwaitingIds = new Set(awaitingDelivery.map((o) => o.tableId));
+  const eligibleAwaitingIds = tablesEligibleForAwaitingFlash(awaitingDelivery);
   document.querySelectorAll('.floor-map-table').forEach((el) => {
     const id = el.dataset.tableId;
     el.classList.toggle('flash-needs', needsIds.has(id));
-    el.classList.toggle('flash-awaiting', !needsIds.has(id) && awaitingIds.has(id));
+    el.classList.toggle('flash-awaiting', !needsIds.has(id) && eligibleAwaitingIds.has(id));
+    // Entered but not yet plausibly ready — a static color (not flashing)
+    // just to show an order's been placed and is being worked on.
+    el.classList.toggle('processing', !needsIds.has(id) && allAwaitingIds.has(id) && !eligibleAwaitingIds.has(id));
   });
 
   // A table in a section other than the one currently shown can't flash on
@@ -208,7 +212,7 @@ function updateFloorMapFlashing(needsEntry, awaitingDelivery) {
     tableSection[entry.id] = entry.section;
   });
   const sectionsWithNeeds = new Set(needsEntry.map((o) => tableSection[o.tableId]).filter(Boolean));
-  const sectionsWithAwaiting = new Set([...awaitingIds].map((tableId) => tableSection[tableId]).filter(Boolean));
+  const sectionsWithAwaiting = new Set([...eligibleAwaitingIds].map((tableId) => tableSection[tableId]).filter(Boolean));
   document.querySelectorAll('#floor-map-tabs button').forEach((btn) => {
     const section = btn.dataset.section;
     if (section === activeFloorMapSection) {

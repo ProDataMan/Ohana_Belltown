@@ -9,10 +9,13 @@ document.querySelectorAll('.nav-dropdown-toggle').forEach((btn) => {
 });
 
 (async () => {
+  // #nav-login-link only exists on public pages (the header nav) — staff
+  // admin pages have their own layout instead, but should still get the
+  // alerts/mute toggle below, so this no longer bails out without it.
   const loginLink = document.getElementById('nav-login-link');
-  if (!loginLink) return;
 
   function makeLogoutLink(logoutUrl) {
+    if (!loginLink) return;
     loginLink.textContent = 'Log Out';
     loginLink.classList.remove('active');
     loginLink.href = '#';
@@ -32,6 +35,7 @@ document.querySelectorAll('.nav-dropdown-toggle').forEach((btn) => {
     const staffResponse = await fetch('/api/auth/me');
     if (staffResponse.ok) {
       makeLogoutLink('/api/auth/logout');
+      startStaffAlertMuteToggle();
       startStaffTableOrderAlerts();
       startStaffFeedbackAlerts();
     }
@@ -39,6 +43,41 @@ document.querySelectorAll('.nav-dropdown-toggle').forEach((btn) => {
     // leave the "Log In" link as-is
   }
 })();
+
+// Whether a staff member has muted the spoken order alerts on this device.
+// Per-browser (localStorage), not per-account — deliberately simple, since
+// nothing here asked for the mute preference to follow a staff member
+// between devices.
+const ALERTS_MUTED_KEY = 'ohana_staff_alerts_muted';
+function alertsMuted() {
+  return localStorage.getItem(ALERTS_MUTED_KEY) === '1';
+}
+function setAlertsMuted(muted) {
+  localStorage.setItem(ALERTS_MUTED_KEY, muted ? '1' : '0');
+}
+
+// A small always-visible toggle (not just shown when there's an active
+// alert) so a staff member can mute/unmute regardless of what's happening
+// right now, from any page.
+function startStaffAlertMuteToggle() {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'staff-alert-mute-toggle';
+
+  function paint() {
+    const muted = alertsMuted();
+    btn.textContent = muted ? '\u{1F515} Alerts muted' : '\u{1F514} Alerts on';
+    btn.setAttribute('aria-pressed', String(muted));
+    btn.title = muted ? 'Click to turn spoken order alerts back on' : 'Click to mute spoken order alerts';
+  }
+
+  paint();
+  btn.addEventListener('click', () => {
+    setAlertsMuted(!alertsMuted());
+    paint();
+  });
+  getStaffAlertsContainer().appendChild(btn);
+}
 
 function getStaffAlertsContainer() {
   let container = document.getElementById('staff-alerts-container');
@@ -75,11 +114,60 @@ async function getTableSection(tableId) {
 // it. Best-effort: some browsers won't play audio at all until the page has
 // had a user interaction, and that's fine — the visual badge below still works.
 function announceNewOrder(tableId, section) {
-  if (!window.speechSynthesis) return;
+  if (alertsMuted() || !window.speechSynthesis) return;
   const sectionLabel = section ? `, ${section}` : '';
   const utterance = new SpeechSynthesisUtterance(`New order, table ${tableId}${sectionLabel}`);
   utterance.rate = 0.95;
   window.speechSynthesis.speak(utterance);
+}
+
+// Speaks once a table has plausibly had enough time to cook — see
+// tablesEligibleForAwaitingFlash for the exact threshold. "Order up" is the
+// standard kitchen call for "this is ready," so it reads as unambiguous to
+// staff rather than another generic chime.
+function announceOrderUp(tableId, section) {
+  if (alertsMuted() || !window.speechSynthesis) return;
+  const sectionLabel = section ? `, ${section}` : '';
+  const utterance = new SpeechSynthesisUtterance(`Order up, table ${tableId}${sectionLabel}`);
+  utterance.rate = 0.95;
+  window.speechSynthesis.speak(utterance);
+}
+
+// A table shouldn't be announced/flashed as ready for delivery the instant
+// an order is entered — that's before the kitchen could plausibly have it
+// ready. It becomes eligible once we're at whichever is greater: the average
+// prep time of the single slowest dish still cooking there, or half the
+// combined average prep time of everything cooking there. Mirrors the same
+// function in table-orders-admin.js — duplicated rather than shared since
+// these are separate plain <script> files with no module loader between them.
+function tablesEligibleForAwaitingFlash(awaitingDelivery) {
+  const byTable = {};
+  awaitingDelivery.forEach((o) => {
+    (byTable[o.tableId] = byTable[o.tableId] || []).push(o);
+  });
+
+  const eligible = new Set();
+  Object.entries(byTable).forEach(([tableId, orders]) => {
+    const durationsMs = [];
+    const enteredTimesMs = [];
+    orders.forEach((o) => {
+      if (!o.enteredAt || !o.estimatedReadyAt) return;
+      const entered = new Date(o.enteredAt).getTime();
+      const ready = new Date(o.estimatedReadyAt).getTime();
+      durationsMs.push(ready - entered);
+      enteredTimesMs.push(entered);
+    });
+    if (!durationsMs.length) return;
+
+    const longestDishMs = Math.max(...durationsMs);
+    const halfOfTotalPrepMs = durationsMs.reduce((sum, d) => sum + d, 0) / 2;
+    const delayMs = Math.max(longestDishMs, halfOfTotalPrepMs);
+    const earliestEnteredMs = Math.min(...enteredTimesMs);
+    if (Date.now() - earliestEnteredMs >= delayMs) {
+      eligible.add(tableId);
+    }
+  });
+  return eligible;
 }
 
 // A small floating indicator, shown site-wide to a logged-in staff member
@@ -96,6 +184,7 @@ function startStaffTableOrderAlerts() {
   // null until the first poll establishes a baseline, so page-load doesn't
   // announce every order that was already waiting before this tab opened.
   let knownOrderIds = null;
+  let knownEligibleTableIds = null;
 
   async function poll() {
     try {
@@ -111,6 +200,16 @@ function startStaffTableOrderAlerts() {
         }
       }
       knownOrderIds = new Set(data.needsEntry.map((order) => order.id));
+
+      const currentEligibleTableIds = tablesEligibleForAwaitingFlash(data.awaitingDelivery);
+      if (knownEligibleTableIds) {
+        for (const tableId of currentEligibleTableIds) {
+          if (!knownEligibleTableIds.has(tableId)) {
+            getTableSection(tableId).then((section) => announceOrderUp(tableId, section));
+          }
+        }
+      }
+      knownEligibleTableIds = currentEligibleTableIds;
 
       const attention = data.needsEntry.length + data.readyCount;
       if (attention) {

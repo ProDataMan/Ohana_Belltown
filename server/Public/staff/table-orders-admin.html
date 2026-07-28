@@ -39,10 +39,11 @@
         <div class="editor-toolbar">
           <h2>Floor Map</h2>
         </div>
-        <p class="hint">A table flashes here as soon as a guest taps "Order" at it, and again once it's ready for delivery.</p>
+        <p class="hint">A table flashes here as soon as a guest taps "Order" at it, turns solid purple once it's been entered and is cooking, then flashes pink once it's had enough time to plausibly be ready.</p>
         <div class="floor-map-tabs" id="floor-map-tabs"></div>
         <div class="floor-map-legend">
           <span class="floor-map-legend-item"><span class="floor-map-dot floor-map-dot-needs"></span> Needs entry</span>
+          <span class="floor-map-legend-item"><span class="floor-map-dot floor-map-dot-processing"></span> Processing</span>
           <span class="floor-map-legend-item"><span class="floor-map-dot floor-map-dot-awaiting"></span> Awaiting delivery</span>
         </div>
         <div class="floor-map-canvas" id="floor-map-canvas"></div>
@@ -78,6 +79,7 @@
       </section>
     </main>
 
+    <script src="/nav.js"></script>
     <script src="../staff-auth.js"></script>
     <script src="../table-orders-admin.js"></script>
   </body>
