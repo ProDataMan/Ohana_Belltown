@@ -51,6 +51,37 @@ function getStaffAlertsContainer() {
   return container;
 }
 
+// Table id -> floor section ("dining"/"bar"/"sushi"/"deck"), fetched once and
+// reused by the spoken order announcements below.
+let tableMapSections = null;
+async function getTableSection(tableId) {
+  if (!tableMapSections) {
+    tableMapSections = {};
+    try {
+      const response = await fetch('/api/table-map');
+      const entries = response.ok ? await response.json() : [];
+      entries.forEach((entry) => {
+        tableMapSections[entry.id] = entry.section;
+      });
+    } catch {
+      // leave the lookup empty — announcements still work, just without a section name
+    }
+  }
+  return tableMapSections[tableId];
+}
+
+// Speaks a new table order aloud (table number + floor section) via the
+// browser's built-in text-to-speech, so staff away from a screen still hear
+// it. Best-effort: some browsers won't play audio at all until the page has
+// had a user interaction, and that's fine — the visual badge below still works.
+function announceNewOrder(tableId, section) {
+  if (!window.speechSynthesis) return;
+  const sectionLabel = section ? `, ${section}` : '';
+  const utterance = new SpeechSynthesisUtterance(`New order, table ${tableId}${sectionLabel}`);
+  utterance.rate = 0.95;
+  window.speechSynthesis.speak(utterance);
+}
+
 // A small floating indicator, shown site-wide to a logged-in staff member
 // whenever a dine-in guest has tapped "Order" on a menu item — so a server
 // walking the floor with the public site open on their phone still sees it,
@@ -62,11 +93,25 @@ function startStaffTableOrderAlerts() {
   alertEl.hidden = true;
   getStaffAlertsContainer().appendChild(alertEl);
 
+  // null until the first poll establishes a baseline, so page-load doesn't
+  // announce every order that was already waiting before this tab opened.
+  let knownOrderIds = null;
+
   async function poll() {
     try {
       const response = await fetch('/api/table-orders/dashboard');
       if (!response.ok) return;
       const data = await response.json();
+
+      if (knownOrderIds) {
+        for (const order of data.needsEntry) {
+          if (!knownOrderIds.has(order.id)) {
+            getTableSection(order.tableId).then((section) => announceNewOrder(order.tableId, section));
+          }
+        }
+      }
+      knownOrderIds = new Set(data.needsEntry.map((order) => order.id));
+
       const attention = data.needsEntry.length + data.readyCount;
       if (attention) {
         const parts = [];
