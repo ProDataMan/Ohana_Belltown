@@ -16,3 +16,6 @@ node_modules/
 
 # Editor swap files
 *.swp
+
+# Local photo dumps (source images for one-off uploads — not version-controlled)
+chownow images/
