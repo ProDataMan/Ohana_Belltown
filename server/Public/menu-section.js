@@ -258,7 +258,7 @@ function renderMenu(data) {
           const index = itemsByIndex.length;
           itemsByIndex.push({ item, categoryName: category.name });
 
-          const priceMarkup = item.price != null ? `<div class="price">$${Number(item.price).toFixed(2)}</div>` : '';
+          const priceMarkup = item.price != null ? `<div class="price" data-base-price="${item.price}">$${Number(item.price).toFixed(2)}</div>` : '';
           const featuredImage = (item.images || [])[0];
           const imageMarkup = featuredImage
             ? `<img class="item-photo" src="${escapeHtml(featuredImage)}" alt="${escapeHtml(item.name)}" loading="lazy" />`
@@ -287,7 +287,7 @@ function renderMenu(data) {
                     .map(
                       (m) => `
                     <label class="item-modifier-checkbox">
-                      <input type="checkbox" data-modifier-name="${escapeHtml(m.name)}" ${activeOrderId ? 'disabled' : ''} />
+                      <input type="checkbox" data-modifier-name="${escapeHtml(m.name)}" data-modifier-price="${m.priceDelta}" ${activeOrderId ? 'disabled' : ''} />
                       ${escapeHtml(m.name)} (+$${Number(m.priceDelta).toFixed(2)})
                     </label>
                   `
@@ -463,6 +463,31 @@ async function openItemModal(index) {
     googleSection.hidden = true;
   }
 }
+
+// Keeps the displayed price in sync with whichever add-ons are checked, so
+// a guest sees the real total (and what's driving it) before they order —
+// e.g. "$55.10 (Base $29.00 + Yosh Size $26.10)".
+function updateItemPriceDisplay(articleEl) {
+  const priceEl = articleEl.querySelector('.price');
+  if (!priceEl || priceEl.dataset.basePrice == null) return;
+  const basePrice = Number(priceEl.dataset.basePrice);
+
+  const checked = Array.from(articleEl.querySelectorAll('.item-modifiers input:checked'));
+  if (!checked.length) {
+    priceEl.textContent = `$${basePrice.toFixed(2)}`;
+    return;
+  }
+
+  const additionsTotal = checked.reduce((sum, cb) => sum + Number(cb.dataset.modifierPrice), 0);
+  const breakdown = checked.map((cb) => `${cb.dataset.modifierName} $${Number(cb.dataset.modifierPrice).toFixed(2)}`).join(', ');
+  priceEl.textContent = `$${(basePrice + additionsTotal).toFixed(2)} (Base $${basePrice.toFixed(2)} + ${breakdown})`;
+}
+
+menuContainer.addEventListener('change', (event) => {
+  if (!event.target.matches('.item-modifiers input')) return;
+  const articleEl = event.target.closest('.item');
+  if (articleEl) updateItemPriceDisplay(articleEl);
+});
 
 menuContainer.addEventListener('click', (event) => {
   const orderBtn = event.target.closest('.order-btn');
