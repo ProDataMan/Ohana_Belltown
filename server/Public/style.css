@@ -1373,6 +1373,130 @@ select {
   border-color: transparent;
 }
 
+/* ---- Staff floor map (table-orders-admin.html) ---- */
+
+.floor-map-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.floor-map-tabs button {
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--pink);
+  background: transparent;
+  color: var(--pink-text);
+  font-weight: 600;
+  font-size: 0.9rem;
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+
+.floor-map-tabs button.active {
+  background: var(--gradient-brand);
+  color: #fff;
+  border-color: transparent;
+}
+
+.floor-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.floor-map-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.floor-map-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.floor-map-dot-needs {
+  background: var(--gold-bright);
+}
+
+.floor-map-dot-awaiting {
+  background: var(--pink);
+}
+
+.floor-map-canvas {
+  position: relative;
+  width: 100%;
+  padding-bottom: 55%;
+  background: var(--paper);
+  border: 1px dashed var(--panel-border);
+  border-radius: 16px;
+}
+
+.floor-map-table {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  min-width: 2.6rem;
+  height: 2.6rem;
+  padding: 0 0.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel);
+  border: 2px solid var(--panel-border);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 0.8rem;
+  box-shadow: 0 4px 10px rgba(36, 20, 45, 0.08);
+}
+
+.floor-map-table.shape-round {
+  border-radius: 50%;
+}
+
+.floor-map-table.shape-square {
+  border-radius: 10px;
+}
+
+.floor-map-table.flash-needs {
+  animation: floorMapFlashNeeds 1s ease-in-out infinite;
+}
+
+.floor-map-table.flash-awaiting {
+  animation: floorMapFlashAwaiting 1.6s ease-in-out infinite;
+}
+
+@keyframes floorMapFlashNeeds {
+  0%, 100% { background: var(--panel); border-color: var(--gold-bright); color: var(--text); }
+  50% { background: var(--gold-bright); border-color: var(--gold-bright); color: #fff; }
+}
+
+@keyframes floorMapFlashAwaiting {
+  0%, 100% { background: var(--panel); border-color: var(--pink); color: var(--text); }
+  50% { background: var(--pink); border-color: var(--pink); color: #fff; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floor-map-table.flash-needs {
+    animation: none;
+    background: var(--gold-bright);
+    color: #fff;
+  }
+
+  .floor-map-table.flash-awaiting {
+    animation: none;
+    background: var(--pink);
+    color: #fff;
+  }
+}
+
 .locations {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));

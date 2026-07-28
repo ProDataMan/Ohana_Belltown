@@ -115,32 +115,56 @@
       <h1>Table Cards</h1>
       <p>
         Print this page (Cmd/Ctrl+P) to get table-ready cards sized for a standard 4&times;6" acrylic
-        stand — one per numbered table. Each QR code is unique to its table: scanning it lands on
-        Happy Hour automatically during Happy Hour (Mon&ndash;Fri, 3&ndash;6pm) or the full menu the
-        rest of the time, and unlocks an "Order" button next to every menu item so a guest can flag
-        staff for something without waving anyone down. Currently set up for 12 tables &mdash; ask to
-        add more if Ohana has additional seating to cover.
+        stand — one per table/seat across the dining room, bar, sushi bar, and deck, matching the
+        real floor plan. Each QR code is unique to its spot: scanning it lands on Happy Hour
+        automatically during Happy Hour (Mon&ndash;Fri, 3&ndash;6pm) or the full menu the rest of the
+        time, and unlocks an "Order" button next to every menu item so a guest can flag staff for
+        something without waving anyone down.
       </p>
       <button type="button" onclick="window.print()">Print This Page</button>
     </div>
 
-    <div class="card-sheet" id="card-sheet"></div>
+    <div class="card-sheet" id="card-sheet">Loading...</div>
 
     <script>
-      const tableCount = 12;
-      const sheet = document.getElementById('card-sheet');
-      for (let i = 1; i <= tableCount; i++) {
-        const card = document.createElement('div');
-        card.className = 'table-card';
-        card.innerHTML = `
-          <img class="logo" src="/images/logo.png" alt="" />
-          <span class="table-number">Table ${i}</span>
-          <h2>Scan to Order</h2>
-          <img class="qr" src="/images/table-qr-${i}.png" alt="QR code for Table ${i}, linking to the Ohana Belltown menu" />
-          <p>Food &middot; Sushi &middot; Drinks &middot; Happy Hour</p>
-        `;
-        sheet.appendChild(card);
+      const sectionLabels = { dining: 'Dining Room', bar: 'Bar', sushi: 'Sushi Bar', deck: 'Deck' };
+
+      function labelFor(entry) {
+        if (entry.section === 'bar' && entry.id.startsWith('R')) return `Rail Seat ${entry.id}`;
+        if (entry.section === 'bar' && entry.id.startsWith('B')) return `Bar Table ${entry.id}`;
+        if (entry.section === 'sushi') return `Sushi Bar ${entry.id}`;
+        return `Table ${entry.id}`;
       }
+
+      async function loadTableCards() {
+        const sheet = document.getElementById('card-sheet');
+        try {
+          const response = await fetch('/api/table-map');
+          if (!response.ok) throw new Error(`Unable to load the table map (${response.status}).`);
+          const entries = await response.json();
+          const sectionOrder = ['dining', 'bar', 'sushi', 'deck'];
+          entries.sort((a, b) => sectionOrder.indexOf(a.section) - sectionOrder.indexOf(b.section) || a.id.localeCompare(b.id, undefined, { numeric: true }));
+
+          sheet.innerHTML = entries
+            .map((entry) => {
+              const label = labelFor(entry);
+              return `
+                <div class="table-card">
+                  <img class="logo" src="/images/logo.png" alt="" />
+                  <span class="table-number">${label} — ${sectionLabels[entry.section] || entry.section}</span>
+                  <h2>Scan to Order</h2>
+                  <img class="qr" src="/images/table-qr-${entry.id}.png" alt="QR code for ${label}, linking to the Ohana Belltown menu" />
+                  <p>Food &middot; Sushi &middot; Drinks &middot; Happy Hour</p>
+                </div>
+              `;
+            })
+            .join('');
+        } catch (error) {
+          sheet.textContent = error.message;
+        }
+      }
+
+      loadTableCards();
     </script>
   </body>
 </html>

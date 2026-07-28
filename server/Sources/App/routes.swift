@@ -330,6 +330,10 @@ func routes(_ app: Application) throws {
         )
     }
 
+    app.get("api", "table-map") { _ throws -> [TableMapEntry] in
+        TableMap.entries
+    }
+
     app.get("api", "table-orders", "dashboard") { req throws -> TableOrdersDashboard in
         try requireLogin(req)
         return try TableOrdersDashboard(

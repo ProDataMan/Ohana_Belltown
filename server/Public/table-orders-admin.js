@@ -103,10 +103,74 @@ async function loadTableOrders() {
     const data = await response.json();
     renderNeedsEntry(data.needsEntry);
     renderAwaitingDelivery(data.awaitingDelivery);
+    updateFloorMapFlashing(data.needsEntry, data.awaitingDelivery);
   } catch (error) {
     const message = `<p class="status status-error">${escapeHtmlTableOrders(error.message)}</p>`;
     needsEntryEl.innerHTML = message;
     awaitingDeliveryEl.innerHTML = message;
+  }
+}
+
+// --- Floor map ---
+
+const sectionLabels = { dining: 'Dining', bar: 'Bar', sushi: 'Sushi', deck: 'Deck' };
+const sectionOrder = ['dining', 'bar', 'sushi', 'deck'];
+let floorMapEntries = [];
+let activeFloorMapSection = 'dining';
+
+function renderFloorMapCanvas() {
+  const canvas = document.getElementById('floor-map-canvas');
+  const tables = floorMapEntries.filter((entry) => entry.section === activeFloorMapSection);
+  canvas.innerHTML = tables
+    .map(
+      (entry) => `
+        <div
+          class="floor-map-table shape-${entry.shape}"
+          data-table-id="${escapeHtmlTableOrders(entry.id)}"
+          style="left: ${entry.x}%; top: ${entry.y}%;"
+        >${escapeHtmlTableOrders(entry.id)}</div>
+      `
+    )
+    .join('');
+}
+
+function renderFloorMapTabs() {
+  const tabsEl = document.getElementById('floor-map-tabs');
+  const present = sectionOrder.filter((s) => floorMapEntries.some((e) => e.section === s));
+  tabsEl.innerHTML = present
+    .map(
+      (s) => `<button type="button" data-section="${s}" class="${s === activeFloorMapSection ? 'active' : ''}">${sectionLabels[s] || s}</button>`
+    )
+    .join('');
+  tabsEl.querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      activeFloorMapSection = btn.dataset.section;
+      tabsEl.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b === btn));
+      renderFloorMapCanvas();
+      loadTableOrders();
+    });
+  });
+}
+
+function updateFloorMapFlashing(needsEntry, awaitingDelivery) {
+  const needsIds = new Set(needsEntry.map((o) => o.tableId));
+  const awaitingIds = new Set(awaitingDelivery.map((o) => o.tableId));
+  document.querySelectorAll('.floor-map-table').forEach((el) => {
+    const id = el.dataset.tableId;
+    el.classList.toggle('flash-needs', needsIds.has(id));
+    el.classList.toggle('flash-awaiting', !needsIds.has(id) && awaitingIds.has(id));
+  });
+}
+
+async function loadFloorMap() {
+  try {
+    const response = await fetch('/api/table-map');
+    if (!response.ok) throw new Error(`Unable to load the floor map (${response.status}).`);
+    floorMapEntries = await response.json();
+    renderFloorMapTabs();
+    renderFloorMapCanvas();
+  } catch (error) {
+    document.getElementById('floor-map-canvas').innerHTML = `<p class="status status-error">${escapeHtmlTableOrders(error.message)}</p>`;
   }
 }
 
@@ -145,5 +209,5 @@ document.getElementById('staffing-form').addEventListener('submit', async (event
 document.getElementById('reload-table-orders-btn').addEventListener('click', loadTableOrders);
 
 loadStaffing();
-loadTableOrders();
+loadFloorMap().then(loadTableOrders);
 setInterval(loadTableOrders, 15000);

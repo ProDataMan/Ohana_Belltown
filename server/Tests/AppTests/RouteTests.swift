@@ -527,6 +527,17 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testTableMapIsPublicAndCoversAllSections() throws {
+        try app.test(.GET, "api/table-map") { res in
+            XCTAssertEqual(res.status, .ok)
+            let entries = try res.content.decode([TableMapEntry].self)
+            XCTAssertEqual(entries.count, TableMap.entries.count)
+            let sections = Set(entries.map(\.section))
+            XCTAssertEqual(sections, Set(TableMap.sections))
+            XCTAssertEqual(Set(entries.map(\.id)), TableMap.allIds)
+        }
+    }
+
     func testEventsWriteRequiresAdmin() throws {
         let body = ByteBuffer(string: #"{"events":[]}"#)
         try app.test(.PUT, "api/events", headers: ["Content-Type": "application/json"], body: body) { res in

@@ -165,46 +165,65 @@ final class StaffRewardsStore: @unchecked Sendable {
     /// called alongside a real edit that should succeed regardless.
     @discardableResult
     func award(staffId: String, category: String, note: String?, awardedBy: String?) throws -> StaffRewardStatus {
-        guard Self.categories.contains(category) else { throw StaffRewardError.invalidCategory }
+        try awardBatch(staffId: staffId, categories: [category], note: note, awardedBy: awardedBy)
+    }
+
+    /// Same as `award`, but applies one or more categories under a single
+    /// lock/persist — a menu edit that adds a photo, sets a price, *and*
+    /// marks a special all at once still only touches disk once, not three
+    /// times, since this always runs inline inside another route's request.
+    @discardableResult
+    func awardBatch(staffId: String, categories: [String], note: String?, awardedBy: String?) throws -> StaffRewardStatus {
+        for category in categories {
+            guard Self.categories.contains(category) else { throw StaffRewardError.invalidCategory }
+        }
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
         let idx = findOrCreateCardIndex(staffId: staffId)
+        guard !categories.isEmpty else { return statusFor(data.cards[idx]) }
 
-        if awardedBy == nil {
-            let today = Self.dayKey(fromISO8601: now())
-            let autoAwardsToday = data.events.filter {
-                $0.staffId == staffId && $0.awardedBy == nil && Self.dayKey(fromISO8601: $0.createdAt) == today
-            }.count
-            guard autoAwardsToday < Self.maxAutoAwardsPerDay else {
-                try persist()
-                return statusFor(data.cards[idx])
+        let today = Self.dayKey(fromISO8601: now())
+        var autoAwardsToday = awardedBy == nil
+            ? data.events.filter { $0.staffId == staffId && $0.awardedBy == nil && Self.dayKey(fromISO8601: $0.createdAt) == today }.count
+            : 0
+
+        var awardedAny = false
+        for category in categories {
+            if awardedBy == nil {
+                guard autoAwardsToday < Self.maxAutoAwardsPerDay else { continue }
+                autoAwardsToday += 1
             }
+            let timestamp = now()
+            data.events.append(StaffRewardEvent(staffId: staffId, category: category, note: note, awardedBy: awardedBy, createdAt: timestamp))
+            data.cards[idx].punches += 1
+            data.cards[idx].updatedAt = timestamp
+            awardedAny = true
         }
-
-        let timestamp = now()
-        data.events.append(StaffRewardEvent(staffId: staffId, category: category, note: note, awardedBy: awardedBy, createdAt: timestamp))
-        data.cards[idx].punches += 1
-        data.cards[idx].updatedAt = timestamp
-        try persist()
+        if awardedAny {
+            try persist()
+        }
         return statusFor(data.cards[idx])
     }
 
     /// Convenience for the menu-item PATCH route — diffs a before/after
-    /// item and awards whichever of photo/price/special actually changed.
-    /// Never throws; a rewards-system hiccup should never block a real
-    /// menu edit from succeeding.
+    /// item and awards whichever of photo/price/special actually changed,
+    /// all in one batched write. Never throws; a rewards-system hiccup
+    /// should never block a real menu edit from succeeding.
     func awardForMenuEdit(staffId: String, before: MenuItem?, after: MenuItem) {
         guard let before else { return }
+        var categories: [String] = []
         if after.images.count > before.images.count {
-            try? award(staffId: staffId, category: "photo", note: nil, awardedBy: nil)
+            categories.append("photo")
         }
         if let newPrice = after.price, newPrice != before.price {
-            try? award(staffId: staffId, category: "price", note: nil, awardedBy: nil)
+            categories.append("price")
         }
         if after.featured && !before.featured {
-            try? award(staffId: staffId, category: "special", note: nil, awardedBy: nil)
+            categories.append("special")
         }
+        guard !categories.isEmpty else { return }
+        try? awardBatch(staffId: staffId, categories: categories, note: nil, awardedBy: nil)
     }
 
     @discardableResult
