@@ -59,14 +59,14 @@ async function loadCards() {
     const cards = await response.json();
 
     if (!cards.length) {
-      listEl.innerHTML = '<p class="hint">No punches awarded yet.</p>';
+      listEl.innerHTML = '<p class="hint">No points awarded yet.</p>';
       return;
     }
 
     listEl.innerHTML = `
       <div class="data-table">
         <table>
-          <thead><tr><th>Staff</th><th>Punches</th><th>Total Redeemed</th><th></th></tr></thead>
+          <thead><tr><th>Staff</th><th>Points</th><th>Total Redeemed</th><th></th></tr></thead>
           <tbody>
             ${cards
               .map(
@@ -74,11 +74,11 @@ async function loadCards() {
               <tr data-staff-id="${c.staffId}">
                 <td>${escapeHtmlRewards(staffName(c.staffId))}</td>
                 <td>
-                  <span class="pill ${c.punches >= 10 ? 'pill-approved' : ''}">${c.punches} / 10</span>
+                  <span class="pill ${c.points >= 10 ? 'pill-approved' : ''}">${c.points} / 10</span>
                 </td>
                 <td>${c.totalRedeemed}</td>
                 <td>${
-                  c.punches >= 10
+                  c.points >= 10
                     ? '<button type="button" class="secondary redeem-btn">Redeem reward</button>'
                     : ''
                 }</td>
@@ -131,7 +131,7 @@ async function loadEvents() {
     listEl.innerHTML = `
       <div class="data-table">
         <table>
-          <thead><tr><th>When</th><th>Staff</th><th>Reason</th><th>Note</th><th>Granted by</th></tr></thead>
+          <thead><tr><th>When</th><th>Staff</th><th>Reason</th><th>Points</th><th>Note</th><th>Granted by</th></tr></thead>
           <tbody>
             ${events
               .map(
@@ -140,6 +140,7 @@ async function loadEvents() {
                 <td>${new Date(e.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</td>
                 <td>${escapeHtmlRewards(staffName(e.staffId))}</td>
                 <td><span class="pill ${e.category === 'redeemed' ? 'pill-approved' : ''}">${escapeHtmlRewards(categoryLabels[e.category] || e.category)}</span></td>
+                <td>${e.points > 0 ? `+${e.points}` : e.points}</td>
                 <td>${escapeHtmlRewards(e.note || '')}</td>
                 <td>${grantedByLabel(e)}</td>
               </tr>
@@ -178,7 +179,7 @@ document.getElementById('award-form').addEventListener('submit', async (event) =
       const body = await response.json().catch(() => ({}));
       throw new Error(body.reason || `Failed (${response.status}).`);
     }
-    statusEl.textContent = 'Punch awarded!';
+    statusEl.textContent = 'Points awarded!';
     statusEl.classList.add('status-ok');
     noteInput.value = '';
     await loadCards();

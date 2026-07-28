@@ -13,13 +13,15 @@
         <p class="eyebrow">Ohana Belltown — Staff</p>
         <h1>Staff Rewards</h1>
         <p>
-          A punch card for keeping the site itself up to date — adding a photo, setting a
-          price, marking a special, or adding an event earns a punch automatically. Staff can log
-          their own unverifiable activity (like a social media post) from <a href="/account.html">My Account</a>,
-          or award one by hand below for anything else worth recognizing.
+          A points card for keeping the site itself up to date — points are scaled to effort:
+          marking a special or updating a price is worth 1 point, adding a photo or an event is
+          worth 2, and a social media post is worth 3 (roughly $1 of reward per point). Editing a
+          menu item auto-awards the relevant points; adding an event does too. Staff can log their
+          own unverifiable activity (like a social post) from <a href="/account.html">My Account</a>,
+          or award points by hand below for anything else worth recognizing.
         </p>
         <p>
-          <strong>10 punches = one free Classic Ohana Roll or Happy Hour appetizer</strong> (see the
+          <strong>10 points = one free Classic Ohana Roll or Happy Hour appetizer</strong> (see the
           <a href="/happy-hour">Happy Hour menu</a>) — redeem it below once a staff member gets there.
         </p>
         <p class="admin-link"><a href="/menu">&larr; Back to menu</a></p>
@@ -38,25 +40,25 @@
       </header>
 
       <section class="panel">
-        <h2>Award a Punch</h2>
+        <h2>Award Points</h2>
         <form id="award-form">
           <label>Staff member
             <select id="award-staff-select" required></select>
           </label>
           <label>Reason
             <select id="award-category-select">
-              <option value="social">Social media post</option>
-              <option value="photo">Added a photo</option>
-              <option value="price">Updated a price</option>
-              <option value="special">Marked a special</option>
-              <option value="event">Added an event</option>
-              <option value="other">Other</option>
+              <option value="social">Social media post (3 points)</option>
+              <option value="photo">Added a photo (2 points)</option>
+              <option value="price">Updated a price (1 point)</option>
+              <option value="special">Marked a special (1 point)</option>
+              <option value="event">Added an event (2 points)</option>
+              <option value="other">Other (2 points)</option>
             </select>
           </label>
           <label>Note (optional)
             <input type="text" id="award-note-input" placeholder="e.g. Instagram story about the new roll" />
           </label>
-          <button type="submit">Award Punch</button>
+          <button type="submit">Award Points</button>
           <p id="award-status" class="status"></p>
         </form>
       </section>

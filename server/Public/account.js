@@ -69,7 +69,7 @@ async function loadRewards() {
     if (!response.ok) throw new Error('Unable to load rewards.');
     const status = await response.json();
     el.innerHTML = `
-      <span class="pill ${status.rewardReady ? 'pill-approved' : ''}">${status.punches} / ${status.punchesNeeded} punches</span>
+      <span class="pill ${status.rewardReady ? 'pill-approved' : ''}">${status.points} / ${status.pointsNeeded} points</span>
       ${status.rewardReady ? '<span class="pill pill-approved">Reward ready — ask an admin!</span>' : ''}
       <span class="hint">Total redeemed: ${status.totalRedeemed}</span>
     `;
@@ -95,7 +95,7 @@ document.getElementById('log-activity-form')?.addEventListener('submit', async (
       const body = await response.json().catch(() => ({}));
       throw new Error(body.reason || `Failed (${response.status}).`);
     }
-    statusEl.textContent = 'Logged — punch added!';
+    statusEl.textContent = 'Logged — points added!';
     statusEl.classList.add('status-ok');
     noteInput.value = '';
     await loadRewards();

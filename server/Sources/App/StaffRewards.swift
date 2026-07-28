@@ -1,21 +1,59 @@
 import Vapor
 
-/// A staff member's running punch count toward a reward — same mechanic as
-/// the customer loyalty card, but earned by keeping the site itself up to
-/// date (photos, prices, specials, events) rather than by ordering food.
-/// What the reward actually is (a free shift meal, schedule preference,
-/// etc.) is a real-world decision an admin communicates and fulfills;
-/// this just tracks the count and lets an admin redeem it once given.
+/// A staff member's running point balance toward a reward — same mechanic
+/// as the customer loyalty card, but earned by keeping the site itself up
+/// to date (photos, prices, specials, events) rather than by ordering food.
+/// 1 point = roughly $1 of reward value (see `StaffRewardsStore.pointValue`)
+/// — 10 points redeems one free Classic Ohana Roll or Happy Hour appetizer,
+/// which average ~$9.83 across both lists as of 2026-07-28.
 struct StaffRewardCard: Codable, Content {
     var staffId: String
-    var punches: Int
+    var points: Int
     var totalRedeemed: Int
     var createdAt: String
     var updatedAt: String
+
+    /// "punches" is the pre-2026-07-28 key name, back when every action was
+    /// worth a flat 1 regardless of effort — decoding it straight into
+    /// `points` is a reasonable reinterpretation since those flat values
+    /// sat within the same 1-3 range the new per-category values use.
+    enum CodingKeys: String, CodingKey {
+        case staffId, points, punches, totalRedeemed, createdAt, updatedAt
+    }
+
+    init(staffId: String, points: Int, totalRedeemed: Int, createdAt: String, updatedAt: String) {
+        self.staffId = staffId
+        self.points = points
+        self.totalRedeemed = totalRedeemed
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        staffId = try container.decode(String.self, forKey: .staffId)
+        if let points = try container.decodeIfPresent(Int.self, forKey: .points) {
+            self.points = points
+        } else {
+            points = try container.decodeIfPresent(Int.self, forKey: .punches) ?? 0
+        }
+        totalRedeemed = try container.decode(Int.self, forKey: .totalRedeemed)
+        createdAt = try container.decode(String.self, forKey: .createdAt)
+        updatedAt = try container.decode(String.self, forKey: .updatedAt)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(staffId, forKey: .staffId)
+        try container.encode(points, forKey: .points)
+        try container.encode(totalRedeemed, forKey: .totalRedeemed)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
+    }
 }
 
-/// One earned (or manually granted) punch, kept as an activity log entry
-/// so admins can see who earned what and when.
+/// One earned (or manually granted) award, kept as an activity log entry
+/// so admins can see who earned what, worth how many points, and when.
 struct StaffRewardEvent: Codable, Content {
     var id: String
     var staffId: String
@@ -25,17 +63,39 @@ struct StaffRewardEvent: Codable, Content {
     var category: String
     var note: String?
     /// The admin's staff id who manually granted this, or nil if it was
-    /// auto-awarded from the staff member's own edit.
+    /// auto-awarded/self-reported.
     var awardedBy: String?
+    /// Points this specific event was worth at the time — stored rather
+    /// than recomputed from category, so the log stays accurate even if
+    /// point values are retuned later.
+    var points: Int
     var createdAt: String
 
-    init(id: String = UUID().uuidString, staffId: String, category: String, note: String?, awardedBy: String?, createdAt: String) {
+    enum CodingKeys: String, CodingKey {
+        case id, staffId, category, note, awardedBy, points, createdAt
+    }
+
+    init(id: String = UUID().uuidString, staffId: String, category: String, note: String?, awardedBy: String?, points: Int, createdAt: String) {
         self.id = id
         self.staffId = staffId
         self.category = category
         self.note = note
         self.awardedBy = awardedBy
+        self.points = points
         self.createdAt = createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        staffId = try container.decode(String.self, forKey: .staffId)
+        category = try container.decode(String.self, forKey: .category)
+        note = try container.decodeIfPresent(String.self, forKey: .note)
+        awardedBy = try container.decodeIfPresent(String.self, forKey: .awardedBy)
+        // Pre-2026-07-28 events predate per-category point values and were
+        // always worth a flat 1 punch.
+        points = try container.decodeIfPresent(Int.self, forKey: .points) ?? 1
+        createdAt = try container.decode(String.self, forKey: .createdAt)
     }
 }
 
@@ -46,8 +106,8 @@ struct StaffRewardsData: Codable {
 
 struct StaffRewardStatus: Content {
     var staffId: String
-    var punches: Int
-    var punchesNeeded: Int
+    var points: Int
+    var pointsNeeded: Int
     var rewardReady: Bool
     var totalRedeemed: Int
 }
@@ -70,7 +130,7 @@ extension StaffRewardError: AbortError {
     var reason: String {
         switch self {
         case .cardNotFound: return "No rewards card found for that staff member."
-        case .noRewardAvailable: return "This staff member doesn't have enough punches for a reward yet."
+        case .noRewardAvailable: return "This staff member doesn't have enough points for a reward yet."
         case .invalidCategory: return "Unknown reward category."
         }
     }
@@ -78,18 +138,35 @@ extension StaffRewardError: AbortError {
 
 final class StaffRewardsStore: @unchecked Sendable {
     static let shared = StaffRewardsStore()
-    static let punchesNeeded = 10
-    static let categories = ["photo", "price", "special", "event", "social", "other"]
+    /// 10 points ≈ $9.83, the average cost across the Classic Ohana Rolls
+    /// ($8.90 avg) and Happy Hour appetizers ($11.00 avg) that make up the
+    /// reward — a deliberate ~$1/point anchor, not an arbitrary count.
+    static let pointsNeeded = 10
+    /// Points awarded per category, scaled to real effort and business
+    /// value rather than a flat amount per action:
+    ///   - marking a special / updating a price: trivial data-entry effort
+    ///   - adding a photo / adding an event: real content-creation effort
+    ///   - a social media post: the most effort (shoot, write, post) and
+    ///     the most marketing value, so it's worth the most
+    static let pointValues: [String: Int] = [
+        "special": 1,
+        "price": 1,
+        "photo": 2,
+        "event": 2,
+        "other": 2,
+        "social": 3,
+    ]
+    static var categories: [String] { Array(pointValues.keys) }
     /// Categories a staff member can log for themselves, without an admin —
     /// only the ones that can't be auto-detected from a real edit. Letting
     /// someone self-report "photo"/"price"/"special"/"event" would let them
     /// claim credit without actually doing the edit that's supposed to earn it.
     static let selfReportableCategories = ["social", "other"]
-    /// Only auto-awarded punches (from a staff member's own edits, not a
-    /// manual admin grant) count against this — caps how many times a day
-    /// repeatedly editing the same item can earn a punch, without limiting
-    /// genuine deliberate recognition from an admin.
-    static let maxAutoAwardsPerDay = 5
+    /// Only auto-awarded/self-reported points (not a manual admin grant)
+    /// count against this — caps how many points a day repeatedly editing
+    /// the same item (or repeatedly self-reporting) can earn, without
+    /// limiting genuine deliberate recognition from an admin.
+    static let maxAutoPointsPerDay = 10
 
     private let lock = NSLock()
     private var fileURL = URL(fileURLWithPath: "Data/staff-rewards.json")
@@ -118,14 +195,14 @@ final class StaffRewardsStore: @unchecked Sendable {
     private func statusFor(_ card: StaffRewardCard) -> StaffRewardStatus {
         StaffRewardStatus(
             staffId: card.staffId,
-            punches: card.punches,
-            punchesNeeded: Self.punchesNeeded,
-            rewardReady: card.punches >= Self.punchesNeeded,
+            points: card.points,
+            pointsNeeded: Self.pointsNeeded,
+            rewardReady: card.points >= Self.pointsNeeded,
             totalRedeemed: card.totalRedeemed
         )
     }
 
-    /// Finds a staff member's card, creating a fresh zero-punch one if this
+    /// Finds a staff member's card, creating a fresh zero-point one if this
     /// is their first ever award — unlike customer loyalty cards, every
     /// staff member should be able to see a "0/10" status right away rather
     /// than a 404. Assumes the lock is already held.
@@ -134,7 +211,7 @@ final class StaffRewardsStore: @unchecked Sendable {
             return idx
         }
         let timestamp = now()
-        let card = StaffRewardCard(staffId: staffId, punches: 0, totalRedeemed: 0, createdAt: timestamp, updatedAt: timestamp)
+        let card = StaffRewardCard(staffId: staffId, points: 0, totalRedeemed: 0, createdAt: timestamp, updatedAt: timestamp)
         data.cards.append(card)
         return data.cards.count - 1
     }
@@ -152,7 +229,7 @@ final class StaffRewardsStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
-        return data.cards.sorted { $0.punches > $1.punches }
+        return data.cards.sorted { $0.points > $1.points }
     }
 
     func recentEvents(limit: Int) throws -> [StaffRewardEvent] {
@@ -162,12 +239,12 @@ final class StaffRewardsStore: @unchecked Sendable {
         return data.events.reversed().sorted { $0.createdAt > $1.createdAt }.prefix(limit).map { $0 }
     }
 
-    /// Awards one punch. `awardedBy` nil means the system auto-detected the
-    /// action from the staff member's own edit; a non-nil admin id means a
-    /// manual grant (e.g. for a social media post, which can't be verified
-    /// automatically). Auto-awards silently no-op once the daily cap for
-    /// that staff member is hit, rather than erroring — this always gets
-    /// called alongside a real edit that should succeed regardless.
+    /// Awards points for one category. `awardedBy` nil means the system
+    /// auto-detected the action from the staff member's own edit (or they
+    /// self-reported it); a non-nil admin id means a manual grant. Auto/
+    /// self-reported points silently no-op once the daily cap is hit,
+    /// rather than erroring — this always gets called alongside a real
+    /// edit that should succeed regardless.
     @discardableResult
     func award(staffId: String, category: String, note: String?, awardedBy: String?) throws -> StaffRewardStatus {
         try awardBatch(staffId: staffId, categories: [category], note: note, awardedBy: awardedBy)
@@ -180,7 +257,9 @@ final class StaffRewardsStore: @unchecked Sendable {
     @discardableResult
     func awardBatch(staffId: String, categories: [String], note: String?, awardedBy: String?) throws -> StaffRewardStatus {
         for category in categories {
-            guard Self.categories.contains(category) else { throw StaffRewardError.invalidCategory }
+            guard let pointValue = Self.pointValues[category], pointValue > 0 else {
+                throw StaffRewardError.invalidCategory
+            }
         }
         lock.lock()
         defer { lock.unlock() }
@@ -189,19 +268,25 @@ final class StaffRewardsStore: @unchecked Sendable {
         guard !categories.isEmpty else { return statusFor(data.cards[idx]) }
 
         let today = Self.dayKey(fromISO8601: now())
-        var autoAwardsToday = awardedBy == nil
-            ? data.events.filter { $0.staffId == staffId && $0.awardedBy == nil && Self.dayKey(fromISO8601: $0.createdAt) == today }.count
+        // "redeemed" events are excluded — spending points isn't an earning
+        // event, and their negative point value would otherwise loosen the
+        // cap for the rest of the day.
+        var autoPointsToday = awardedBy == nil
+            ? data.events
+                .filter { $0.staffId == staffId && $0.awardedBy == nil && $0.category != "redeemed" && Self.dayKey(fromISO8601: $0.createdAt) == today }
+                .reduce(0) { $0 + $1.points }
             : 0
 
         var awardedAny = false
         for category in categories {
+            let pointValue = Self.pointValues[category] ?? 1
             if awardedBy == nil {
-                guard autoAwardsToday < Self.maxAutoAwardsPerDay else { continue }
-                autoAwardsToday += 1
+                guard autoPointsToday < Self.maxAutoPointsPerDay else { continue }
+                autoPointsToday += pointValue
             }
             let timestamp = now()
-            data.events.append(StaffRewardEvent(staffId: staffId, category: category, note: note, awardedBy: awardedBy, createdAt: timestamp))
-            data.cards[idx].punches += 1
+            data.events.append(StaffRewardEvent(staffId: staffId, category: category, note: note, awardedBy: awardedBy, points: pointValue, createdAt: timestamp))
+            data.cards[idx].points += pointValue
             data.cards[idx].updatedAt = timestamp
             awardedAny = true
         }
@@ -233,8 +318,8 @@ final class StaffRewardsStore: @unchecked Sendable {
 
     /// A staff member logging their own activity (e.g. "posted on
     /// Instagram") rather than an admin granting it. Still subject to the
-    /// shared daily auto-award cap, same as system-detected punches — it's
-    /// unverified, so it shouldn't be able to farm unlimited punches.
+    /// shared daily auto-award cap, same as system-detected points — it's
+    /// unverified, so it shouldn't be able to farm unlimited points.
     @discardableResult
     func selfReport(staffId: String, category: String, note: String?) throws -> StaffRewardStatus {
         guard Self.selfReportableCategories.contains(category) else { throw StaffRewardError.invalidCategory }
@@ -249,13 +334,13 @@ final class StaffRewardsStore: @unchecked Sendable {
         guard let idx = data.cards.firstIndex(where: { $0.staffId == staffId }) else {
             throw StaffRewardError.cardNotFound
         }
-        guard data.cards[idx].punches >= Self.punchesNeeded else {
+        guard data.cards[idx].points >= Self.pointsNeeded else {
             throw StaffRewardError.noRewardAvailable
         }
-        data.cards[idx].punches -= Self.punchesNeeded
+        data.cards[idx].points -= Self.pointsNeeded
         data.cards[idx].totalRedeemed += 1
         data.cards[idx].updatedAt = now()
-        data.events.append(StaffRewardEvent(staffId: staffId, category: "redeemed", note: note, awardedBy: nil, createdAt: now()))
+        data.events.append(StaffRewardEvent(staffId: staffId, category: "redeemed", note: note, awardedBy: nil, points: -Self.pointsNeeded, createdAt: now()))
         try persist()
         return statusFor(data.cards[idx])
     }
