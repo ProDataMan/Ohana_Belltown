@@ -466,7 +466,7 @@ async function openItemModal(index) {
 
 // Keeps the displayed price in sync with whichever add-ons are checked, so
 // a guest sees the real total (and what's driving it) before they order —
-// e.g. "$55.10 (Base $29.00 + Yosh Size $26.10)".
+// e.g. "$55.10 ($29.00 + Yosh Size $26.10)".
 function updateItemPriceDisplay(articleEl) {
   const priceEl = articleEl.querySelector('.price');
   if (!priceEl || priceEl.dataset.basePrice == null) return;
@@ -479,8 +479,10 @@ function updateItemPriceDisplay(articleEl) {
   }
 
   const additionsTotal = checked.reduce((sum, cb) => sum + Number(cb.dataset.modifierPrice), 0);
-  const breakdown = checked.map((cb) => `${cb.dataset.modifierName} $${Number(cb.dataset.modifierPrice).toFixed(2)}`).join(', ');
-  priceEl.textContent = `$${(basePrice + additionsTotal).toFixed(2)} (Base $${basePrice.toFixed(2)} + ${breakdown})`;
+  const breakdown = checked
+    .map((cb) => `${cb.dataset.modifierName.replace(/^Add /i, '')} $${Number(cb.dataset.modifierPrice).toFixed(2)}`)
+    .join(', ');
+  priceEl.textContent = `$${(basePrice + additionsTotal).toFixed(2)} ($${basePrice.toFixed(2)} + ${breakdown})`;
 }
 
 menuContainer.addEventListener('change', (event) => {
