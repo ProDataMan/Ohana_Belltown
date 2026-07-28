@@ -91,6 +91,23 @@ final class MenuStore: @unchecked Sendable {
         throw MenuItemError.itemNotFound
     }
 
+    func additionsCatalog() throws -> [AdditionCatalogItem] {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        return menu.additionsCatalog
+    }
+
+    @discardableResult
+    func saveAdditionsCatalog(_ items: [AdditionCatalogItem]) throws -> [AdditionCatalogItem] {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        menu.additionsCatalog = items
+        try persist()
+        return items
+    }
+
     func deleteItem(id: String) throws {
         lock.lock()
         defer { lock.unlock() }

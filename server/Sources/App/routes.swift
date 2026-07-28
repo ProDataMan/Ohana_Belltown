@@ -124,6 +124,19 @@ func routes(_ app: Application) throws {
         return try MenuStore.shared.save(incoming)
     }
 
+    // Reusable add-on definitions staff pick from when adding a modifier to
+    // any item, instead of retyping the same name/price every time.
+    app.get("api", "additions-catalog") { req throws -> [AdditionCatalogItem] in
+        try requireLogin(req)
+        return try MenuStore.shared.additionsCatalog()
+    }
+
+    app.put("api", "additions-catalog") { req throws -> [AdditionCatalogItem] in
+        try requireLogin(req)
+        let items = try req.content.decode([AdditionCatalogItem].self)
+        return try MenuStore.shared.saveAdditionsCatalog(items)
+    }
+
     app.get("api", "menu", "items", ":id") { req throws -> MenuItemLocation in
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
         return try MenuStore.shared.findItem(id: id)

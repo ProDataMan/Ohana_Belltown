@@ -327,6 +327,40 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testAdditionsCatalogRequiresLoginToViewAndSave() throws {
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        try app.test(.GET, "api/additions-catalog") { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+        try app.test(.GET, "api/additions-catalog", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+            let items = try res.content.decode([AdditionCatalogItem].self)
+            XCTAssertEqual(items, [])
+        }
+
+        let newCatalogBody = ByteBuffer(string: #"[{"id":"a1","name":"Add Bacon","priceDelta":5.5}]"#)
+        try app.test(.PUT, "api/additions-catalog", headers: ["Content-Type": "application/json"], body: newCatalogBody) { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+        try app.test(.PUT, "api/additions-catalog", headers: ["Content-Type": "application/json", "Cookie": cookie], body: newCatalogBody) { res in
+            XCTAssertEqual(res.status, .ok)
+            let items = try res.content.decode([AdditionCatalogItem].self)
+            XCTAssertEqual(items, [AdditionCatalogItem(id: "a1", name: "Add Bacon", priceDelta: 5.5)])
+        }
+        try app.test(.GET, "api/additions-catalog", headers: ["Cookie": cookie]) { res in
+            let items = try res.content.decode([AdditionCatalogItem].self)
+            XCTAssertEqual(items.count, 1, "saved catalog should persist across requests")
+        }
+    }
+
     func testSingleItemGetPatchDeleteLifecycle() throws {
         var sessionCookie: String?
         try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],

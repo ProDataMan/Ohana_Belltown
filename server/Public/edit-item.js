@@ -28,6 +28,50 @@ const statusEl = document.getElementById('status');
 const panelEl = document.getElementById('editor-panel');
 let currentImages = [];
 let currentModifiers = [];
+let additionsCatalog = [];
+
+async function loadAdditionsCatalog() {
+  const select = document.getElementById('catalog-modifier-select');
+  try {
+    const response = await staffFetch('/api/additions-catalog');
+    if (!response.ok) throw new Error(`Unable to load the additions catalog (${response.status}).`);
+    additionsCatalog = await response.json();
+    additionsCatalog.sort((a, b) => a.name.localeCompare(b.name));
+    select.innerHTML =
+      '<option value="">— pick an existing addition —</option>' +
+      additionsCatalog
+        .map((a) => `<option value="${escapeAttrItem(a.id)}">${escapeAttrItem(a.name)} (+$${Number(a.priceDelta).toFixed(2)})</option>`)
+        .join('');
+  } catch {
+    // The free-text add-on inputs still work without the catalog.
+  }
+}
+
+document.getElementById('catalog-modifier-select').addEventListener('change', (event) => {
+  const picked = additionsCatalog.find((a) => a.id === event.target.value);
+  if (!picked) return;
+  document.getElementById('new-modifier-name').value = picked.name;
+  document.getElementById('new-modifier-price').value = picked.priceDelta;
+  event.target.value = '';
+});
+
+/// Saves a brand-new addition name to the shared catalog so other items can
+/// reuse it later — fire-and-forget, since this shouldn't block adding the
+/// modifier to the item itself if it fails.
+async function addToCatalogIfNew(name, priceDelta) {
+  if (additionsCatalog.some((a) => a.name.toLowerCase() === name.toLowerCase())) return;
+  const updated = [...additionsCatalog, { id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`, name, priceDelta }];
+  try {
+    const response = await staffFetch('/api/additions-catalog', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    });
+    if (response.ok) await loadAdditionsCatalog();
+  } catch {
+    // Not critical — the modifier is still added to this item either way.
+  }
+}
 
 function renderModifiersList() {
   const el = document.getElementById('modifiers-list');
@@ -71,6 +115,7 @@ function addModifier() {
   if (!name || Number.isNaN(priceDelta)) return;
   currentModifiers.push({ id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`, name, priceDelta });
   renderModifiersList();
+  addToCatalogIfNew(name, priceDelta);
   nameInput.value = '';
   priceInput.value = '';
   nameInput.focus();
@@ -296,4 +341,5 @@ document.getElementById('photo-google-btn').addEventListener('click', openGoogle
 document.getElementById('save-btn').addEventListener('click', saveItem);
 document.getElementById('delete-btn').addEventListener('click', deleteItem);
 
+loadAdditionsCatalog();
 loadItem();

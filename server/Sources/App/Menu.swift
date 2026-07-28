@@ -105,8 +105,46 @@ struct MenuCategory: Codable, Content {
     var items: [MenuItem]
 }
 
+/// A reusable add-on definition staff can pick from when adding a modifier
+/// to any menu item (e.g. "Add Bacon +$5.50"), instead of retyping the same
+/// name/price on every item that offers it. The price here is just a
+/// starting point — an item-specific modifier copied from the catalog can
+/// still be edited afterward, since some add-ons (like "Yosh Size") price
+/// differently depending on the dish.
+struct AdditionCatalogItem: Codable, Content, Equatable {
+    var id: String
+    var name: String
+    var priceDelta: Double
+
+    init(id: String = UUID().uuidString, name: String, priceDelta: Double) {
+        self.id = id
+        self.name = name
+        self.priceDelta = priceDelta
+    }
+}
+
 struct Menu: Codable, Content {
     var restaurant: String
     var lastUpdated: String
     var categories: [MenuCategory]
+    var additionsCatalog: [AdditionCatalogItem]
+
+    enum CodingKeys: String, CodingKey {
+        case restaurant, lastUpdated, categories, additionsCatalog
+    }
+
+    init(restaurant: String, lastUpdated: String, categories: [MenuCategory], additionsCatalog: [AdditionCatalogItem] = []) {
+        self.restaurant = restaurant
+        self.lastUpdated = lastUpdated
+        self.categories = categories
+        self.additionsCatalog = additionsCatalog
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        restaurant = try container.decode(String.self, forKey: .restaurant)
+        lastUpdated = try container.decode(String.self, forKey: .lastUpdated)
+        categories = try container.decode([MenuCategory].self, forKey: .categories)
+        additionsCatalog = try container.decodeIfPresent([AdditionCatalogItem].self, forKey: .additionsCatalog) ?? []
+    }
 }

@@ -128,5 +128,31 @@ final class MenuTests: XCTestCase {
         let menu = try JSONDecoder().decode(Menu.self, from: Data(json.utf8))
         XCTAssertEqual(menu.categories.count, 1)
         XCTAssertEqual(menu.categories[0].items.first?.name, "Gyoza")
+        XCTAssertEqual(menu.additionsCatalog, [], "menus predating the additions catalog should default to none")
+    }
+
+    func testDecodesAdditionsCatalogWhenPresent() throws {
+        let json = """
+        {
+            "restaurant": "Ohana Belltown",
+            "lastUpdated": "2026-01-01",
+            "categories": [],
+            "additionsCatalog": [{ "id": "a1", "name": "Add Bacon", "priceDelta": 5.5 }]
+        }
+        """
+        let menu = try JSONDecoder().decode(Menu.self, from: Data(json.utf8))
+        XCTAssertEqual(menu.additionsCatalog.count, 1)
+        XCTAssertEqual(menu.additionsCatalog[0].name, "Add Bacon")
+        XCTAssertEqual(menu.additionsCatalog[0].priceDelta, 5.5)
+    }
+
+    func testAdditionsCatalogRoundTripEncodeDecode() throws {
+        let menu = Menu(
+            restaurant: "Ohana Belltown", lastUpdated: "2026-01-01", categories: [],
+            additionsCatalog: [AdditionCatalogItem(id: "a1", name: "Add Bacon", priceDelta: 5.5)]
+        )
+        let data = try JSONEncoder().encode(menu)
+        let decoded = try JSONDecoder().decode(Menu.self, from: data)
+        XCTAssertEqual(decoded.additionsCatalog, menu.additionsCatalog)
     }
 }

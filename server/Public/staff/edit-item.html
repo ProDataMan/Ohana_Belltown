@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Edit Menu Item — Ohana Belltown</title>
     <meta name="robots" content="noindex, nofollow" />
-    <link rel="stylesheet" href="./style.css" />
+    <link rel="stylesheet" href="../style.css" />
   </head>
   <body>
     <main class="page">
@@ -62,11 +62,17 @@
           <h3>Add-Ons &amp; Upgrades</h3>
           <p class="hint">Optional extras a customer can check when placing a table order — e.g. "Add Katsu" or "Yosh Size", priced as the extra amount added to this item's price.</p>
           <div id="modifiers-list"></div>
+          <label>Choose from catalog
+            <select id="catalog-modifier-select">
+              <option value="">— pick an existing addition —</option>
+            </select>
+          </label>
           <div class="cta-row">
             <input type="text" id="new-modifier-name" placeholder="e.g. Yosh Size" style="flex: 2;" />
             <input type="number" id="new-modifier-price" step="0.01" placeholder="+$" style="flex: 1;" />
             <button type="button" id="add-modifier-btn" class="secondary">Add</button>
           </div>
+          <p class="hint">Picking from the catalog fills in the name/price above — tweak the price first if this dish needs a different one (e.g. Yosh Size varies by dish). Adding a new name here also saves it to the catalog for next time.</p>
         </div>
 
         <div class="save-row">
@@ -77,7 +83,7 @@
       </section>
     </main>
 
-    <script src="./staff-auth.js"></script>
-    <script src="./edit-item.js"></script>
+    <script src="../staff-auth.js"></script>
+    <script src="../edit-item.js"></script>
   </body>
 </html>
