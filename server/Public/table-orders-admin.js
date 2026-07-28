@@ -155,9 +155,46 @@ function renderFloorMapTabs() {
   });
 }
 
+// A table shouldn't start flashing for delivery the instant an order is
+// entered — that's before the kitchen could plausibly have it ready. It
+// becomes eligible once we're at whichever is greater: the average prep time
+// of the single slowest dish still cooking there (the table can't be fully
+// ready before that dish alone would be), or half the combined average prep
+// time of everything cooking there (several dishes cooking in parallel is a
+// different wait than one dish taking three times as long).
+function tablesEligibleForAwaitingFlash(awaitingDelivery) {
+  const byTable = {};
+  awaitingDelivery.forEach((o) => {
+    (byTable[o.tableId] = byTable[o.tableId] || []).push(o);
+  });
+
+  const eligible = new Set();
+  Object.entries(byTable).forEach(([tableId, orders]) => {
+    const durationsMs = [];
+    const enteredTimesMs = [];
+    orders.forEach((o) => {
+      if (!o.enteredAt || !o.estimatedReadyAt) return;
+      const entered = new Date(o.enteredAt).getTime();
+      const ready = new Date(o.estimatedReadyAt).getTime();
+      durationsMs.push(ready - entered);
+      enteredTimesMs.push(entered);
+    });
+    if (!durationsMs.length) return;
+
+    const longestDishMs = Math.max(...durationsMs);
+    const halfOfTotalPrepMs = durationsMs.reduce((sum, d) => sum + d, 0) / 2;
+    const delayMs = Math.max(longestDishMs, halfOfTotalPrepMs);
+    const earliestEnteredMs = Math.min(...enteredTimesMs);
+    if (Date.now() - earliestEnteredMs >= delayMs) {
+      eligible.add(tableId);
+    }
+  });
+  return eligible;
+}
+
 function updateFloorMapFlashing(needsEntry, awaitingDelivery) {
   const needsIds = new Set(needsEntry.map((o) => o.tableId));
-  const awaitingIds = new Set(awaitingDelivery.map((o) => o.tableId));
+  const awaitingIds = tablesEligibleForAwaitingFlash(awaitingDelivery);
   document.querySelectorAll('.floor-map-table').forEach((el) => {
     const id = el.dataset.tableId;
     el.classList.toggle('flash-needs', needsIds.has(id));
@@ -171,7 +208,7 @@ function updateFloorMapFlashing(needsEntry, awaitingDelivery) {
     tableSection[entry.id] = entry.section;
   });
   const sectionsWithNeeds = new Set(needsEntry.map((o) => tableSection[o.tableId]).filter(Boolean));
-  const sectionsWithAwaiting = new Set(awaitingDelivery.map((o) => tableSection[o.tableId]).filter(Boolean));
+  const sectionsWithAwaiting = new Set([...awaitingIds].map((tableId) => tableSection[tableId]).filter(Boolean));
   document.querySelectorAll('#floor-map-tabs button').forEach((btn) => {
     const section = btn.dataset.section;
     if (section === activeFloorMapSection) {
