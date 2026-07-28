@@ -25,6 +25,7 @@ final class RouteTests: XCTestCase {
         TableOrdersStore.shared.configure(dataDirectory: tempDir.path)
         StaffingStore.shared.configure(dataDirectory: tempDir.path)
         FeedbackStore.shared.configure(dataDirectory: tempDir.path)
+        StaffRewardsStore.shared.configure(dataDirectory: tempDir.path)
     }
 
     override func tearDown() async throws {
@@ -450,6 +451,79 @@ final class RouteTests: XCTestCase {
             // Vapor's router rejects the encoded ".." segments before this
             // route's own ".." guard ever runs — still blocked either way.
             XCTAssertEqual(res.status, .forbidden, "path traversal attempt")
+        }
+    }
+
+    func testMenuItemPatchAutoAwardsStaffRewardPunches() throws {
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        let menuBody = ByteBuffer(string: #"""
+        {"restaurant":"Ohana","lastUpdated":"now","categories":[
+          {"section":"menu","name":"Rolls","note":null,"items":[
+            {"id":"item-1","name":"Volcano Roll","description":null,"price":null,"images":[],"tags":[],"featured":false,"available":true,"happyHour":false}
+          ]}
+        ]}
+        """#)
+        try app.test(.PUT, "api/menu", headers: ["Content-Type": "application/json", "Cookie": cookie], body: menuBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+
+        // Adds a photo, sets a price, and marks it featured all in one edit — three separate punches.
+        let patchBody = ByteBuffer(string: #"""
+        {"name":"Volcano Roll","description":null,"price":18,"images":["/uploads/a.jpg"],"tags":[],"featured":true,"available":true,"happyHour":false}
+        """#)
+        try app.test(.PATCH, "api/menu/items/item-1", headers: ["Content-Type": "application/json", "Cookie": cookie], body: patchBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+
+        try app.test(.GET, "api/staff-rewards/me", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+            let status = try res.content.decode(StaffRewardStatus.self)
+            XCTAssertEqual(status.punches, 3)
+        }
+    }
+
+    func testStaffRewardsAwardAndRedeemRequireAdmin() throws {
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        let awardBody = ByteBuffer(string: #"{"staffId":"admin1","category":"social","note":"Instagram post"}"#)
+        try app.test(.POST, "api/staff-rewards/award", headers: ["Content-Type": "application/json"], body: awardBody) { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+        try app.test(.POST, "api/staff-rewards/award", headers: ["Content-Type": "application/json", "Cookie": cookie], body: awardBody) { res in
+            XCTAssertEqual(res.status, .ok)
+            let status = try res.content.decode(StaffRewardStatus.self)
+            XCTAssertEqual(status.punches, 1)
+        }
+
+        try app.test(.GET, "api/staff-rewards") { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+        try app.test(.GET, "api/staff-rewards", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+            let cards = try res.content.decode([StaffRewardCard].self)
+            XCTAssertEqual(cards.count, 1)
+        }
+
+        try app.test(.POST, "api/staff-rewards/admin1/redeem") { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+        try app.test(.POST, "api/staff-rewards/admin1/redeem", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .badRequest, "only 1 punch so far, needs 10")
         }
     }
 

@@ -61,6 +61,23 @@ async function loadProfile() {
   }
 }
 
+async function loadRewards() {
+  const el = document.getElementById('rewards-status');
+  if (!el) return;
+  try {
+    const response = await staffFetch('/api/staff-rewards/me');
+    if (!response.ok) throw new Error('Unable to load rewards.');
+    const status = await response.json();
+    el.innerHTML = `
+      <span class="pill ${status.rewardReady ? 'pill-approved' : ''}">${status.punches} / ${status.punchesNeeded} punches</span>
+      ${status.rewardReady ? '<span class="pill pill-approved">Reward ready — ask an admin!</span>' : ''}
+      <span class="hint">Total redeemed: ${status.totalRedeemed}</span>
+    `;
+  } catch (error) {
+    el.textContent = error.message;
+  }
+}
+
 document.getElementById('logout-btn').addEventListener('click', async () => {
   await fetch('/api/auth/logout', { method: 'POST' });
   window.location.href = '/login';
@@ -168,3 +185,4 @@ document.getElementById('phone-form').addEventListener('submit', async (event) =
 });
 
 loadProfile();
+loadRewards();

@@ -29,6 +29,12 @@ struct TableOrdersDashboard: Content {
     var readyCount: Int
 }
 
+struct StaffRewardAwardRequest: Content {
+    var staffId: String
+    var category: String
+    var note: String?
+}
+
 struct FeedbackSubmission: Content {
     var category: String
     var rating: Int?
@@ -105,10 +111,11 @@ func routes(_ app: Application) throws {
     }
 
     app.on(.PATCH, "api", "menu", "items", ":id") { req throws -> MenuItem in
-        try requireLogin(req)
+        let staff = try requireLogin(req)
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
         let body = try req.content.decode(MenuItemUpdateRequest.self)
-        return try MenuStore.shared.updateItem(id: id) { item in
+        let before = try? MenuStore.shared.findItem(id: id).item
+        let updated = try MenuStore.shared.updateItem(id: id) { item in
             item.name = body.name
             item.description = body.description
             item.price = body.price
@@ -119,6 +126,8 @@ func routes(_ app: Application) throws {
             item.modifiers = body.modifiers ?? []
             item.happyHour = body.happyHour
         }
+        StaffRewardsStore.shared.awardForMenuEdit(staffId: staff.id, before: before, after: updated)
+        return updated
     }
 
     app.on(.DELETE, "api", "menu", "items", ":id") { req throws -> HTTPStatus in
@@ -187,9 +196,48 @@ func routes(_ app: Application) throws {
     }
 
     app.put("api", "events") { req throws -> EventsList in
-        try requireAdmin(req)
+        let admin = try requireAdmin(req)
+        let beforeIds = Set((try? EventsStore.shared.get().events.map(\.id)) ?? [])
         let incoming = try req.content.decode(EventsList.self)
-        return try EventsStore.shared.save(incoming)
+        let saved = try EventsStore.shared.save(incoming)
+        if saved.events.contains(where: { !beforeIds.contains($0.id) }) {
+            try? StaffRewardsStore.shared.award(staffId: admin.id, category: "event", note: nil, awardedBy: nil)
+        }
+        return saved
+    }
+
+    // Staff rewards: a punch card earned by keeping the site itself up to
+    // date (photos, prices, specials on menu-item edits; new events), plus
+    // manual admin grants for anything that can't be auto-detected (a
+    // social media post, going above and beyond, etc.).
+    app.get("api", "staff-rewards", "me") { req throws -> StaffRewardStatus in
+        let staff = try requireLogin(req)
+        return try StaffRewardsStore.shared.status(staffId: staff.id)
+    }
+
+    app.get("api", "staff-rewards") { req throws -> [StaffRewardCard] in
+        try requireAdmin(req)
+        return try StaffRewardsStore.shared.allCards()
+    }
+
+    app.get("api", "staff-rewards", "events") { req throws -> [StaffRewardEvent] in
+        try requireAdmin(req)
+        let limit = req.query[Int.self, at: "limit"] ?? 50
+        return try StaffRewardsStore.shared.recentEvents(limit: limit)
+    }
+
+    app.post("api", "staff-rewards", "award") { req throws -> StaffRewardStatus in
+        let admin = try requireAdmin(req)
+        let body = try req.content.decode(StaffRewardAwardRequest.self)
+        return try StaffRewardsStore.shared.award(
+            staffId: body.staffId, category: body.category, note: body.note, awardedBy: admin.id
+        )
+    }
+
+    app.post("api", "staff-rewards", ":staffId", "redeem") { req throws -> StaffRewardStatus in
+        try requireAdmin(req)
+        guard let staffId = req.parameters.get("staffId") else { throw Abort(.badRequest) }
+        return try StaffRewardsStore.shared.redeem(staffId: staffId, note: req.query[String.self, at: "note"])
     }
 
     app.post("api", "loyalty", "lookup") { req throws -> LoyaltyStatus in
@@ -403,6 +451,7 @@ func routes(_ app: Application) throws {
         ("create-account.html", "staff/create-account.html", true),
         ("manage-users.html", "staff/manage-users.html", true),
         ("analytics.html", "staff/analytics.html", true),
+        ("staff-rewards-admin.html", "staff/staff-rewards-admin.html", true),
     ]
     for (route, file, adminOnly) in staffPages {
         app.get(PathComponent(stringLiteral: route)) { req in
