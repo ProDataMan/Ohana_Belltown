@@ -27,6 +27,8 @@ const addCategorySection = document.getElementById('add-category-section');
 const reloadBtn = document.getElementById('reload-btn');
 const saveBtn = document.getElementById('save-btn');
 const saveStatus = document.getElementById('save-status');
+const seedAdditionsBtn = document.getElementById('seed-additions-btn');
+const seedAdditionsStatus = document.getElementById('seed-additions-status');
 
 let restaurantName = 'Ohana Belltown';
 
@@ -446,6 +448,30 @@ async function saveMenu() {
   }
 }
 
+async function seedCommonAdditions() {
+  seedAdditionsBtn.disabled = true;
+  setStatus(seedAdditionsStatus, 'Scanning menu item descriptions for add-ons like "Add Katsu +$6"...', false);
+  try {
+    const response = await staffFetch('/api/menu/seed-additions', { method: 'POST' });
+    if (!response.ok) throw new Error(`Scan failed (${response.status}).`);
+    const result = await response.json();
+    if (!result.catalogAdded && !result.itemsUpdated.length) {
+      setStatus(seedAdditionsStatus, 'Nothing new found — the catalog and every known item already have their add-ons.', false);
+    } else {
+      const parts = [];
+      if (result.catalogAdded) parts.push(`${result.catalogAdded} new catalog entr${result.catalogAdded === 1 ? 'y' : 'ies'}`);
+      if (result.itemsUpdated.length) parts.push(`updated ${result.itemsUpdated.length} item${result.itemsUpdated.length === 1 ? '' : 's'} (${result.itemsUpdated.join(', ')})`);
+      setStatus(seedAdditionsStatus, `Done — ${parts.join(', ')}.`, false);
+    }
+    await loadMenu();
+  } catch (error) {
+    setStatus(seedAdditionsStatus, error.message, true);
+  } finally {
+    seedAdditionsBtn.disabled = false;
+  }
+}
+
+seedAdditionsBtn.addEventListener('click', seedCommonAdditions);
 reloadBtn.addEventListener('click', () => loadMenu().catch((error) => setStatus(statusEl, error.message, true)));
 saveBtn.addEventListener('click', saveMenu);
 addCategoryBtn.addEventListener('click', () => {

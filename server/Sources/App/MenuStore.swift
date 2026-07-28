@@ -24,6 +24,11 @@ struct MenuItemLocation: Content {
     var section: String
 }
 
+struct SeedAdditionsResult: Content {
+    var catalogAdded: Int
+    var itemsUpdated: [String]
+}
+
 final class MenuStore: @unchecked Sendable {
     static let shared = MenuStore()
 
@@ -106,6 +111,97 @@ final class MenuStore: @unchecked Sendable {
         menu.additionsCatalog = items
         try persist()
         return items
+    }
+
+    // Curated from a full sweep of every item's description on 2026-07-28,
+    // looking for real upcharge text ("Add Katsu +$6", "YOSH size: $53.20",
+    // etc). One consistent price per addition across every item that offers
+    // it, except Yosh Size, which is priced per item below since it
+    // genuinely varies by dish.
+    private static let commonAdditionsCatalog: [(name: String, priceDelta: Double)] = [
+        ("Add Bacon", 5.50),
+        ("Add Fried Egg", 3.50),
+        ("Add Spam", 6),
+        ("Add Salmon", 6),
+        ("Add Shrimp", 5),
+        ("Add Katsu", 6),
+        ("Add Chicken", 6),
+        ("Sub Fried Rice", 6),
+        ("Sub Kalua Pork", 0),
+        ("Sub Noodles", 3),
+        ("Extra Tofu", 3),
+        ("Add Strawberry", 1.50),
+        ("Add Mango", 1.50),
+        ("Add Banana", 1.50),
+        ("Yosh Size", 25.20),
+    ]
+
+    private static let commonItemModifiers: [(itemName: String, additions: [(name: String, priceOverride: Double?)])] = [
+        ("Spicy Fried Rice", [("Add Fried Egg", nil), ("Add Spam", nil), ("Add Bacon", nil)]),
+        ("Veggie Spring Rolls", [("Add Salmon", 5), ("Add Shrimp", nil)]),
+        ("Loco Moco", [("Sub Fried Rice", nil), ("Sub Kalua Pork", nil), ("Add Bacon", nil), ("Add Katsu", nil), ("Add Spam", nil), ("Yosh Size", 25.20)]),
+        ("Kalua Pork", [("Yosh Size", 24.30)]),
+        ("Curry Rice", [("Add Katsu", nil), ("Yosh Size", 23.40)]),
+        ("Adobo", [("Yosh Size", 25.20)]),
+        ("Yakisoba", [("Extra Tofu", nil), ("Add Chicken", 4), ("Yosh Size", 20.70)]),
+        ("Chicken Katsu", [("Yosh Size", 25.20)]),
+        ("Ginger Chicken Broccoli", [("Sub Noodles", nil), ("Yosh Size", 25.20)]),
+        ("Big Kahuna Fish & Chips", [("Yosh Size", 26.10)]),
+        ("Ohana Cheese Burger", [("Add Bacon", nil)]),
+        ("Island Style Baby Back Ribs", [("Yosh Size", 28.80)]),
+        ("Ohana Salad", [("Add Chicken", nil), ("Add Salmon", nil), ("Yosh Size", 11.70)]),
+        ("Chicken Teriyaki / Spicy Chicken Teriyaki", [("Yosh Size", 25.20)]),
+        ("Salmon Teriyaki", [("Yosh Size", 27.90)]),
+        ("Beef Teriyaki / Spicy Beef Teriyaki", [("Yosh Size", 27.90)]),
+        ("Virgin Pina Colada", [("Add Strawberry", nil), ("Add Mango", nil), ("Add Banana", nil)]),
+    ]
+
+    /// One-click, idempotent: seeds the shared catalog and applies matching
+    /// modifiers to whichever of the known items are still missing them.
+    /// Safe to run repeatedly — already-present catalog entries/modifiers
+    /// (matched case-insensitively by name) are left untouched.
+    @discardableResult
+    func seedCommonAdditions() throws -> SeedAdditionsResult {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+
+        let existingCatalogNames = Set(menu.additionsCatalog.map { $0.name.lowercased() })
+        var catalogAdded = 0
+        for entry in Self.commonAdditionsCatalog where !existingCatalogNames.contains(entry.name.lowercased()) {
+            menu.additionsCatalog.append(AdditionCatalogItem(name: entry.name, priceDelta: entry.priceDelta))
+            catalogAdded += 1
+        }
+        let catalogPrices = Dictionary(uniqueKeysWithValues: Self.commonAdditionsCatalog.map { ($0.name, $0.priceDelta) })
+
+        var itemsUpdated: [String] = []
+        for (itemName, additions) in Self.commonItemModifiers {
+            let normalizedName = itemName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            outer: for catIdx in menu.categories.indices {
+                for itemIdx in menu.categories[catIdx].items.indices {
+                    guard menu.categories[catIdx].items[itemIdx].name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == normalizedName else { continue }
+
+                    let existingModNames = Set(menu.categories[catIdx].items[itemIdx].modifiers.map { $0.name.lowercased() })
+                    var added = 0
+                    for addition in additions where !existingModNames.contains(addition.name.lowercased()) {
+                        let price = addition.priceOverride ?? catalogPrices[addition.name] ?? 0
+                        menu.categories[catIdx].items[itemIdx].modifiers.append(MenuItemModifier(name: addition.name, priceDelta: price))
+                        added += 1
+                    }
+                    if added > 0 {
+                        itemsUpdated.append(itemName)
+                    }
+                    break outer
+                }
+            }
+        }
+
+        if catalogAdded > 0 || !itemsUpdated.isEmpty {
+            menu.lastUpdated = String(ISO8601DateFormatter().string(from: Date()).prefix(10))
+            try persist()
+        }
+
+        return SeedAdditionsResult(catalogAdded: catalogAdded, itemsUpdated: itemsUpdated)
     }
 
     func deleteItem(id: String) throws {

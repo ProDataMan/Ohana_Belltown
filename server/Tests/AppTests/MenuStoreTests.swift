@@ -98,4 +98,51 @@ final class MenuStoreTests: XCTestCase {
         let secondLoadMenu = try MenuStore.shared.get()
         XCTAssertEqual(secondLoadMenu.categories.first?.items.first?.id, assignedId)
     }
+
+    func testSeedCommonAdditionsAddsCatalogAndMatchingItemModifiers() throws {
+        try seedMenu(items: [
+            MenuItem(id: "loco", name: "Loco Moco", price: 18),
+            MenuItem(id: "unrelated", name: "Miso Soup", price: 4),
+        ])
+
+        let result = try MenuStore.shared.seedCommonAdditions()
+
+        XCTAssertEqual(result.catalogAdded, 15)
+        XCTAssertEqual(result.itemsUpdated, ["Loco Moco"])
+
+        let catalog = try MenuStore.shared.additionsCatalog()
+        XCTAssertTrue(catalog.contains { $0.name == "Add Bacon" && $0.priceDelta == 5.50 })
+
+        let locoMoco = try MenuStore.shared.findItem(id: "loco")
+        let modNames = Set(locoMoco.item.modifiers.map { $0.name })
+        XCTAssertEqual(modNames, ["Sub Fried Rice", "Sub Kalua Pork", "Add Bacon", "Add Katsu", "Add Spam", "Yosh Size"])
+        XCTAssertEqual(locoMoco.item.modifiers.first { $0.name == "Yosh Size" }?.priceDelta, 25.20)
+
+        let misoSoup = try MenuStore.shared.findItem(id: "unrelated")
+        XCTAssertEqual(misoSoup.item.modifiers, [], "items with no known upcharge shouldn't get modifiers invented for them")
+    }
+
+    func testSeedCommonAdditionsIsIdempotent() throws {
+        try seedMenu(items: [MenuItem(id: "loco", name: "Loco Moco", price: 18)])
+
+        try MenuStore.shared.seedCommonAdditions()
+        let second = try MenuStore.shared.seedCommonAdditions()
+
+        XCTAssertEqual(second.catalogAdded, 0)
+        XCTAssertEqual(second.itemsUpdated, [])
+        let locoMoco = try MenuStore.shared.findItem(id: "loco")
+        XCTAssertEqual(locoMoco.item.modifiers.count, 6, "running it twice shouldn't duplicate modifiers")
+    }
+
+    func testSeedCommonAdditionsSkipsAModifierAlreadyPresentByName() throws {
+        try seedMenu(items: [
+            MenuItem(id: "loco", name: "loco moco", price: 18, modifiers: [MenuItemModifier(name: "add bacon", priceDelta: 999)]),
+        ])
+
+        try MenuStore.shared.seedCommonAdditions()
+
+        let locoMoco = try MenuStore.shared.findItem(id: "loco")
+        let bacon = locoMoco.item.modifiers.first { $0.name.lowercased() == "add bacon" }
+        XCTAssertEqual(bacon?.priceDelta, 999, "a pre-existing modifier (matched case-insensitively) should be left alone, not overwritten")
+    }
 }

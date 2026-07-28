@@ -361,6 +361,44 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testSeedAdditionsRequiresLoginAndAppliesKnownModifiers() throws {
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        let menuBody = ByteBuffer(string: #"""
+        {"restaurant":"Ohana","lastUpdated":"now","categories":[
+          {"section":"menu","name":"Entrees","note":null,"items":[
+            {"name":"Loco Moco","price":18}
+          ]}
+        ]}
+        """#)
+        try app.test(.PUT, "api/menu", headers: ["Content-Type": "application/json", "Cookie": cookie], body: menuBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+
+        try app.test(.POST, "api/menu/seed-additions") { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+        try app.test(.POST, "api/menu/seed-additions", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+            let result = try res.content.decode(SeedAdditionsResult.self)
+            XCTAssertEqual(result.catalogAdded, 15)
+            XCTAssertEqual(result.itemsUpdated, ["Loco Moco"])
+        }
+
+        try app.test(.GET, "api/menu") { res in
+            let menu = try res.content.decode(Menu.self)
+            let locoMoco = menu.categories.first?.items.first { $0.name == "Loco Moco" }
+            XCTAssertEqual(locoMoco?.modifiers.count, 6)
+        }
+    }
+
     func testSingleItemGetPatchDeleteLifecycle() throws {
         var sessionCookie: String?
         try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],

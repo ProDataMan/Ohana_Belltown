@@ -137,6 +137,14 @@ func routes(_ app: Application) throws {
         return try MenuStore.shared.saveAdditionsCatalog(items)
     }
 
+    // One-click "scan the menu for add-ons already written into item
+    // descriptions" — seeds the shared catalog and adds matching modifiers
+    // to whichever known items don't already have them. Idempotent.
+    app.post("api", "menu", "seed-additions") { req throws -> SeedAdditionsResult in
+        try requireLogin(req)
+        return try MenuStore.shared.seedCommonAdditions()
+    }
+
     app.get("api", "menu", "items", ":id") { req throws -> MenuItemLocation in
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
         return try MenuStore.shared.findItem(id: id)
