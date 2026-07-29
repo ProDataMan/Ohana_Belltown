@@ -24,6 +24,7 @@ func configure(_ app: Application) throws {
     StaffingStore.shared.configure(dataDirectory: dataDirectory)
     FeedbackStore.shared.configure(dataDirectory: dataDirectory)
     StaffRewardsStore.shared.configure(dataDirectory: dataDirectory)
+    CompetitorPricingStore.shared.configure(dataDirectory: dataDirectory)
 
     app.routes.defaultMaxBodySize = "10mb"
 

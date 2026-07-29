@@ -2303,3 +2303,15 @@ fieldset legend {
   padding: 0.35rem 0.7rem;
   font-size: 0.82rem;
 }
+
+.plain-list {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  white-space: normal;
+  font-size: 0.85rem;
+}
+
+.plain-list li {
+  padding: 0.2rem 0;
+}

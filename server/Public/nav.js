@@ -81,6 +81,7 @@ function insertStaffNavDropdown() {
       <a href="/table-card.html">Table Cards</a>
       <a href="/analytics.html">Analytics</a>
       <a href="/staff-rewards-admin.html">Staff Rewards</a>
+      <a href="/competitor-pricing-admin.html">Competitor Pricing</a>
       <a href="/manage-users.html">Manage Users</a>
       <a href="/account.html">My Account</a>
     </div>

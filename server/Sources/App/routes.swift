@@ -336,6 +336,48 @@ func routes(_ app: Application) throws {
         return try StaffRewardsStore.shared.redeem(staffId: staffId, catalogItemId: body.catalogItemId, note: body.note)
     }
 
+    // Competitor menu-price comparison — entirely staff-curated (there's no
+    // reliable live API for a competitor's actual published prices), admin
+    // only since this is competitive pricing strategy, same gating as
+    // /analytics.html itself.
+    app.get("api", "competitor-pricing", "restaurants") { req throws -> [CompetitorRestaurant] in
+        try requireAdmin(req)
+        return try CompetitorPricingStore.shared.restaurants()
+    }
+
+    app.put("api", "competitor-pricing", "restaurants") { req throws -> [CompetitorRestaurant] in
+        try requireAdmin(req)
+        let items = try req.content.decode([CompetitorRestaurant].self)
+        return try CompetitorPricingStore.shared.saveRestaurants(items)
+    }
+
+    app.get("api", "competitor-pricing", "groups") { req throws -> [MenuPriceComparisonGroup] in
+        try requireAdmin(req)
+        return try CompetitorPricingStore.shared.groups()
+    }
+
+    app.put("api", "competitor-pricing", "groups") { req throws -> [MenuPriceComparisonGroup] in
+        try requireAdmin(req)
+        let items = try req.content.decode([MenuPriceComparisonGroup].self)
+        return try CompetitorPricingStore.shared.saveGroups(items)
+    }
+
+    app.get("api", "competitor-pricing", "entries") { req throws -> [CompetitorPriceEntry] in
+        try requireAdmin(req)
+        return try CompetitorPricingStore.shared.entries()
+    }
+
+    app.put("api", "competitor-pricing", "entries") { req throws -> [CompetitorPriceEntry] in
+        try requireAdmin(req)
+        let items = try req.content.decode([CompetitorPriceEntry].self)
+        return try CompetitorPricingStore.shared.saveEntries(items)
+    }
+
+    app.get("api", "competitor-pricing", "report") { req throws -> [CompetitorPriceReportRow] in
+        try requireAdmin(req)
+        return try CompetitorPricingStore.shared.report()
+    }
+
     app.post("api", "loyalty", "lookup") { req throws -> LoyaltyStatus in
         let body = try req.content.decode(PhoneRequest.self)
         return try LoyaltyStore.shared.lookup(phone: body.phone)
@@ -558,6 +600,7 @@ func routes(_ app: Application) throws {
         ("manage-users.html", "staff/manage-users.html", true),
         ("analytics.html", "staff/analytics.html", true),
         ("staff-rewards-admin.html", "staff/staff-rewards-admin.html", true),
+        ("competitor-pricing-admin.html", "staff/competitor-pricing-admin.html", true),
     ]
     for (route, file, adminOnly) in staffPages {
         app.get(PathComponent(stringLiteral: route)) { req in

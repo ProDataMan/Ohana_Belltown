@@ -309,6 +309,66 @@ async function loadMenuHealthReports() {
   }
 }
 
+async function loadCompetitorPricingReport() {
+  const summaryEl = document.getElementById('competitor-pricing-summary');
+  const listEl = document.getElementById('competitor-pricing-list');
+  listEl.innerHTML = '<p class="hint">Loading...</p>';
+
+  try {
+    const response = await staffFetch('/api/competitor-pricing/report');
+    if (!response.ok) throw new Error(`Unable to load the pricing report (${response.status}).`);
+    const rows = await response.json();
+
+    const priced = rows.filter((r) => r.ourPrice != null && r.competitorAverage != null);
+    const above = priced.filter((r) => r.deltaVsAverage > 0).length;
+    const below = priced.filter((r) => r.deltaVsAverage < 0).length;
+    renderSummaryPills(summaryEl, [
+      { label: `${rows.length} comparison${rows.length === 1 ? '' : 's'} tracked` },
+      ...(priced.length ? [{ label: `${above} above average, ${below} below`, cls: above > below ? 'pill-warning' : 'pill-approved' }] : []),
+    ]);
+
+    if (!rows.length) {
+      listEl.innerHTML = '<p class="hint">No comparison groups yet — set them up on <a href="/competitor-pricing-admin.html">Competitor Pricing</a>.</p>';
+      return;
+    }
+
+    listEl.innerHTML = `
+      <div class="data-table">
+        <table>
+          <thead><tr><th>Comparison</th><th>Our Price</th><th>Competitor Avg</th><th>Range</th><th>Vs. Average</th></tr></thead>
+          <tbody>
+            ${rows
+              .map((row) => {
+                const ourPriceText = row.ourPrice != null ? `$${row.ourPrice.toFixed(2)}` : '<span class="hint">not linked</span>';
+                const avgText = row.competitorAverage != null ? `$${row.competitorAverage.toFixed(2)} (${row.competitorCount})` : '<span class="hint">no data yet</span>';
+                const rangeText = row.competitorMin != null ? `$${row.competitorMin.toFixed(2)}&ndash;$${row.competitorMax.toFixed(2)}` : '';
+                let deltaText = '<span class="hint">&mdash;</span>';
+                if (row.deltaVsAverage != null) {
+                  const sign = row.deltaVsAverage > 0 ? '+' : '';
+                  const pillClass = row.deltaVsAverage > 0 ? 'pill-denied' : 'pill-approved';
+                  deltaText = `<span class="pill ${pillClass}">${sign}$${row.deltaVsAverage.toFixed(2)} (${sign}${row.deltaPercentVsAverage.toFixed(0)}%)</span>`;
+                }
+                return `
+                <tr>
+                  <td>${escapeHtmlAnalytics(row.label)}${row.ourMenuItemName ? `<div class="hint">${escapeHtmlAnalytics(row.ourMenuItemName)}</div>` : ''}</td>
+                  <td>${ourPriceText}</td>
+                  <td>${avgText}</td>
+                  <td>${rangeText}</td>
+                  <td>${deltaText}</td>
+                </tr>
+              `;
+              })
+              .join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (error) {
+    summaryEl.innerHTML = '';
+    listEl.innerHTML = `<p class="status status-error">${escapeHtmlAnalytics(error.message)}</p>`;
+  }
+}
+
 async function loadDeliveryStats() {
   const summaryEl = document.getElementById('delivery-stats-summary');
   const listEl = document.getElementById('delivery-stats');
@@ -464,10 +524,12 @@ document.getElementById('range-select').addEventListener('change', loadAnalytics
 document.getElementById('range-select').addEventListener('change', loadDeliveryStats);
 document.getElementById('range-select').addEventListener('change', loadOccupancyStats);
 document.getElementById('reload-menu-health-btn').addEventListener('click', loadMenuHealthReports);
+document.getElementById('reload-competitor-pricing-btn').addEventListener('click', loadCompetitorPricingReport);
 
 initAnalyticsLayout();
 loadAnalytics();
 loadMenuHealthReports();
+loadCompetitorPricingReport();
 loadDeliveryStats();
 loadOccupancyStats();
 loadFeedback();
