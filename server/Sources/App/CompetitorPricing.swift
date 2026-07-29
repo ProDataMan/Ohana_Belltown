@@ -17,10 +17,16 @@ struct CompetitorRestaurant: Codable, Content, Equatable {
     /// Search picker — lets the admin UI recognize "already added" and skip
     /// offering a duplicate. Absent for anything added before this existed.
     var placeId: String?
+    /// Photos of this competitor's actual menu (uploaded via the shared
+    /// /api/upload endpoint, same as menu item photos) — a reference for
+    /// whoever's entering prices, since a competitor's site often doesn't
+    /// list them at all.
+    var menuPhotoUrls: [String]?
 
     init(
         id: String = UUID().uuidString, name: String, distanceMiles: Double? = nil,
-        address: String? = nil, website: String? = nil, notes: String? = nil, placeId: String? = nil
+        address: String? = nil, website: String? = nil, notes: String? = nil, placeId: String? = nil,
+        menuPhotoUrls: [String]? = nil
     ) {
         self.id = id
         self.name = name
@@ -29,6 +35,7 @@ struct CompetitorRestaurant: Codable, Content, Equatable {
         self.website = website
         self.notes = notes
         self.placeId = placeId
+        self.menuPhotoUrls = menuPhotoUrls
     }
 }
 

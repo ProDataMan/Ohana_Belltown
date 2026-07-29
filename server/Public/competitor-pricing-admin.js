@@ -218,6 +218,22 @@ document.getElementById('save-groups-btn').addEventListener('click', async () =>
 
 // ---- Competitor Restaurants ----
 
+// Reads whatever's currently typed into each row's inputs back into the
+// `restaurants` array before a photo upload/remove triggers a re-render —
+// otherwise an in-progress, not-yet-saved text edit would be silently
+// wiped out when the table rebuilds from stale in-memory data.
+function syncRestaurantsFromDOM() {
+  document.querySelectorAll('#restaurants-list tr[data-index]').forEach((row, i) => {
+    if (!restaurants[i]) return;
+    restaurants[i].name = row.querySelector('.restaurant-name-input').value.trim();
+    const distanceRaw = row.querySelector('.restaurant-distance-input').value;
+    restaurants[i].distanceMiles = distanceRaw ? Number(distanceRaw) : null;
+    restaurants[i].address = row.querySelector('.restaurant-address-input').value.trim() || null;
+    restaurants[i].website = row.querySelector('.restaurant-website-input').value.trim() || null;
+    restaurants[i].notes = row.querySelector('.restaurant-notes-input').value.trim() || null;
+  });
+}
+
 function renderRestaurantsList() {
   const listEl = document.getElementById('restaurants-list');
   if (!restaurants.length) {
@@ -227,7 +243,7 @@ function renderRestaurantsList() {
   listEl.innerHTML = `
     <div class="data-table">
       <table>
-        <thead><tr><th>Name</th><th>Miles</th><th>Address</th><th>Website</th><th>Notes</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>Miles</th><th>Address</th><th>Website</th><th>Notes</th><th>Menu Photos</th><th></th></tr></thead>
         <tbody>
           ${restaurants
             .map(
@@ -238,6 +254,27 @@ function renderRestaurantsList() {
               <td><input type="text" class="restaurant-address-input" value="${escapeHtmlCompetitor(r.address || '')}" /></td>
               <td><input type="text" class="restaurant-website-input" value="${escapeHtmlCompetitor(r.website || '')}" /></td>
               <td><input type="text" class="restaurant-notes-input" value="${escapeHtmlCompetitor(r.notes || '')}" /></td>
+              <td>
+                <div class="item-thumb-gallery">
+                  ${(r.menuPhotoUrls || [])
+                    .map(
+                      (url, photoIndex) => `
+                    <div class="item-thumb-wrap">
+                      <a href="${escapeHtmlCompetitor(url)}" target="_blank" rel="noopener">
+                        <img class="item-thumb" src="${escapeHtmlCompetitor(url)}" alt="Menu photo" />
+                      </a>
+                      <button type="button" class="thumb-remove-btn menu-photo-remove-btn" data-photo-index="${photoIndex}" aria-label="Remove this menu photo">&times;</button>
+                    </div>
+                  `
+                    )
+                    .join('')}
+                </div>
+                <label class="photo-upload-btn">
+                  + Add Photo
+                  <input type="file" accept="image/*" class="menu-photo-upload-input" hidden />
+                </label>
+                <p class="hint menu-photo-status"></p>
+              </td>
               <td><button type="button" class="secondary restaurant-remove-btn">Remove</button></td>
             </tr>
           `
@@ -249,11 +286,50 @@ function renderRestaurantsList() {
   `;
   listEl.querySelectorAll('.restaurant-remove-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
+      syncRestaurantsFromDOM();
       const index = Number(btn.closest('tr').dataset.index);
       restaurants.splice(index, 1);
       renderRestaurantsList();
     });
   });
+  listEl.querySelectorAll('.menu-photo-remove-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      syncRestaurantsFromDOM();
+      const restaurantIndex = Number(btn.closest('tr').dataset.index);
+      const photoIndex = Number(btn.dataset.photoIndex);
+      restaurants[restaurantIndex].menuPhotoUrls.splice(photoIndex, 1);
+      renderRestaurantsList();
+    });
+  });
+  listEl.querySelectorAll('.menu-photo-upload-input').forEach((input) => {
+    input.addEventListener('change', (event) => uploadMenuPhoto(event, Number(input.closest('tr').dataset.index)));
+  });
+}
+
+async function uploadMenuPhoto(event, restaurantIndex) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const statusEl = event.target.closest('td').querySelector('.menu-photo-status');
+  statusEl.textContent = 'Uploading...';
+  statusEl.classList.remove('status-error');
+
+  const formData = new FormData();
+  formData.append('image', file);
+
+  try {
+    const response = await fetch('/api/upload', { method: 'POST', body: formData });
+    if (!response.ok) throw new Error(`Upload failed (${response.status}).`);
+    const result = await response.json();
+    syncRestaurantsFromDOM();
+    if (!restaurants[restaurantIndex].menuPhotoUrls) restaurants[restaurantIndex].menuPhotoUrls = [];
+    restaurants[restaurantIndex].menuPhotoUrls.push(result.url);
+    renderRestaurantsList();
+    document.getElementById('restaurants-status').textContent = 'Photo added — click Save Restaurants to keep it.';
+    document.getElementById('restaurants-status').classList.remove('status-error', 'status-ok');
+  } catch (error) {
+    statusEl.textContent = error.message;
+    statusEl.classList.add('status-error');
+  }
 }
 
 async function loadRestaurants() {
@@ -350,6 +426,7 @@ document.getElementById('save-restaurants-btn').addEventListener('click', async 
       website: row.querySelector('.restaurant-website-input').value.trim() || null,
       notes: row.querySelector('.restaurant-notes-input').value.trim() || null,
       placeId: restaurants[i].placeId || null,
+      menuPhotoUrls: restaurants[i].menuPhotoUrls || null,
     };
   });
   statusEl.textContent = 'Saving...';
