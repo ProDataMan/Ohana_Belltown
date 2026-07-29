@@ -97,34 +97,53 @@ function clearPendingCart() {
   sessionStorage.removeItem('ohana_pending_cart');
 }
 
+// The same item can have an order button on both the menu list (.item) and
+// in the item-detail modal (.item-modal-overlay) at once — these find every
+// instance of a given item's controls so an action taken in either place
+// (e.g. adding to cart from the modal) is reflected in the other right away.
+function findOrderButtons(itemName) {
+  return Array.from(document.querySelectorAll(`.order-btn[data-item-name="${CSS.escape(itemName)}"]`));
+}
+
+function findItemContainers(itemName) {
+  return findOrderButtons(itemName)
+    .map((btn) => btn.closest('.item') || btn.closest('.item-modal-overlay'))
+    .filter(Boolean);
+}
+
 // Adding an item no longer sends it right away — it just joins the pending
 // cart (see sendPendingOrder) so a guest can pick several things across
 // however many menu pages before staff are actually notified once.
 function addItemToCart(button) {
   const itemName = button.dataset.itemName;
   const itemId = button.dataset.itemId || null;
-  const articleEl = button.closest('.item');
-  const modifierCheckboxes = articleEl ? Array.from(articleEl.querySelectorAll('.item-modifiers input')) : [];
+  const ownContainer = button.closest('.item') || button.closest('.item-modal-overlay');
+  const modifierCheckboxes = ownContainer ? Array.from(ownContainer.querySelectorAll('.item-modifiers input')) : [];
   const modifiers = modifierCheckboxes.filter((cb) => cb.checked).map((cb) => cb.dataset.modifierName);
 
   setPendingCartItem(itemName, { itemId, section: window.MENU_SECTION, modifiers });
 
-  button.textContent = 'Added — Tap to Remove';
-  button.classList.add('order-btn-in-cart');
-  modifierCheckboxes.forEach((cb) => { cb.disabled = true; });
+  findOrderButtons(itemName).forEach((btn) => {
+    btn.textContent = 'Added — Tap to Remove';
+    btn.classList.add('order-btn-in-cart');
+  });
+  findItemContainers(itemName).forEach((c) => {
+    c.querySelectorAll('.item-modifiers input').forEach((cb) => { cb.disabled = true; });
+  });
   updateCartBadge();
 }
 
 function removeItemFromCart(button) {
   const itemName = button.dataset.itemName;
-  const articleEl = button.closest('.item');
   removePendingCartItem(itemName);
 
-  button.textContent = 'Add to Order';
-  button.classList.remove('order-btn-in-cart');
-  if (articleEl) {
-    articleEl.querySelectorAll('.item-modifiers input').forEach((cb) => { cb.disabled = false; });
-  }
+  findOrderButtons(itemName).forEach((btn) => {
+    btn.textContent = 'Add to Order';
+    btn.classList.remove('order-btn-in-cart');
+  });
+  findItemContainers(itemName).forEach((c) => {
+    c.querySelectorAll('.item-modifiers input').forEach((cb) => { cb.disabled = false; });
+  });
   updateCartBadge();
 }
 
@@ -160,13 +179,12 @@ async function sendPendingOrder() {
     if (!result.ok) return;
     setActiveOrder(result.itemName, result.orderId);
     removePendingCartItem(result.itemName);
-    const btn = menuContainer.querySelector(`.order-btn[data-item-name="${CSS.escape(result.itemName)}"]`);
-    if (btn) {
+    findOrderButtons(result.itemName).forEach((btn) => {
       btn.dataset.orderId = result.orderId;
       btn.textContent = 'Mark Received';
       btn.classList.remove('order-btn-in-cart');
       btn.classList.add('order-btn-active');
-    }
+    });
   });
 
   updateCartBadge();
@@ -176,23 +194,24 @@ async function sendPendingOrder() {
 async function markOrderDelivered(button) {
   const orderId = button.dataset.orderId;
   const itemName = button.dataset.itemName;
-  const articleEl = button.closest('.item');
   button.disabled = true;
   button.textContent = 'Confirming...';
   try {
     const response = await fetch(`/api/table-orders/${encodeURIComponent(orderId)}/deliver`, { method: 'POST' });
     if (!response.ok) throw new Error();
     clearActiveOrder(itemName);
-    delete button.dataset.orderId;
-    button.textContent = 'Order';
-    button.classList.remove('order-btn-active');
-    button.disabled = false;
-    if (articleEl) {
-      articleEl.querySelectorAll('.item-modifiers input').forEach((cb) => {
+    findOrderButtons(itemName).forEach((btn) => {
+      delete btn.dataset.orderId;
+      btn.textContent = 'Add to Order';
+      btn.classList.remove('order-btn-active');
+      btn.disabled = false;
+    });
+    findItemContainers(itemName).forEach((c) => {
+      c.querySelectorAll('.item-modifiers input').forEach((cb) => {
         cb.disabled = false;
         cb.checked = false;
       });
-    }
+    });
   } catch {
     button.textContent = 'Failed — tap to retry';
     button.disabled = false;
@@ -463,11 +482,13 @@ function ensureItemModal() {
       <p class="item-modal-category"></p>
       <span class="sold-out-badge item-modal-sold-out" hidden>Sold Out Today</span>
       <h3 class="item-modal-name"></h3>
-      <div class="item-modal-price"></div>
+      <div class="item-modal-price price"></div>
       <p class="item-modal-desc"></p>
       <div class="item-tags item-modal-tags"></div>
+      <div class="item-modifiers item-modal-modifiers" hidden></div>
+      <button type="button" class="order-btn item-modal-order-btn" hidden></button>
       <div class="item-modal-google-section" hidden>
-        <p class="item-modal-google-label">More photos from our Google page (general restaurant photos, not necessarily this dish):</p>
+        <p class="item-modal-google-label"></p>
         <div class="item-modal-google-strip"></div>
       </div>
     </div>
@@ -475,7 +496,23 @@ function ensureItemModal() {
   document.body.appendChild(modal);
 
   modal.addEventListener('click', (event) => {
-    if (event.target === modal) closeItemModal();
+    if (event.target === modal) {
+      closeItemModal();
+      return;
+    }
+    const orderBtn = event.target.closest('.order-btn');
+    if (orderBtn) {
+      if (orderBtn.dataset.orderId) {
+        markOrderDelivered(orderBtn);
+      } else if (orderBtn.classList.contains('order-btn-in-cart')) {
+        removeItemFromCart(orderBtn);
+      } else {
+        addItemToCart(orderBtn);
+      }
+    }
+  });
+  modal.addEventListener('change', (event) => {
+    if (event.target.matches('.item-modifiers input')) updateItemPriceDisplay(modal);
   });
   modal.querySelector('.item-modal-close').addEventListener('click', closeItemModal);
   document.addEventListener('keydown', (event) => {
@@ -526,12 +563,66 @@ async function openItemModal(index) {
 
   const priceEl = modal.querySelector('.item-modal-price');
   const showPrice = item.price != null && (Boolean(getTableId()) || staffLoggedIn);
+  if (item.price != null) {
+    priceEl.dataset.basePrice = item.price;
+  } else {
+    delete priceEl.dataset.basePrice;
+  }
   priceEl.textContent = showPrice ? `$${Number(item.price).toFixed(2)}` : '';
   priceEl.hidden = !showPrice;
 
   const tagsEl = modal.querySelector('.item-modal-tags');
   const tags = item.tags || [];
   tagsEl.innerHTML = tags.map((t) => `<span class="item-tag-badge">${escapeHtml(TAG_LABELS[t] || t)}</span>`).join('');
+
+  const tableId = getTableId();
+  const soldOut = item.available === false;
+  const activeOrders = getActiveOrders();
+  const pendingCart = getPendingCart();
+  const activeOrderId = activeOrders[item.name];
+  const inCart = !activeOrderId && Boolean(pendingCart[item.name]);
+  const orderLocked = Boolean(activeOrderId) || inCart;
+
+  const modifiersEl = modal.querySelector('.item-modal-modifiers');
+  const modifiers = item.modifiers || [];
+  if (tableId && !soldOut && modifiers.length) {
+    modifiersEl.hidden = false;
+    modifiersEl.innerHTML = modifiers
+      .map(
+        (m) => `
+          <label class="item-modifier-checkbox">
+            <input type="checkbox" data-modifier-name="${escapeHtml(m.name)}" data-modifier-price="${m.priceDelta}" ${orderLocked ? 'disabled' : ''} />
+            ${escapeHtml(m.name)} (+$${Number(m.priceDelta).toFixed(2)})
+          </label>
+        `
+      )
+      .join('');
+  } else {
+    modifiersEl.hidden = true;
+    modifiersEl.innerHTML = '';
+  }
+
+  const orderBtnEl = modal.querySelector('.item-modal-order-btn');
+  if (tableId && !soldOut) {
+    orderBtnEl.hidden = false;
+    orderBtnEl.className = 'order-btn item-modal-order-btn';
+    if (activeOrderId) {
+      orderBtnEl.classList.add('order-btn-active');
+      orderBtnEl.textContent = 'Mark Received';
+      orderBtnEl.dataset.orderId = activeOrderId;
+    } else if (inCart) {
+      orderBtnEl.classList.add('order-btn-in-cart');
+      orderBtnEl.textContent = 'Added — Tap to Remove';
+      delete orderBtnEl.dataset.orderId;
+    } else {
+      orderBtnEl.textContent = 'Add to Order';
+      delete orderBtnEl.dataset.orderId;
+    }
+    orderBtnEl.dataset.itemName = item.name;
+    orderBtnEl.dataset.itemId = item.id || '';
+  } else {
+    orderBtnEl.hidden = true;
+  }
 
   if (galleryRotationInterval) {
     clearInterval(galleryRotationInterval);
@@ -567,22 +658,41 @@ async function openItemModal(index) {
 
   modal.hidden = false;
 
+  // With 2+ of its own photos, this dish already has real coverage — show a
+  // proper gallery of just those instead of diluting it with generic
+  // restaurant photos. Below that, fall back to Google's photos as before,
+  // since a bare 0-1-photo item would otherwise have nothing extra to show.
   const googleSection = modal.querySelector('.item-modal-google-section');
+  const label = modal.querySelector('.item-modal-google-label');
   const strip = modal.querySelector('.item-modal-google-strip');
-  const photos = await loadGooglePhotosOnce();
-  if (photos.length) {
+  if (images.length >= 2) {
     googleSection.hidden = false;
-    strip.innerHTML = photos
+    label.textContent = 'More photos of this dish:';
+    strip.innerHTML = images
       .map(
-        (p) =>
-          `<img src="${escapeHtml(p.url)}" alt="Photo of Ohana Belltown from Google Maps" loading="lazy" data-full="${escapeHtml(p.url)}" data-caption="Photo by ${escapeHtml(p.attributionName)}, via Google" />`
+        (src) => `<img src="${escapeHtml(src)}" alt="${escapeHtml(item.name)}" loading="lazy" data-full="${escapeHtml(src)}" data-caption="${escapeHtml(item.name)}" />`
       )
       .join('');
     strip.querySelectorAll('img').forEach((imgEl) => {
       imgEl.addEventListener('click', () => window.openLightbox(imgEl.dataset.full, imgEl.dataset.caption));
     });
   } else {
-    googleSection.hidden = true;
+    const photos = await loadGooglePhotosOnce();
+    if (photos.length) {
+      googleSection.hidden = false;
+      label.textContent = 'More photos from our Google page (general restaurant photos, not necessarily this dish):';
+      strip.innerHTML = photos
+        .map(
+          (p) =>
+            `<img src="${escapeHtml(p.url)}" alt="Photo of Ohana Belltown from Google Maps" loading="lazy" data-full="${escapeHtml(p.url)}" data-caption="Photo by ${escapeHtml(p.attributionName)}, via Google" />`
+        )
+        .join('');
+      strip.querySelectorAll('img').forEach((imgEl) => {
+        imgEl.addEventListener('click', () => window.openLightbox(imgEl.dataset.full, imgEl.dataset.caption));
+      });
+    } else {
+      googleSection.hidden = true;
+    }
   }
 }
 
@@ -732,8 +842,8 @@ function renderCartModalBody() {
     removeBtn.addEventListener('click', () => {
       const itemName = removeBtn.closest('.cart-line').dataset.itemName;
       removePendingCartItem(itemName);
-      const pageBtn = menuContainer.querySelector(`.order-btn[data-item-name="${CSS.escape(itemName)}"]`);
-      if (pageBtn && pageBtn.classList.contains('order-btn-in-cart')) {
+      const pageBtn = findOrderButtons(itemName).find((btn) => btn.classList.contains('order-btn-in-cart'));
+      if (pageBtn) {
         removeItemFromCart(pageBtn);
       } else {
         updateCartBadge();

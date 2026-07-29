@@ -4,8 +4,21 @@ document.getElementById('nav-toggle')?.addEventListener('click', () => {
 
 document.querySelectorAll('.nav-dropdown-toggle').forEach((btn) => {
   btn.addEventListener('click', () => {
-    btn.parentElement?.classList.toggle('open');
+    const dropdown = btn.parentElement;
+    const willOpen = !dropdown?.classList.contains('open');
+    document.querySelectorAll('.nav-dropdown.open').forEach((d) => d.classList.remove('open'));
+    if (willOpen) dropdown?.classList.add('open');
   });
+});
+
+// Belt-and-suspenders for touch devices: a tap anywhere outside an open
+// dropdown closes it, so it's never stuck open waiting for a second tap
+// on the same toggle (see the ":hover" note in style.css for the other
+// half of this fix).
+document.addEventListener('click', (event) => {
+  if (event.target.closest('.nav-dropdown-toggle')) return;
+  if (event.target.closest('.nav-dropdown-menu')) return;
+  document.querySelectorAll('.nav-dropdown.open').forEach((d) => d.classList.remove('open'));
 });
 
 (async () => {
@@ -73,7 +86,9 @@ function insertStaffNavDropdown() {
     </div>
   `;
   dropdown.querySelector('.nav-dropdown-toggle').addEventListener('click', () => {
-    dropdown.classList.toggle('open');
+    const willOpen = !dropdown.classList.contains('open');
+    document.querySelectorAll('.nav-dropdown.open').forEach((d) => d.classList.remove('open'));
+    if (willOpen) dropdown.classList.add('open');
   });
 
   const loginLink = document.getElementById('nav-login-link');

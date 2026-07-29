@@ -1165,9 +1165,19 @@ select {
   padding: 0.4rem;
 }
 
-.nav-dropdown.open .nav-dropdown-menu,
-.nav-dropdown:hover .nav-dropdown-menu {
+.nav-dropdown.open .nav-dropdown-menu {
   display: block;
+}
+
+/* Hover-to-open is a bonus for real mouse/trackpad users only — on touch
+   devices (iPad included) a tap leaves a synthetic ":hover" stuck active,
+   which OR'd with this rule kept the menu open even after the JS toggle
+   removed .open. Scoping it out for touch means the JS toggle is the only
+   thing controlling visibility there. */
+@media (hover: hover) and (pointer: fine) {
+  .nav-dropdown:hover .nav-dropdown-menu {
+    display: block;
+  }
 }
 
 .nav-dropdown-menu a {
@@ -2026,6 +2036,27 @@ select {
 .item-modal-desc {
   color: var(--text-muted);
   line-height: 1.6;
+}
+
+.item-modal-modifiers {
+  margin-top: 0.75rem;
+}
+
+.item-modal-modifiers[hidden] {
+  display: none;
+}
+
+.item-modal-order-btn {
+  display: block;
+  width: 100%;
+  margin-top: 0.75rem;
+  padding: 0.6rem 1rem;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.item-modal-order-btn[hidden] {
+  display: none;
 }
 
 .item-modal-google-section {
