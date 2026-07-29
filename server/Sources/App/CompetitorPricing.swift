@@ -1,9 +1,11 @@
+import Foundation
 import Vapor
 
-/// A nearby restaurant staff are comparing prices against — not a live feed
-/// (there's no reliable API for a competitor's actual menu prices), just a
-/// staff-curated reference list they periodically check and re-enter from
-/// the competitor's own published menu/site.
+/// A nearby restaurant staff are comparing prices against. The restaurant
+/// itself is sourced from Google Maps (`nearbyRestaurants`, below) rather
+/// than typed in by hand — there's just no reliable API for a competitor's
+/// actual menu *prices*, so those still need a staff member to check the
+/// competitor's own published menu/site and enter what they find.
 struct CompetitorRestaurant: Codable, Content, Equatable {
     var id: String
     var name: String
@@ -11,10 +13,14 @@ struct CompetitorRestaurant: Codable, Content, Equatable {
     var address: String?
     var website: String?
     var notes: String?
+    /// Google's place_id, when this restaurant was added from the Nearby
+    /// Search picker — lets the admin UI recognize "already added" and skip
+    /// offering a duplicate. Absent for anything added before this existed.
+    var placeId: String?
 
     init(
         id: String = UUID().uuidString, name: String, distanceMiles: Double? = nil,
-        address: String? = nil, website: String? = nil, notes: String? = nil
+        address: String? = nil, website: String? = nil, notes: String? = nil, placeId: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -22,6 +28,7 @@ struct CompetitorRestaurant: Codable, Content, Equatable {
         self.address = address
         self.website = website
         self.notes = notes
+        self.placeId = placeId
     }
 }
 
@@ -100,6 +107,30 @@ struct CompetitorPriceReportRow: Content {
     var entries: [CompetitorPriceReportEntry]
 }
 
+/// One result from Google's Nearby Search, before it's been picked and added
+/// to `CompetitorRestaurant` — a candidate, not yet part of the saved list.
+struct NearbyRestaurantCandidate: Content {
+    var placeId: String
+    var name: String
+    var address: String?
+    var distanceMiles: Double
+    var rating: Double?
+}
+
+private struct GoogleNearbySearchResult: Codable {
+    let place_id: String
+    let name: String
+    let vicinity: String?
+    let rating: Double?
+    let geometry: GoogleGeometry?
+    let business_status: String?
+}
+
+private struct GoogleNearbySearchResponse: Codable {
+    let results: [GoogleNearbySearchResult]
+    let status: String
+}
+
 enum CompetitorPricingError: Error {
     case restaurantNotFound
     case groupNotFound
@@ -128,11 +159,77 @@ final class CompetitorPricingStore: @unchecked Sendable {
     private var data = CompetitorPricingData(restaurants: [], groups: [], entries: [])
     private var loaded = false
 
+    // Nearby-search results aren't persisted (they're just Google's answer to
+    // "what's around here right now," re-fetched on demand) — a short
+    // in-memory cache avoids re-billing/re-hitting the API on every reload of
+    // the admin page.
+    private var nearbyCache: [NearbyRestaurantCandidate]?
+    private var nearbyCacheFetchedAt: Date?
+    private let nearbyCacheTTL: TimeInterval = 6 * 3600
+
     func configure(dataDirectory: String) {
         lock.lock()
         defer { lock.unlock() }
         fileURL = URL(fileURLWithPath: dataDirectory).appendingPathComponent("competitor-pricing.json")
         loaded = false
+    }
+
+    /// Restaurants near Ohana Belltown from Google's Nearby Search — lets
+    /// staff pick a competitor from a real, current list instead of typing a
+    /// name/address by hand. This only sources *who's nearby*; Google has no
+    /// API for a competitor's actual menu prices, so those still need a
+    /// person to look at the competitor's own site/menu.
+    func nearbyRestaurants(client: Client, apiKey: String, placeId: String, radiusMiles: Double) async throws -> [NearbyRestaurantCandidate] {
+        lock.lock()
+        let isFresh = nearbyCacheFetchedAt.map { Date().timeIntervalSince($0) < nearbyCacheTTL } ?? false
+        if isFresh, let cached = nearbyCache {
+            lock.unlock()
+            return cached
+        }
+        lock.unlock()
+
+        let ourDetails = try await PlacesPhotoCache.shared.getDetails(client: client, apiKey: apiKey, placeId: placeId)
+        guard let ourLocation = ourDetails.geometry?.location else {
+            return []
+        }
+
+        let radiusMeters = Int(radiusMiles * 1609.34)
+        let uri = URI(string: "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=\(ourLocation.lat),\(ourLocation.lng)&radius=\(radiusMeters)&type=restaurant&key=\(apiKey)")
+        let response = try await client.get(uri).get()
+        let decoded = try response.content.decode(GoogleNearbySearchResponse.self)
+
+        let candidates = decoded.results
+            .compactMap { result -> NearbyRestaurantCandidate? in
+                guard result.place_id != placeId else { return nil }
+                guard result.business_status == nil || result.business_status == "OPERATIONAL" else { return nil }
+                guard let location = result.geometry?.location else { return nil }
+                let distance = Self.haversineMiles(lat1: ourLocation.lat, lng1: ourLocation.lng, lat2: location.lat, lng2: location.lng)
+                guard distance <= radiusMiles else { return nil }
+                return NearbyRestaurantCandidate(
+                    placeId: result.place_id,
+                    name: result.name,
+                    address: result.vicinity,
+                    distanceMiles: (distance * 10).rounded() / 10,
+                    rating: result.rating
+                )
+            }
+            .sorted { $0.distanceMiles < $1.distanceMiles }
+
+        lock.lock()
+        nearbyCache = candidates
+        nearbyCacheFetchedAt = Date()
+        lock.unlock()
+
+        return candidates
+    }
+
+    private static func haversineMiles(lat1: Double, lng1: Double, lat2: Double, lng2: Double) -> Double {
+        let earthRadiusMiles = 3958.8
+        let dLat = (lat2 - lat1) * .pi / 180
+        let dLng = (lng2 - lng1) * .pi / 180
+        let a = sin(dLat / 2) * sin(dLat / 2) + cos(lat1 * .pi / 180) * cos(lat2 * .pi / 180) * sin(dLng / 2) * sin(dLng / 2)
+        let c = 2 * atan2(sqrt(a), sqrt(1 - a))
+        return earthRadiusMiles * c
     }
 
     func restaurants() throws -> [CompetitorRestaurant] {

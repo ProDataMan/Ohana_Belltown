@@ -340,6 +340,19 @@ func routes(_ app: Application) throws {
     // reliable live API for a competitor's actual published prices), admin
     // only since this is competitive pricing strategy, same gating as
     // /analytics.html itself.
+    // Sources the restaurant list from Google Maps' own Nearby Search instead
+    // of asking staff to type a name/address by hand — Google just doesn't
+    // expose a competitor's actual menu prices, so that part still needs a
+    // person to look at the competitor's own site/menu.
+    app.get("api", "competitor-pricing", "nearby-restaurants") { req async throws -> [NearbyRestaurantCandidate] in
+        try requireAdmin(req)
+        guard let apiKey = Environment.get("GOOGLE_PLACES_API_KEY"), let placeId = Environment.get("GOOGLE_PLACE_ID") else {
+            return []
+        }
+        let radiusMiles = req.query[Double.self, at: "radiusMiles"] ?? 3.0
+        return try await CompetitorPricingStore.shared.nearbyRestaurants(client: req.client, apiKey: apiKey, placeId: placeId, radiusMiles: radiusMiles)
+    }
+
     app.get("api", "competitor-pricing", "restaurants") { req throws -> [CompetitorRestaurant] in
         try requireAdmin(req)
         return try CompetitorPricingStore.shared.restaurants()

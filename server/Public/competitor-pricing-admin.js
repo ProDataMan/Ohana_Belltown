@@ -221,7 +221,7 @@ document.getElementById('save-groups-btn').addEventListener('click', async () =>
 function renderRestaurantsList() {
   const listEl = document.getElementById('restaurants-list');
   if (!restaurants.length) {
-    listEl.innerHTML = '<p class="hint">No competitor restaurants yet — add one below.</p>';
+    listEl.innerHTML = '<p class="hint">No competitor restaurants yet — find some nearby below.</p>';
     return;
   }
   listEl.innerHTML = `
@@ -270,24 +270,71 @@ async function loadRestaurants() {
 
 document.getElementById('reload-restaurants-btn').addEventListener('click', loadRestaurants);
 
-document.getElementById('restaurants-form').addEventListener('submit', (event) => {
-  event.preventDefault();
-  const nameInput = document.getElementById('new-restaurant-name-input');
-  const distanceInput = document.getElementById('new-restaurant-distance-input');
-  const name = nameInput.value.trim();
-  if (!name) return;
-  restaurants.push({
-    id: `restaurant-${Date.now()}`,
-    name,
-    distanceMiles: distanceInput.value ? Number(distanceInput.value) : null,
-    address: null,
-    website: null,
-    notes: null,
+// ---- Find Nearby Restaurants (Google Maps) ----
+
+function renderNearbyList(candidates) {
+  const listEl = document.getElementById('nearby-list');
+  if (!candidates.length) {
+    listEl.innerHTML = '<p class="hint">No results — try a larger radius, or Google Maps credentials aren\'t configured yet.</p>';
+    return;
+  }
+  listEl.innerHTML = `
+    <div class="data-table">
+      <table>
+        <thead><tr><th>Name</th><th>Distance</th><th>Address</th><th>Rating</th><th></th></tr></thead>
+        <tbody>
+          ${candidates
+            .map((c) => {
+              const alreadyAdded = restaurants.some((r) => r.placeId === c.placeId);
+              return `
+              <tr data-place-id="${escapeHtmlCompetitor(c.placeId)}">
+                <td>${escapeHtmlCompetitor(c.name)}</td>
+                <td>${c.distanceMiles} mi</td>
+                <td>${escapeHtmlCompetitor(c.address || '')}</td>
+                <td>${c.rating != null ? `&#9733; ${c.rating}` : ''}</td>
+                <td><button type="button" class="secondary nearby-add-btn" ${alreadyAdded ? 'disabled' : ''}>${alreadyAdded ? 'Added' : 'Add'}</button></td>
+              </tr>
+            `;
+            })
+            .join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+  listEl.querySelectorAll('.nearby-add-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const placeId = btn.closest('tr').dataset.placeId;
+      const candidate = candidates.find((c) => c.placeId === placeId);
+      if (!candidate) return;
+      restaurants.push({
+        id: `restaurant-${Date.now()}`,
+        name: candidate.name,
+        distanceMiles: candidate.distanceMiles,
+        address: candidate.address || null,
+        website: null,
+        notes: null,
+        placeId: candidate.placeId,
+      });
+      renderRestaurantsList();
+      refreshEntryFormSelects();
+      btn.disabled = true;
+      btn.textContent = 'Added';
+    });
   });
-  nameInput.value = '';
-  distanceInput.value = '';
-  renderRestaurantsList();
-  refreshEntryFormSelects();
+}
+
+document.getElementById('find-nearby-btn').addEventListener('click', async () => {
+  const listEl = document.getElementById('nearby-list');
+  const radius = document.getElementById('nearby-radius-input').value || 3;
+  listEl.innerHTML = '<p class="hint">Searching Google Maps...</p>';
+  try {
+    const response = await staffFetch(`/api/competitor-pricing/nearby-restaurants?radiusMiles=${encodeURIComponent(radius)}`);
+    if (!response.ok) throw new Error(`Unable to search nearby restaurants (${response.status}).`);
+    const candidates = await response.json();
+    renderNearbyList(candidates);
+  } catch (error) {
+    listEl.innerHTML = `<p class="status status-error">${escapeHtmlCompetitor(error.message)}</p>`;
+  }
 });
 
 document.getElementById('save-restaurants-btn').addEventListener('click', async () => {
@@ -302,6 +349,7 @@ document.getElementById('save-restaurants-btn').addEventListener('click', async 
       address: row.querySelector('.restaurant-address-input').value.trim() || null,
       website: row.querySelector('.restaurant-website-input').value.trim() || null,
       notes: row.querySelector('.restaurant-notes-input').value.trim() || null,
+      placeId: restaurants[i].placeId || null,
     };
   });
   statusEl.textContent = 'Saving...';

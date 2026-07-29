@@ -13,11 +13,29 @@ struct GoogleReview: Codable {
     let text: String?
 }
 
+struct GoogleLatLng: Codable {
+    let lat: Double
+    let lng: Double
+}
+
+struct GoogleGeometry: Codable {
+    let location: GoogleLatLng
+}
+
 struct GooglePlaceDetailsResult: Codable {
     let photos: [GooglePhotoRef]?
     let reviews: [GoogleReview]?
     let rating: Double?
     let user_ratings_total: Int?
+    let geometry: GoogleGeometry?
+
+    init(photos: [GooglePhotoRef]?, reviews: [GoogleReview]?, rating: Double?, user_ratings_total: Int?, geometry: GoogleGeometry? = nil) {
+        self.photos = photos
+        self.reviews = reviews
+        self.rating = rating
+        self.user_ratings_total = user_ratings_total
+        self.geometry = geometry
+    }
 }
 
 struct GooglePlaceDetailsResponse: Codable {
@@ -140,10 +158,10 @@ final class PlacesPhotoCache: @unchecked Sendable {
         }
         lock.unlock()
 
-        let uri = URI(string: "https://maps.googleapis.com/maps/api/place/details/json?place_id=\(placeId)&fields=photos,reviews,rating,user_ratings_total&key=\(apiKey)")
+        let uri = URI(string: "https://maps.googleapis.com/maps/api/place/details/json?place_id=\(placeId)&fields=photos,reviews,rating,user_ratings_total,geometry&key=\(apiKey)")
         let response = try await client.get(uri).get()
         let decoded = try response.content.decode(GooglePlaceDetailsResponse.self)
-        let result = decoded.result ?? GooglePlaceDetailsResult(photos: nil, reviews: nil, rating: nil, user_ratings_total: nil)
+        let result = decoded.result ?? GooglePlaceDetailsResult(photos: nil, reviews: nil, rating: nil, user_ratings_total: nil, geometry: nil)
 
         lock.lock()
         cachedDetails = result

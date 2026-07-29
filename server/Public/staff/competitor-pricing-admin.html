@@ -72,15 +72,21 @@
             <button id="reload-restaurants-btn" type="button" class="secondary">Reload</button>
           </div>
         </div>
-        <p class="hint">Nearby restaurants you're comparing against. Distance is just for sorting/reference — enter it however you measured it (e.g. from Google Maps).</p>
+        <p class="hint">Sourced from Google Maps, not typed in by hand — find nearby restaurants below and add the ones worth comparing against. Google doesn't publish a competitor's actual menu prices, so those still need to be checked and entered by hand in Price Entries below.</p>
         <div id="restaurants-list"></div>
-        <form id="restaurants-form" style="margin-top: 1rem;">
-          <div class="cta-row">
-            <input type="text" id="new-restaurant-name-input" placeholder="Restaurant name" />
-            <input type="number" id="new-restaurant-distance-input" min="0" step="0.1" placeholder="Miles" style="max-width: 8rem;" />
-            <button type="submit" class="secondary">Add Restaurant</button>
+
+        <div class="editor-toolbar" style="margin-top: 1.5rem;">
+          <h3 style="margin: 0;">Find Nearby Restaurants</h3>
+          <div class="toolbar-actions">
+            <label style="flex-direction: row; align-items: center; gap: 0.4rem; margin: 0;">
+              <input type="number" id="nearby-radius-input" min="0.5" step="0.5" value="3" style="max-width: 5rem;" />
+              miles
+            </label>
+            <button id="find-nearby-btn" type="button" class="secondary">Find Nearby Restaurants</button>
           </div>
-        </form>
+        </div>
+        <div id="nearby-list"></div>
+
         <button id="save-restaurants-btn" type="button" style="margin-top: 0.75rem;">Save Restaurants</button>
         <p id="restaurants-status" class="status"></p>
       </section>

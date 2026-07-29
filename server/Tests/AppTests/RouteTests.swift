@@ -26,6 +26,7 @@ final class RouteTests: XCTestCase {
         StaffingStore.shared.configure(dataDirectory: tempDir.path)
         FeedbackStore.shared.configure(dataDirectory: tempDir.path)
         StaffRewardsStore.shared.configure(dataDirectory: tempDir.path)
+        CompetitorPricingStore.shared.configure(dataDirectory: tempDir.path)
     }
 
     override func tearDown() async throws {
@@ -321,6 +322,29 @@ final class RouteTests: XCTestCase {
             XCTAssertEqual(res.status, .ok)
             let summary = try res.content.decode(PlaceReviewsSummary.self)
             XCTAssertTrue(summary.reviews.isEmpty)
+        }
+    }
+
+    func testNearbyRestaurantsRequiresAdminAndReturnsEmptyWithoutAPIConfigured() throws {
+        try app.test(.GET, "api/competitor-pricing/nearby-restaurants") { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+
+        let bootstrapBody = ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"], body: bootstrapBody) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        // No GOOGLE_PLACES_API_KEY/GOOGLE_PLACE_ID in the test environment —
+        // same graceful empty-list fallback as /api/place-reviews.
+        try app.test(.GET, "api/competitor-pricing/nearby-restaurants", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+            let candidates = try res.content.decode([NearbyRestaurantCandidate].self)
+            XCTAssertTrue(candidates.isEmpty)
         }
     }
 
