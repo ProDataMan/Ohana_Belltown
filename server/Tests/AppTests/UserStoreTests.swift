@@ -249,4 +249,44 @@ final class UserStoreTests: XCTestCase {
         let result = try UserStore.shared.setEmailIfMissing(id: admin.id, email: "shared@example.com")
         XCTAssertNil(result.email)
     }
+
+    func testUpdateDisplayNameFixesATypo() throws {
+        try bootstrapAdmin()
+        let tim = try UserStore.shared.create(
+            username: "dayna", displayName: "Dana", password: "12345", role: .employee, mustChangePassword: false
+        )
+        let renamed = try UserStore.shared.updateDisplayName(id: tim.id, displayName: "Dayna")
+        XCTAssertEqual(renamed.displayName, "Dayna")
+
+        let reloaded = try UserStore.shared.find(id: tim.id)
+        XCTAssertEqual(reloaded.displayName, "Dayna")
+    }
+
+    func testUpdateDisplayNameTrimsWhitespace() throws {
+        try bootstrapAdmin()
+        let tim = try UserStore.shared.create(
+            username: "tim", displayName: "Tim", password: "12345", role: .employee, mustChangePassword: false
+        )
+        let renamed = try UserStore.shared.updateDisplayName(id: tim.id, displayName: "  Timothy  ")
+        XCTAssertEqual(renamed.displayName, "Timothy")
+    }
+
+    func testUpdateDisplayNameRejectsBlank() throws {
+        try bootstrapAdmin()
+        let tim = try UserStore.shared.create(
+            username: "tim", displayName: "Tim", password: "12345", role: .employee, mustChangePassword: false
+        )
+        XCTAssertThrowsError(try UserStore.shared.updateDisplayName(id: tim.id, displayName: "   ")) { error in
+            guard let userError = error as? UserError else { return XCTFail("wrong error type") }
+            XCTAssertEqual(userError, .displayNameRequired)
+        }
+    }
+
+    func testUpdateDisplayNameForUnknownUserThrows() throws {
+        try bootstrapAdmin()
+        XCTAssertThrowsError(try UserStore.shared.updateDisplayName(id: "does-not-exist", displayName: "Someone")) { error in
+            guard let userError = error as? UserError else { return XCTFail("wrong error type") }
+            XCTAssertEqual(userError, .notFound)
+        }
+    }
 }

@@ -43,6 +43,10 @@ struct UpdateRoleRequest: Content {
     var role: UserRole
 }
 
+struct UpdateDisplayNameRequest: Content {
+    var displayName: String
+}
+
 func currentUser(_ req: Request) throws -> StaffUser? {
     guard let userId = req.session.data["userId"] else { return nil }
     return try? UserStore.shared.find(id: userId)
@@ -170,6 +174,13 @@ func registerAuthRoutes(_ app: Application) throws {
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
         let body = try req.content.decode(UpdateRoleRequest.self)
         return try UserStore.shared.updateRole(id: id, role: body.role)
+    }
+
+    app.post("api", "users", ":id", "display-name") { req throws -> StaffUserPublic in
+        try requireAdmin(req)
+        guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
+        let body = try req.content.decode(UpdateDisplayNameRequest.self)
+        return try UserStore.shared.updateDisplayName(id: id, displayName: body.displayName)
     }
 
     app.post("api", "users", ":id", "deactivate") { req throws -> StaffUserPublic in

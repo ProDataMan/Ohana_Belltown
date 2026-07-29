@@ -312,10 +312,10 @@ async function saveItem() {
       body: JSON.stringify(body),
     });
     if (!response.ok) throw new Error(`Save failed (${response.status}).`);
-    setStatus(saveStatusEl, 'Saved! The live site is already up to date.', false);
+    setStatus(saveStatusEl, 'Saved! Returning to the menu...', false);
+    setTimeout(() => { window.location.href = '/menu'; }, 700);
   } catch (error) {
     setStatus(saveStatusEl, error.message, true);
-  } finally {
     document.getElementById('save-btn').disabled = false;
   }
 }

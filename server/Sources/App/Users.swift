@@ -121,6 +121,7 @@ enum UserError: Error, Equatable {
     case cannotDeactivateLastAdmin
     case emailTaken
     case invalidBirthdayFormat
+    case displayNameRequired
 }
 
 extension UserError: AbortError {
@@ -130,7 +131,7 @@ extension UserError: AbortError {
         case .invalidCredentials, .wrongCurrentPassword, .accountDeactivated: return .unauthorized
         case .notFound, .oauthNotLinked: return .notFound
         case .alreadyBootstrapped, .cannotDeactivateSelf, .cannotDeactivateLastAdmin: return .forbidden
-        case .invalidBirthdayFormat: return .badRequest
+        case .invalidBirthdayFormat, .displayNameRequired: return .badRequest
         }
     }
 
@@ -148,6 +149,7 @@ extension UserError: AbortError {
         case .cannotDeactivateLastAdmin: return "Can't deactivate the last active admin."
         case .emailTaken: return "That email is already in use by another account."
         case .invalidBirthdayFormat: return "Birthday must be in MM-DD format."
+        case .displayNameRequired: return "Name can't be empty."
         }
     }
 }
@@ -489,6 +491,24 @@ final class UserStore: @unchecked Sendable {
             throw UserError.notFound
         }
         users[idx].role = role
+        users[idx].updatedAt = now()
+        try persist()
+        return StaffUserPublic(users[idx])
+    }
+
+    @discardableResult
+    func updateDisplayName(id: String, displayName: String) throws -> StaffUserPublic {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard let idx = users.firstIndex(where: { $0.id == id }) else {
+            throw UserError.notFound
+        }
+        let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw UserError.displayNameRequired
+        }
+        users[idx].displayName = trimmed
         users[idx].updatedAt = now()
         try persist()
         return StaffUserPublic(users[idx])

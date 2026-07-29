@@ -611,6 +611,35 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testUpdateDisplayNameRequiresAdminAndFixesATypo() throws {
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        var userId: String?
+        let createBody = ByteBuffer(string: #"{"username":"dayna","displayName":"Dana","password":"12345","role":"employee"}"#)
+        try app.test(.POST, "api/users", headers: ["Content-Type": "application/json", "Cookie": cookie], body: createBody) { res in
+            XCTAssertEqual(res.status, .ok)
+            userId = try res.content.decode(StaffUserPublic.self).id
+        }
+        guard let id = userId else { return XCTFail("expected a created user id") }
+
+        let renameBody = ByteBuffer(string: #"{"displayName":"Dayna"}"#)
+        try app.test(.POST, "api/users/\(id)/display-name", headers: ["Content-Type": "application/json"], body: renameBody) { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+        try app.test(.POST, "api/users/\(id)/display-name", headers: ["Content-Type": "application/json", "Cookie": cookie], body: renameBody) { res in
+            XCTAssertEqual(res.status, .ok)
+            let updated = try res.content.decode(StaffUserPublic.self)
+            XCTAssertEqual(updated.displayName, "Dayna")
+        }
+    }
+
     func testStaffCanLogOtherActivityInstantlyButNotAutoDetectedOrSocialCategories() throws {
         var sessionCookie: String?
         try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],

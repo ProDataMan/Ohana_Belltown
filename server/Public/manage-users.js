@@ -19,14 +19,18 @@ async function loadUsers() {
       <div class="data-table">
         <table>
           <thead>
-            <tr><th>Name</th><th>Username</th><th>Status</th><th>Role</th><th></th><th></th><th></th></tr>
+            <tr><th>Name</th><th></th><th>Username</th><th>Status</th><th>Role</th><th></th><th></th><th></th></tr>
           </thead>
           <tbody>
             ${users
               .map(
                 (u) => `
               <tr data-id="${u.id}" class="${u.active === false ? 'item-sold-out' : ''}">
-                <td>${escapeHtmlUsers(u.displayName)}${u.mustChangePassword ? ' <span class="pill">must change password</span>' : ''}</td>
+                <td>
+                  <input type="text" class="name-input" value="${escapeHtmlUsers(u.displayName)}" style="width: 9rem;" />
+                  ${u.mustChangePassword ? ' <span class="pill">must change password</span>' : ''}
+                </td>
+                <td><button type="button" class="secondary save-name-btn">Save name</button></td>
                 <td>@${escapeHtmlUsers(u.username)}</td>
                 <td><span class="pill ${u.active === false ? 'pill-denied' : 'pill-approved'}">${u.active === false ? 'Deactivated' : 'Active'}</span></td>
                 <td>
@@ -48,6 +52,9 @@ async function loadUsers() {
         </table>
       </div>
     `;
+    usersListEl.querySelectorAll('.save-name-btn').forEach((btn) =>
+      btn.addEventListener('click', (e) => saveDisplayName(e.target.closest('tr')))
+    );
     usersListEl.querySelectorAll('.save-role-btn').forEach((btn) =>
       btn.addEventListener('click', (e) => saveRole(e.target.closest('tr')))
     );
@@ -62,6 +69,23 @@ async function loadUsers() {
     );
   } catch (error) {
     usersListEl.innerHTML = `<p class="status status-error">${escapeHtmlUsers(error.message)}</p>`;
+  }
+}
+
+async function saveDisplayName(row) {
+  const id = row.dataset.id;
+  const displayName = row.querySelector('.name-input').value.trim();
+  if (!displayName) return;
+  try {
+    const response = await staffFetch(`/api/users/${id}/display-name`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ displayName }),
+    });
+    if (!response.ok) throw new Error(`Failed (${response.status}).`);
+    await loadUsers();
+  } catch (error) {
+    usersListEl.insertAdjacentHTML('afterbegin', `<p class="status status-error">${escapeHtmlUsers(error.message)}</p>`);
   }
 }
 

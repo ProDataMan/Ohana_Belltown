@@ -26,6 +26,7 @@ const addCategoryBtn = document.getElementById('add-category-btn');
 const addCategorySection = document.getElementById('add-category-section');
 const reloadBtn = document.getElementById('reload-btn');
 const saveBtn = document.getElementById('save-btn');
+const cancelBtn = document.getElementById('cancel-btn');
 const saveStatus = document.getElementById('save-status');
 const seedAdditionsBtn = document.getElementById('seed-additions-btn');
 const seedAdditionsStatus = document.getElementById('seed-additions-status');
@@ -440,10 +441,10 @@ async function saveMenu() {
     if (!response.ok) {
       throw new Error(`Save failed (${response.status}).`);
     }
-    setStatus(saveStatus, 'Saved! The live site is already up to date.', false);
+    setStatus(saveStatus, 'Saved! Returning to the menu...', false);
+    setTimeout(() => { window.location.href = '/menu'; }, 700);
   } catch (error) {
     setStatus(saveStatus, error.message, true);
-  } finally {
     saveBtn.disabled = false;
   }
 }
@@ -474,6 +475,7 @@ async function seedCommonAdditions() {
 seedAdditionsBtn.addEventListener('click', seedCommonAdditions);
 reloadBtn.addEventListener('click', () => loadMenu().catch((error) => setStatus(statusEl, error.message, true)));
 saveBtn.addEventListener('click', saveMenu);
+cancelBtn.addEventListener('click', () => { window.location.href = '/menu'; });
 addCategoryBtn.addEventListener('click', () => {
   const section = addCategorySection.value;
   categoriesContainer.appendChild(categoryBlock(section, 'New Category', '', []));

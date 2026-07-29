@@ -35,6 +35,7 @@ document.querySelectorAll('.nav-dropdown-toggle').forEach((btn) => {
     const staffResponse = await fetch('/api/auth/me');
     if (staffResponse.ok) {
       makeLogoutLink('/api/auth/logout');
+      insertStaffNavDropdown();
       startStaffAlertMuteToggle();
       startStaffTableOrderAlerts();
       startStaffFeedbackAlerts();
@@ -43,6 +44,44 @@ document.querySelectorAll('.nav-dropdown-toggle').forEach((btn) => {
     // leave the "Log In" link as-is
   }
 })();
+
+// A "Staff ▾" dropdown in the public site header, shown only to a logged-in
+// staff member — same links as the .staff-tools-nav on every admin page,
+// just also reachable from the customer-facing site without knowing a URL.
+// Only public pages need this injected; admin pages already have their own
+// staff-tools-nav in the page itself.
+function insertStaffNavDropdown() {
+  const siteNav = document.getElementById('site-nav');
+  if (!siteNav || document.querySelector('.staff-tools-nav') || document.querySelector('.staff-nav-dropdown')) return;
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'nav-dropdown staff-nav-dropdown';
+  dropdown.innerHTML = `
+    <button class="nav-dropdown-toggle" type="button">Staff &#9662;</button>
+    <div class="nav-dropdown-menu">
+      <a href="/edit.html">Menu Editor</a>
+      <a href="/table-orders-admin.html">Table Orders</a>
+      <a href="/loyalty-admin.html">Loyalty</a>
+      <a href="/waitlist-admin.html">Waitlist</a>
+      <a href="/events-admin.html">Events</a>
+      <a href="/table-card.html">Table Cards</a>
+      <a href="/analytics.html">Analytics</a>
+      <a href="/staff-rewards-admin.html">Staff Rewards</a>
+      <a href="/manage-users.html">Manage Users</a>
+      <a href="/account.html">My Account</a>
+    </div>
+  `;
+  dropdown.querySelector('.nav-dropdown-toggle').addEventListener('click', () => {
+    dropdown.classList.toggle('open');
+  });
+
+  const loginLink = document.getElementById('nav-login-link');
+  if (loginLink) {
+    siteNav.insertBefore(dropdown, loginLink);
+  } else {
+    siteNav.appendChild(dropdown);
+  }
+}
 
 // Whether a staff member has muted the spoken order alerts on this device.
 // Per-browser (localStorage), not per-account — deliberately simple, since
