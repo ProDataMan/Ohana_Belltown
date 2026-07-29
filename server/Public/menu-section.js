@@ -67,34 +67,110 @@ function clearActiveOrder(itemName) {
   sessionStorage.setItem('ohana_active_orders', JSON.stringify(active));
 }
 
-async function placeTableOrder(button) {
-  const tableId = getTableId();
-  if (!tableId) return;
+/// Items a guest has picked but not yet sent to staff — keyed by item name,
+/// same as active orders. Lets someone add a sushi roll, then navigate to
+/// Drinks and add a cocktail, then send everything as one order from
+/// wherever they end up. Cleared once the order is actually sent.
+function getPendingCart() {
+  try {
+    return JSON.parse(sessionStorage.getItem('ohana_pending_cart') || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function setPendingCartItem(itemName, entry) {
+  const cart = getPendingCart();
+  cart[itemName] = entry;
+  sessionStorage.setItem('ohana_pending_cart', JSON.stringify(cart));
+  return cart;
+}
+
+function removePendingCartItem(itemName) {
+  const cart = getPendingCart();
+  delete cart[itemName];
+  sessionStorage.setItem('ohana_pending_cart', JSON.stringify(cart));
+  return cart;
+}
+
+function clearPendingCart() {
+  sessionStorage.removeItem('ohana_pending_cart');
+}
+
+// Adding an item no longer sends it right away — it just joins the pending
+// cart (see sendPendingOrder) so a guest can pick several things across
+// however many menu pages before staff are actually notified once.
+function addItemToCart(button) {
   const itemName = button.dataset.itemName;
   const itemId = button.dataset.itemId || null;
   const articleEl = button.closest('.item');
   const modifierCheckboxes = articleEl ? Array.from(articleEl.querySelectorAll('.item-modifiers input')) : [];
   const modifiers = modifierCheckboxes.filter((cb) => cb.checked).map((cb) => cb.dataset.modifierName);
-  button.disabled = true;
-  button.textContent = 'Sending...';
-  try {
-    const response = await fetch('/api/table-orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tableId, itemName, itemId, section: window.MENU_SECTION, modifiers }),
-    });
-    if (!response.ok) throw new Error();
-    const entry = await response.json();
-    setActiveOrder(itemName, entry.id);
-    button.dataset.orderId = entry.id;
-    button.textContent = 'Mark Received';
-    button.classList.add('order-btn-active');
-    button.disabled = false;
-    modifierCheckboxes.forEach((cb) => { cb.disabled = true; });
-  } catch {
-    button.textContent = 'Failed — tap to retry';
-    button.disabled = false;
+
+  setPendingCartItem(itemName, { itemId, section: window.MENU_SECTION, modifiers });
+
+  button.textContent = 'Added — Tap to Remove';
+  button.classList.add('order-btn-in-cart');
+  modifierCheckboxes.forEach((cb) => { cb.disabled = true; });
+  updateCartBadge();
+}
+
+function removeItemFromCart(button) {
+  const itemName = button.dataset.itemName;
+  const articleEl = button.closest('.item');
+  removePendingCartItem(itemName);
+
+  button.textContent = 'Add to Order';
+  button.classList.remove('order-btn-in-cart');
+  if (articleEl) {
+    articleEl.querySelectorAll('.item-modifiers input').forEach((cb) => { cb.disabled = false; });
   }
+  updateCartBadge();
+}
+
+// Sends every item in the pending cart as its own table order (same
+// endpoint as before, just fired together instead of one at a time), then
+// flips each item's button straight to "Mark Received" — same end state
+// placing them individually always resulted in.
+async function sendPendingOrder() {
+  const tableId = getTableId();
+  const cart = getPendingCart();
+  const itemNames = Object.keys(cart);
+  if (!tableId || !itemNames.length) return;
+
+  const results = await Promise.all(
+    itemNames.map(async (itemName) => {
+      const entry = cart[itemName];
+      try {
+        const response = await fetch('/api/table-orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tableId, itemName, itemId: entry.itemId, section: entry.section, modifiers: entry.modifiers }),
+        });
+        if (!response.ok) throw new Error();
+        const order = await response.json();
+        return { itemName, ok: true, orderId: order.id };
+      } catch {
+        return { itemName, ok: false };
+      }
+    })
+  );
+
+  results.forEach((result) => {
+    if (!result.ok) return;
+    setActiveOrder(result.itemName, result.orderId);
+    removePendingCartItem(result.itemName);
+    const btn = menuContainer.querySelector(`.order-btn[data-item-name="${CSS.escape(result.itemName)}"]`);
+    if (btn) {
+      btn.dataset.orderId = result.orderId;
+      btn.textContent = 'Mark Received';
+      btn.classList.remove('order-btn-in-cart');
+      btn.classList.add('order-btn-active');
+    }
+  });
+
+  updateCartBadge();
+  return results;
 }
 
 async function markOrderDelivered(button) {
@@ -256,6 +332,7 @@ function renderMenu(data) {
   itemsByIndex = [];
   const tableId = getTableId();
   const activeOrders = tableId ? getActiveOrders() : {};
+  const pendingCart = tableId ? getPendingCart() : {};
 
   menuContainer.innerHTML = categories
     .map((category) => {
@@ -290,9 +367,20 @@ function renderMenu(data) {
             ? `<a class="staff-edit-link" href="/edit-item.html?id=${encodeURIComponent(item.id)}" hidden>Edit</a>`
             : '';
           const activeOrderId = activeOrders[item.name];
+          const inCart = !activeOrderId && Boolean(pendingCart[item.name]);
+          const orderLocked = Boolean(activeOrderId) || inCart;
+          let orderBtnClass = 'order-btn';
+          let orderBtnLabel = 'Add to Order';
+          if (activeOrderId) {
+            orderBtnClass = 'order-btn order-btn-active';
+            orderBtnLabel = 'Mark Received';
+          } else if (inCart) {
+            orderBtnClass = 'order-btn order-btn-in-cart';
+            orderBtnLabel = 'Added — Tap to Remove';
+          }
           const orderButton =
             tableId && !soldOut
-              ? `<button type="button" class="order-btn${activeOrderId ? ' order-btn-active' : ''}" data-item-name="${escapeHtml(item.name)}" data-item-id="${escapeHtml(item.id || '')}"${activeOrderId ? ` data-order-id="${escapeHtml(activeOrderId)}"` : ''}>${activeOrderId ? 'Mark Received' : 'Order'}</button>`
+              ? `<button type="button" class="${orderBtnClass}" data-item-name="${escapeHtml(item.name)}" data-item-id="${escapeHtml(item.id || '')}"${activeOrderId ? ` data-order-id="${escapeHtml(activeOrderId)}"` : ''}>${orderBtnLabel}</button>`
               : '';
           const modifiers = item.modifiers || [];
           const modifiersMarkup =
@@ -302,7 +390,7 @@ function renderMenu(data) {
                     .map(
                       (m) => `
                     <label class="item-modifier-checkbox">
-                      <input type="checkbox" data-modifier-name="${escapeHtml(m.name)}" data-modifier-price="${m.priceDelta}" ${activeOrderId ? 'disabled' : ''} />
+                      <input type="checkbox" data-modifier-name="${escapeHtml(m.name)}" data-modifier-price="${m.priceDelta}" ${orderLocked ? 'disabled' : ''} />
                       ${escapeHtml(m.name)} (+$${Number(m.priceDelta).toFixed(2)})
                     </label>
                   `
@@ -340,6 +428,7 @@ function renderMenu(data) {
 
   renderControls(categories);
   injectMenuSchema(categories, tableId);
+  updateCartBadge();
 }
 
 function ensureItemModal() {
@@ -512,8 +601,10 @@ menuContainer.addEventListener('click', (event) => {
   if (orderBtn) {
     if (orderBtn.dataset.orderId) {
       markOrderDelivered(orderBtn);
+    } else if (orderBtn.classList.contains('order-btn-in-cart')) {
+      removeItemFromCart(orderBtn);
     } else {
-      placeTableOrder(orderBtn);
+      addItemToCart(orderBtn);
     }
     return;
   }
@@ -533,6 +624,148 @@ menuContainer.addEventListener('click', (event) => {
     openItemModal(Number(itemEl.dataset.index));
   }
 });
+
+// A floating "Your Order" button (bottom-left, opposite the Feedback tab)
+// shown only once the pending cart has something in it — opens a modal to
+// review, remove, and finally send everything as one notification to staff.
+function ensureCartFab() {
+  let btn = document.getElementById('cart-fab-btn');
+  if (btn) return btn;
+  btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = 'cart-fab-btn';
+  btn.className = 'cart-fab-btn';
+  btn.hidden = true;
+  btn.addEventListener('click', openCartModal);
+  document.body.appendChild(btn);
+  return btn;
+}
+
+function updateCartBadge() {
+  const cart = getPendingCart();
+  const count = Object.keys(cart).length;
+  const btn = ensureCartFab();
+  if (count) {
+    btn.textContent = `🛒 Your Order (${count}) — Review & Send`;
+    btn.hidden = false;
+  } else {
+    btn.hidden = true;
+  }
+}
+
+function ensureCartModal() {
+  let modal = document.getElementById('cart-modal-overlay');
+  if (modal) return modal;
+  modal = document.createElement('div');
+  modal.id = 'cart-modal-overlay';
+  modal.className = 'item-modal-overlay';
+  modal.hidden = true;
+  modal.innerHTML = `
+    <div class="item-modal cart-modal">
+      <button type="button" class="item-modal-close" aria-label="Close">&times;</button>
+      <h3 class="item-modal-name">Your Order</h3>
+      <div id="cart-modal-body"></div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) modal.hidden = true;
+  });
+  modal.querySelector('.item-modal-close').addEventListener('click', () => {
+    modal.hidden = true;
+  });
+  return modal;
+}
+
+function renderCartModalBody() {
+  const modal = ensureCartModal();
+  const body = modal.querySelector('#cart-modal-body');
+  const cart = getPendingCart();
+  const itemNames = Object.keys(cart);
+
+  if (!itemNames.length) {
+    body.innerHTML = '<p class="hint">Your order is empty — tap "Add to Order" on anything you\'d like, from any menu page.</p>';
+    return;
+  }
+
+  body.innerHTML = `
+    <div class="cart-lines">
+      ${itemNames
+        .map((itemName) => {
+          const entry = cart[itemName];
+          const modifiersText = entry.modifiers && entry.modifiers.length ? entry.modifiers.join(', ') : '';
+          return `
+            <div class="cart-line" data-item-name="${escapeHtml(itemName)}">
+              <div>
+                <div class="cart-line-name">${escapeHtml(itemName)}</div>
+                ${modifiersText ? `<div class="cart-line-modifiers hint">${escapeHtml(modifiersText)}</div>` : ''}
+              </div>
+              <button type="button" class="secondary cart-line-remove" aria-label="Remove ${escapeHtml(itemName)} from your order">&times;</button>
+            </div>
+          `;
+        })
+        .join('')}
+    </div>
+    <p class="hint">A staff member will come by to confirm and place your order — this isn't sent to the kitchen automatically.</p>
+    <button type="button" id="send-order-btn">Send Order</button>
+    <p id="cart-status" class="status"></p>
+  `;
+
+  body.querySelectorAll('.cart-line-remove').forEach((removeBtn) => {
+    removeBtn.addEventListener('click', () => {
+      const itemName = removeBtn.closest('.cart-line').dataset.itemName;
+      removePendingCartItem(itemName);
+      const pageBtn = menuContainer.querySelector(`.order-btn[data-item-name="${CSS.escape(itemName)}"]`);
+      if (pageBtn && pageBtn.classList.contains('order-btn-in-cart')) {
+        removeItemFromCart(pageBtn);
+      } else {
+        updateCartBadge();
+      }
+      renderCartModalBody();
+    });
+  });
+
+  body.querySelector('#send-order-btn').addEventListener('click', async () => {
+    const sendBtn = body.querySelector('#send-order-btn');
+    const statusEl = body.querySelector('#cart-status');
+    sendBtn.disabled = true;
+    statusEl.textContent = 'Sending...';
+    statusEl.classList.remove('status-error', 'status-ok');
+
+    const results = await sendPendingOrder();
+    const failed = (results || []).filter((r) => !r.ok);
+
+    if (!results || !results.length) {
+      statusEl.textContent = "Couldn't send your order — check your connection and try again.";
+      statusEl.classList.add('status-error');
+      sendBtn.disabled = false;
+      return;
+    }
+
+    if (failed.length) {
+      statusEl.textContent = `${failed.length} item${failed.length === 1 ? '' : 's'} didn't go through — still in your order below, tap Send Order to retry.`;
+      statusEl.classList.add('status-error');
+      sendBtn.disabled = false;
+      renderCartModalBody();
+      return;
+    }
+
+    body.innerHTML = `
+      <p class="status status-ok" style="font-size: 1rem;">
+        Staff have been notified that you're ready to order — someone will be by shortly to confirm it.
+      </p>
+      <button type="button" id="cart-modal-done-btn">Got it</button>
+    `;
+    body.querySelector('#cart-modal-done-btn').addEventListener('click', () => {
+      ensureCartModal().hidden = true;
+    });
+  });
+}
+
+function openCartModal() {
+  renderCartModalBody();
+  ensureCartModal().hidden = false;
+}
 
 async function revealStaffOnlyElementsIfLoggedIn() {
   const links = document.querySelectorAll('.staff-edit-link');

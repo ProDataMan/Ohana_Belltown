@@ -220,35 +220,44 @@ function startStaffTableOrderAlerts() {
   alertEl.hidden = true;
   getStaffAlertsContainer().appendChild(alertEl);
 
-  // null until the first poll establishes a baseline, so page-load doesn't
-  // announce every order that was already waiting before this tab opened.
-  let knownOrderIds = null;
-  let knownEligibleTableIds = null;
+  // Re-announced roughly once a minute for as long as an order stays
+  // unaddressed — not just once on arrival — so a spoken reminder can't get
+  // missed. Keyed by order id / table id -> the timestamp it was last
+  // spoken, so a poll only re-announces once ANNOUNCE_REPEAT_MS has passed.
+  const ANNOUNCE_REPEAT_MS = 60000;
+  let lastAnnouncedNewOrderAt = {};
+  let lastAnnouncedOrderUpAt = {};
 
   async function poll() {
     try {
       const response = await fetch('/api/table-orders/dashboard');
       if (!response.ok) return;
       const data = await response.json();
+      const now = Date.now();
 
-      if (knownOrderIds) {
-        for (const order of data.needsEntry) {
-          if (!knownOrderIds.has(order.id)) {
-            getTableSection(order.tableId).then((section) => announceNewOrder(order.tableId, section));
-          }
+      for (const order of data.needsEntry) {
+        const last = lastAnnouncedNewOrderAt[order.id];
+        if (!last || now - last >= ANNOUNCE_REPEAT_MS) {
+          lastAnnouncedNewOrderAt[order.id] = now;
+          getTableSection(order.tableId).then((section) => announceNewOrder(order.tableId, section));
         }
       }
-      knownOrderIds = new Set(data.needsEntry.map((order) => order.id));
+      const stillPendingIds = new Set(data.needsEntry.map((order) => order.id));
+      Object.keys(lastAnnouncedNewOrderAt).forEach((id) => {
+        if (!stillPendingIds.has(id)) delete lastAnnouncedNewOrderAt[id];
+      });
 
       const currentEligibleTableIds = tablesEligibleForAwaitingFlash(data.awaitingDelivery);
-      if (knownEligibleTableIds) {
-        for (const tableId of currentEligibleTableIds) {
-          if (!knownEligibleTableIds.has(tableId)) {
-            getTableSection(tableId).then((section) => announceOrderUp(tableId, section));
-          }
+      for (const tableId of currentEligibleTableIds) {
+        const last = lastAnnouncedOrderUpAt[tableId];
+        if (!last || now - last >= ANNOUNCE_REPEAT_MS) {
+          lastAnnouncedOrderUpAt[tableId] = now;
+          getTableSection(tableId).then((section) => announceOrderUp(tableId, section));
         }
       }
-      knownEligibleTableIds = currentEligibleTableIds;
+      Object.keys(lastAnnouncedOrderUpAt).forEach((tableId) => {
+        if (!currentEligibleTableIds.has(tableId)) delete lastAnnouncedOrderUpAt[tableId];
+      });
 
       const attention = data.needsEntry.length + data.readyCount;
       if (attention) {
