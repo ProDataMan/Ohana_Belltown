@@ -427,8 +427,25 @@ function renderMenu(data) {
     .join('');
 
   renderControls(categories);
+  renderOrderingHint(tableId);
   injectMenuSchema(categories, tableId);
   updateCartBadge();
+}
+
+// A one-time orientation for guests actively at a table (tableId set) —
+// separate from renderControls, which skips itself entirely on a
+// single-category/no-tags menu page and shouldn't gate this too.
+function renderOrderingHint(tableId) {
+  const existing = document.getElementById('ordering-hint');
+  if (existing) existing.remove();
+  if (!tableId) return;
+
+  const hint = document.createElement('p');
+  hint.id = 'ordering-hint';
+  hint.className = 'hint ordering-hint';
+  hint.innerHTML =
+    'Tap <strong>Add to Order</strong> on anything you\'d like, from any menu page — then tap <strong>Review &amp; Send</strong> (bottom-left) once you\'re done picking.';
+  menuContainer.before(hint);
 }
 
 function ensureItemModal() {
@@ -706,7 +723,7 @@ function renderCartModalBody() {
         })
         .join('')}
     </div>
-    <p class="hint">A staff member will come by to confirm and place your order — this isn't sent to the kitchen automatically.</p>
+    <p class="hint">A staff member will come confirm your order — it hasn't been sent to the kitchen yet.</p>
     <button type="button" id="send-order-btn">Send Order</button>
     <p id="cart-status" class="status"></p>
   `;
