@@ -339,6 +339,7 @@ document.getElementById('add-modifier-btn').addEventListener('click', addModifie
 document.getElementById('item-image-input').addEventListener('change', uploadItemImage);
 document.getElementById('photo-google-btn').addEventListener('click', openGooglePhotoPicker);
 document.getElementById('save-btn').addEventListener('click', saveItem);
+document.getElementById('cancel-btn').addEventListener('click', () => { window.location.href = '/menu'; });
 document.getElementById('delete-btn').addEventListener('click', deleteItem);
 
 loadAdditionsCatalog();

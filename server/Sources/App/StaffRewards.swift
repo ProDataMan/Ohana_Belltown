@@ -3,9 +3,9 @@ import Vapor
 /// A staff member's running point balance toward a reward — same mechanic
 /// as the customer loyalty card, but earned by keeping the site itself up
 /// to date (photos, prices, specials, events) rather than by ordering food.
-/// 100 points ≈ $1 of reward value (see `StaffRewardsStore.pointValues`) —
-/// deliberately big numbers rather than a 1:1 dollar ratio, so progress
-/// feels substantial even for small everyday actions.
+/// See `StaffRewardsStore.pointValues` — rescaled smaller in July 2026 (was
+/// 100:1 points-to-dollar) now that most items already have a photo, so an
+/// individual action reads as a smaller slice of the whole reward.
 struct StaffRewardCard: Codable, Content {
     var staffId: String
     var points: Int
@@ -145,12 +145,19 @@ struct StaffRewardsData: Codable {
     var events: [StaffRewardEvent]
     var catalog: [RewardCatalogItem]?
     var socialRequests: [StaffSocialRequest]?
+    /// Admin-editable override for `StaffRewardsStore.defaultPointValues` —
+    /// nil until an admin has ever saved changes from `/staff-rewards-admin.html`.
+    var pointValues: [String: Int]?
 
-    init(cards: [StaffRewardCard], events: [StaffRewardEvent], catalog: [RewardCatalogItem]? = nil, socialRequests: [StaffSocialRequest]? = nil) {
+    init(
+        cards: [StaffRewardCard], events: [StaffRewardEvent], catalog: [RewardCatalogItem]? = nil,
+        socialRequests: [StaffSocialRequest]? = nil, pointValues: [String: Int]? = nil
+    ) {
         self.cards = cards
         self.events = events
         self.catalog = catalog
         self.socialRequests = socialRequests
+        self.pointValues = pointValues
     }
 }
 
@@ -171,6 +178,7 @@ enum StaffRewardError: Error, Equatable {
     case linkRequired
     case socialRequestNotFound
     case socialRequestAlreadyReviewed
+    case invalidPointValue
 }
 
 extension StaffRewardError: AbortError {
@@ -184,6 +192,7 @@ extension StaffRewardError: AbortError {
         case .linkRequired: return .badRequest
         case .socialRequestNotFound: return .notFound
         case .socialRequestAlreadyReviewed: return .badRequest
+        case .invalidPointValue: return .badRequest
         }
     }
 
@@ -197,6 +206,7 @@ extension StaffRewardError: AbortError {
         case .linkRequired: return "A link to the post is required."
         case .socialRequestNotFound: return "That request doesn't exist."
         case .socialRequestAlreadyReviewed: return "That request has already been reviewed."
+        case .invalidPointValue: return "Point values can't be negative."
         }
     }
 }
@@ -207,39 +217,57 @@ final class StaffRewardsStore: @unchecked Sendable {
     /// entirely unpriced — otherwise `statusFor` uses the cheapest priced
     /// catalog item instead, so the target always reflects something
     /// actually redeemable.
-    static let pointsNeeded = 1000
+    static let pointsNeeded = 100
     /// Points awarded per category, scaled to real effort and business
-    /// value rather than a flat amount per action — at a 100:1 points-to-
-    /// dollar ratio (100 points ≈ $1):
+    /// value rather than a flat amount per action. Rescaled down (roughly
+    /// 1/10, though not a strict formula) in July 2026 — the original
+    /// values assumed most items still needed a photo; now that most do,
+    /// a single photo/price/special edit should read as a smaller slice of
+    /// the whole reward, not the same big jump it used to be:
     ///   - marking a special / updating a price: trivial data-entry effort
     ///   - adding a photo / adding an event: real content-creation effort
     ///   - a social media post: the most effort (shoot, write, post) and
     ///     the most marketing value, so it's worth the most
-    static let pointValues: [String: Int] = [
-        "special": 100,
-        "price": 100,
-        "photo": 200,
-        "event": 200,
-        "other": 200,
-        "social": 300,
+    /// "photo_bounty" is a separate, higher-value category (not directly
+    /// in the effort scale above) — see `awardForMenuEdit`: it's what
+    /// actually gets awarded instead of "photo" when an item goes from zero
+    /// photos to one, since a menu with photo gaps still remaining should
+    /// pay a real bounty to close them, not the same flat rate as touching
+    /// up an item that already had one.
+    ///
+    /// These are just the seed/fallback values — an admin can edit them from
+    /// `/staff-rewards-admin.html` (`GET`/`PUT /api/staff-rewards/point-values`),
+    /// which persists an override in `StaffRewardsData.pointValues`. Always
+    /// go through `effectivePointValues()` / `currentPointValue(for:)`
+    /// rather than this directly, so an edited value actually takes effect.
+    static let defaultPointValues: [String: Int] = [
+        "special": 10,
+        "price": 10,
+        "photo": 25,
+        "photo_bounty": 50,
+        "event": 35,
+        "other": 20,
+        "social": 30,
     ]
-    static var categories: [String] { Array(pointValues.keys) }
+    static var categories: [String] { Array(defaultPointValues.keys) }
     /// Categories a staff member can log for themselves and have credited
     /// instantly, without an admin. "social" is deliberately excluded —
     /// unlike "other", it goes through `submitSocialRequest` instead, since
     /// it needs a link and an admin's approval before the points land.
+    /// "photo_bounty" is excluded too — it's only ever system-detected from
+    /// a real menu edit, never something to self-report.
     static let selfReportableCategories = ["other"]
     /// Only auto-awarded/self-reported points (not a manual admin grant)
     /// count against this — caps how many points a day repeatedly editing
     /// the same item (or repeatedly self-reporting) can earn, without
     /// limiting genuine deliberate recognition from an admin.
-    static let maxAutoPointsPerDay = 1000
+    static let maxAutoPointsPerDay = 100
 
     /// Seeded the first time the catalog is loaded — the base food reward
     /// (priced against real Happy Hour menu costs) plus swag placeholders
     /// with no price yet, pending real supplier quotes.
     static let defaultCatalog: [RewardCatalogItem] = [
-        RewardCatalogItem(id: "roll-or-appetizer", name: "Classic Ohana Roll or Happy Hour Appetizer", pointCost: 1000),
+        RewardCatalogItem(id: "roll-or-appetizer", name: "Classic Ohana Roll or Happy Hour Appetizer", pointCost: 100),
         RewardCatalogItem(id: "hat", name: "Ohana Hat", pointCost: nil),
         RewardCatalogItem(id: "tshirt", name: "Ohana T-Shirt", pointCost: nil),
     ]
@@ -348,6 +376,35 @@ final class StaffRewardsStore: @unchecked Sendable {
         return items
     }
 
+    /// Lock-free — assumes the caller already holds `lock` and has already
+    /// called `loadIfNeeded()`. `Self.defaultPointValues` fills in any
+    /// category missing from a possibly-stale persisted override (e.g. one
+    /// saved before "photo_bounty" existed), so a value is always available.
+    private func currentPointValues() -> [String: Int] {
+        guard let override = data.pointValues else { return Self.defaultPointValues }
+        return Self.defaultPointValues.merging(override) { _, overridden in overridden }
+    }
+
+    func pointValues() throws -> [String: Int] {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        return currentPointValues()
+    }
+
+    @discardableResult
+    func savePointValues(_ values: [String: Int]) throws -> [String: Int] {
+        guard values.values.allSatisfy({ $0 >= 0 }) else {
+            throw StaffRewardError.invalidPointValue
+        }
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        data.pointValues = values
+        try persist()
+        return currentPointValues()
+    }
+
     /// Awards points for one category. `awardedBy` nil means the system
     /// auto-detected the action from the staff member's own edit (or they
     /// self-reported it); a non-nil admin id means a manual grant. Auto/
@@ -365,14 +422,15 @@ final class StaffRewardsStore: @unchecked Sendable {
     /// times, since this always runs inline inside another route's request.
     @discardableResult
     func awardBatch(staffId: String, categories: [String], note: String?, awardedBy: String?) throws -> StaffRewardStatus {
-        for category in categories {
-            guard let pointValue = Self.pointValues[category], pointValue > 0 else {
-                throw StaffRewardError.invalidCategory
-            }
-        }
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
+        let pointValues = currentPointValues()
+        for category in categories {
+            guard pointValues[category] != nil else {
+                throw StaffRewardError.invalidCategory
+            }
+        }
         let idx = findOrCreateCardIndex(staffId: staffId)
         guard !categories.isEmpty else { return statusFor(data.cards[idx]) }
 
@@ -388,7 +446,7 @@ final class StaffRewardsStore: @unchecked Sendable {
 
         var awardedAny = false
         for category in categories {
-            let pointValue = Self.pointValues[category] ?? 1
+            let pointValue = pointValues[category] ?? 1
             if awardedBy == nil {
                 guard autoPointsToday < Self.maxAutoPointsPerDay else { continue }
                 autoPointsToday += pointValue
@@ -409,7 +467,11 @@ final class StaffRewardsStore: @unchecked Sendable {
     func awardForMenuEdit(staffId: String, before: MenuItem?, after: MenuItem) {
         guard let before else { return }
         var categories: [String] = []
-        if after.images.count > before.images.count {
+        if before.images.isEmpty && !after.images.isEmpty {
+            // Bounty rate — this item had zero photos before, so closing
+            // that specific gap is worth double the normal photo rate.
+            categories.append("photo_bounty")
+        } else if after.images.count > before.images.count {
             categories.append("photo")
         }
         if let newPrice = after.price, newPrice != before.price {
@@ -473,7 +535,7 @@ final class StaffRewardsStore: @unchecked Sendable {
         requests[idx].status = approve ? "approved" : "denied"
         requests[idx].reviewedAt = now()
         if approve {
-            let pointValue = Self.pointValues["social"] ?? 300
+            let pointValue = currentPointValues()["social"] ?? 30
             creditPoints(staffId: requests[idx].staffId, category: "social", note: requests[idx].link, awardedBy: reviewerId, pointValue: pointValue)
         }
         data.socialRequests = requests

@@ -280,6 +280,19 @@ func routes(_ app: Application) throws {
         return try StaffRewardsStore.shared.saveCatalog(items)
     }
 
+    // How many points each category is worth — staff can see it (it's
+    // already shown throughout the rewards pages); only an admin can change it.
+    app.get("api", "staff-rewards", "point-values") { req throws -> [String: Int] in
+        try requireLogin(req)
+        return try StaffRewardsStore.shared.pointValues()
+    }
+
+    app.put("api", "staff-rewards", "point-values") { req throws -> [String: Int] in
+        try requireAdmin(req)
+        let values = try req.content.decode([String: Int].self)
+        return try StaffRewardsStore.shared.savePointValues(values)
+    }
+
     app.post("api", "staff-rewards", "log") { req throws -> StaffRewardStatus in
         let staff = try requireLogin(req)
         let body = try req.content.decode(StaffRewardSelfReportRequest.self)

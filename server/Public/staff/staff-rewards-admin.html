@@ -12,12 +12,13 @@
       <header class="hero">
         <p class="eyebrow">Ohana Belltown — Staff</p>
         <h1>Staff Rewards</h1>
-        <p style="font-size: 1.1rem;"><strong>100 points ≈ $1 of reward value.</strong></p>
         <p>
           A points card for keeping the site itself up to date — points are scaled to effort:
-          marking a special or updating a price is worth 100 points, adding a photo or an event is
-          worth 200, and a social media post is worth 300. Editing a menu item auto-awards the
-          relevant points; adding an event does too. Staff can log unverifiable "other" activity
+          marking a special or updating a price is worth 10 points, adding a photo is worth 25
+          (<strong>50 if it's the item's first photo</strong> — a bounty for closing a real gap,
+          not just touching up an item that already had one), adding an event is worth 35, and a
+          social media post is worth 30. Editing a menu item auto-awards the relevant points;
+          adding an event does too. Staff can log unverifiable "other" activity
           from <a href="/account.html">My Account</a> instantly, but a social media post needs a
           link and goes to the <strong>Social Media Requests</strong> queue below for approval
           first — those points aren't credited until you approve it.
@@ -49,8 +50,21 @@
             <button id="reload-social-requests-btn" type="button" class="secondary">Reload</button>
           </div>
         </div>
-        <p class="hint">Staff submit a link when they post about Ohana — approve to credit the points (300), deny to skip it.</p>
+        <p class="hint">Staff submit a link when they post about Ohana — approve to credit the points (30), deny to skip it.</p>
         <div id="social-requests-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="editor-toolbar">
+          <h2>Point Values</h2>
+          <div class="toolbar-actions">
+            <button id="reload-point-values-btn" type="button" class="secondary">Reload</button>
+          </div>
+        </div>
+        <p class="hint">How many points each activity is worth. "Added an item's first-ever photo" only applies the first time a menu item gets a photo — after that, edits to it earn the regular "Added a photo" rate instead.</p>
+        <div id="point-values-list"></div>
+        <button id="save-point-values-btn" type="button" style="margin-top: 0.75rem;">Save Point Values</button>
+        <p id="point-values-status" class="status"></p>
       </section>
 
       <section class="panel">
@@ -61,12 +75,13 @@
           </label>
           <label>Reason
             <select id="award-category-select">
-              <option value="social">Social media post (300 points)</option>
-              <option value="photo">Added a photo (200 points)</option>
-              <option value="price">Updated a price (100 points)</option>
-              <option value="special">Marked a special (100 points)</option>
-              <option value="event">Added an event (200 points)</option>
-              <option value="other">Other (200 points)</option>
+              <option value="social">Social media post (30 points)</option>
+              <option value="photo">Added a photo (25 points)</option>
+              <option value="photo_bounty">Added an item's first-ever photo (50 points)</option>
+              <option value="price">Updated a price (10 points)</option>
+              <option value="special">Marked a special (10 points)</option>
+              <option value="event">Added an event (35 points)</option>
+              <option value="other">Other (20 points)</option>
             </select>
           </label>
           <label>Note (optional)

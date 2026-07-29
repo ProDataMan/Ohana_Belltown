@@ -132,6 +132,23 @@ function updateLogActivityFormForCategory() {
 logActivityCategorySelect?.addEventListener('change', updateLogActivityFormForCategory);
 updateLogActivityFormForCategory();
 
+// The point counts in the dropdown are static HTML by default, but an
+// admin can edit them from /staff-rewards-admin.html — keep them honest.
+(async () => {
+  if (!logActivityCategorySelect) return;
+  try {
+    const response = await fetch('/api/staff-rewards/point-values');
+    if (!response.ok) return;
+    const values = await response.json();
+    const socialOption = logActivityCategorySelect.querySelector('option[value="social"]');
+    const otherOption = logActivityCategorySelect.querySelector('option[value="other"]');
+    if (socialOption && values.social != null) socialOption.textContent = `Posted on social media (${values.social} points)`;
+    if (otherOption && values.other != null) otherOption.textContent = `Something else (${values.other} points)`;
+  } catch {
+    // leave the static labels as-is
+  }
+})();
+
 document.getElementById('log-activity-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
   const statusEl = document.getElementById('log-activity-status');

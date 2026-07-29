@@ -9,6 +9,7 @@ function escapeHtmlRewards(value) {
 
 const categoryLabels = {
   photo: 'Added a photo',
+  photo_bounty: "Added an item's first-ever photo",
   price: 'Updated a price',
   special: 'Marked a special',
   event: 'Added an event',
@@ -219,6 +220,91 @@ document.getElementById('save-catalog-btn').addEventListener('click', async () =
   }
 });
 
+// Same category order everywhere on this page — "redeemed" isn't a real
+// earnable category (it only ever shows up in the activity history table
+// below, via categoryLabels), so it's left out of the editable list here.
+const pointValueCategoryOrder = ['special', 'price', 'photo', 'photo_bounty', 'event', 'social', 'other'];
+let currentPointValues = {};
+
+function renderPointValuesList() {
+  const listEl = document.getElementById('point-values-list');
+  const keys = pointValueCategoryOrder.filter((key) => key in currentPointValues);
+  listEl.innerHTML = `
+    <div class="data-table">
+      <table>
+        <thead><tr><th>Activity</th><th>Points</th></tr></thead>
+        <tbody>
+          ${keys
+            .map(
+              (key) => `
+            <tr data-category="${escapeHtmlRewards(key)}">
+              <td>${escapeHtmlRewards(categoryLabels[key] || key)}</td>
+              <td><input type="number" min="0" class="point-value-input" value="${currentPointValues[key]}" style="max-width: 8rem;" /></td>
+            </tr>
+          `
+            )
+            .join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+// Keeps the "Award Points" reason dropdown's point counts honest — it's
+// static HTML by default, but the whole point of this form is that those
+// numbers can change.
+function refreshAwardCategoryLabels() {
+  const select = document.getElementById('award-category-select');
+  if (!select) return;
+  Array.from(select.options).forEach((option) => {
+    const value = currentPointValues[option.value];
+    if (value == null) return;
+    const label = categoryLabels[option.value] || option.value;
+    option.textContent = `${label} (${value} points)`;
+  });
+}
+
+async function loadPointValues() {
+  const listEl = document.getElementById('point-values-list');
+  try {
+    const response = await staffFetch('/api/staff-rewards/point-values');
+    if (!response.ok) throw new Error(`Unable to load point values (${response.status}).`);
+    currentPointValues = await response.json();
+    renderPointValuesList();
+    refreshAwardCategoryLabels();
+  } catch (error) {
+    listEl.innerHTML = `<p class="status status-error">${escapeHtmlRewards(error.message)}</p>`;
+  }
+}
+
+document.getElementById('reload-point-values-btn').addEventListener('click', loadPointValues);
+
+document.getElementById('save-point-values-btn').addEventListener('click', async () => {
+  const statusEl = document.getElementById('point-values-status');
+  const updated = {};
+  document.querySelectorAll('#point-values-list tr[data-category]').forEach((row) => {
+    updated[row.dataset.category] = Number(row.querySelector('.point-value-input').value);
+  });
+  statusEl.textContent = 'Saving...';
+  statusEl.classList.remove('status-error', 'status-ok');
+  try {
+    const response = await staffFetch('/api/staff-rewards/point-values', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    });
+    if (!response.ok) throw new Error(`Failed (${response.status}).`);
+    currentPointValues = await response.json();
+    renderPointValuesList();
+    refreshAwardCategoryLabels();
+    statusEl.textContent = 'Point values saved!';
+    statusEl.classList.add('status-ok');
+  } catch (error) {
+    statusEl.textContent = error.message;
+    statusEl.classList.add('status-error');
+  }
+});
+
 document.getElementById('reload-catalog-btn').addEventListener('click', loadCatalog);
 
 async function loadCards() {
@@ -382,6 +468,7 @@ document.getElementById('reload-events-btn').addEventListener('click', loadEvent
   await loadStaffOptions();
   await loadSocialRequests();
   await loadCatalog();
+  await loadPointValues();
   await loadCards();
   await loadEvents();
 })();
