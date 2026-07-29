@@ -18,6 +18,9 @@ const TAG_LABELS = {
 let itemsByIndex = [];
 let googlePhotosCache = null;
 let activeTagFilter = null;
+// Set once the logged-in-staff check resolves — staff previewing their own
+// edits need to see prices too, same as the Edit links they already get.
+let staffLoggedIn = false;
 
 function escapeHtml(value) {
   return String(value)
@@ -203,7 +206,7 @@ function filterMenu(query) {
   }
 }
 
-function injectMenuSchema(categories) {
+function injectMenuSchema(categories, tableId) {
   const existing = document.getElementById('menu-schema');
   if (existing) existing.remove();
 
@@ -219,7 +222,11 @@ function injectMenuSchema(categories) {
           name: item.name,
         };
         if (item.description) menuItem.description = item.description;
-        if (item.price != null) {
+        // Same rule as the visible price: only include it in the page's
+        // structured data (what search engines index) when a table's QR
+        // code has actually been scanned — otherwise it'd leak into search
+        // results even with prices hidden on the page itself.
+        if (item.price != null && tableId) {
           menuItem.offers = {
             '@type': 'Offer',
             price: item.price,
@@ -258,7 +265,15 @@ function renderMenu(data) {
           const index = itemsByIndex.length;
           itemsByIndex.push({ item, categoryName: category.name });
 
-          const priceMarkup = item.price != null ? `<div class="price" data-base-price="${item.price}">$${Number(item.price).toFixed(2)}</div>` : '';
+          // Prices only show once a table's QR code has been scanned this
+          // session (Yosh's call — browsing the public site shouldn't show
+          // prices at all, only ordering from an actual table). Rendered
+          // hidden rather than omitted so logged-in staff can still reveal
+          // it (see revealStaffOnlyElementsIfLoggedIn) to check their edits.
+          const priceMarkup =
+            item.price != null
+              ? `<div class="price staff-revealable-price" data-base-price="${item.price}" ${tableId ? '' : 'hidden'}>$${Number(item.price).toFixed(2)}</div>`
+              : '';
           const featuredImage = (item.images || [])[0];
           const imageMarkup = featuredImage
             ? `<img class="item-photo" src="${escapeHtml(featuredImage)}" alt="${escapeHtml(item.name)}" loading="lazy" />`
@@ -324,7 +339,7 @@ function renderMenu(data) {
     .join('');
 
   renderControls(categories);
-  injectMenuSchema(categories);
+  injectMenuSchema(categories, tableId);
 }
 
 function ensureItemModal() {
@@ -404,8 +419,9 @@ async function openItemModal(index) {
   modal.querySelector('.item-modal-desc').textContent = item.description || '';
 
   const priceEl = modal.querySelector('.item-modal-price');
-  priceEl.textContent = item.price != null ? `$${Number(item.price).toFixed(2)}` : '';
-  priceEl.hidden = item.price == null;
+  const showPrice = item.price != null && (Boolean(getTableId()) || staffLoggedIn);
+  priceEl.textContent = showPrice ? `$${Number(item.price).toFixed(2)}` : '';
+  priceEl.hidden = !showPrice;
 
   const tagsEl = modal.querySelector('.item-modal-tags');
   const tags = item.tags || [];
@@ -518,13 +534,16 @@ menuContainer.addEventListener('click', (event) => {
   }
 });
 
-async function revealStaffEditLinksIfLoggedIn() {
+async function revealStaffOnlyElementsIfLoggedIn() {
   const links = document.querySelectorAll('.staff-edit-link');
-  if (!links.length) return;
+  const prices = document.querySelectorAll('.staff-revealable-price');
+  if (!links.length && !prices.length) return;
   try {
     const response = await fetch('/api/auth/me');
     if (response.ok) {
+      staffLoggedIn = true;
       links.forEach((link) => { link.hidden = false; });
+      prices.forEach((price) => { price.hidden = false; });
     }
   } catch {
     // stay hidden
@@ -540,7 +559,7 @@ async function loadMenu() {
 
     const data = await response.json();
     renderMenu(data);
-    revealStaffEditLinksIfLoggedIn();
+    revealStaffOnlyElementsIfLoggedIn();
   } catch (error) {
     menuContainer.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;
   }
