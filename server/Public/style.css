@@ -2100,6 +2100,15 @@ label {
   margin-bottom: 0.9rem;
 }
 
+/* An author-stylesheet rule like the one above always beats the UA
+   stylesheet's own "[hidden] { display: none }" rule when neither is
+   !important, regardless of specificity — so any JS toggling a label's
+   hidden attribute (bonus-type/social-link fields on the rewards and
+   account pages, etc.) silently did nothing without this override. */
+label[hidden] {
+  display: none;
+}
+
 input[type="text"],
 input[type="tel"],
 input[type="search"],

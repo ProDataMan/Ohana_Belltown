@@ -138,6 +138,7 @@ now historical background rather than the current plan.
 <details>
 <summary><strong>Loyalty & engagement</strong></summary>
 
+- **Fixed**: the "Choose a photo" / "Link to your post" fields on the `/rewards` bonus-share form (and the matching "Link to your post" field on staff `/account.html`'s Log Activity form) were both visible at all times regardless of which radio button/category was selected — a global `label { display: flex }` CSS rule was silently overriding the JS toggling each field's `hidden` attribute, since an author-stylesheet rule always beats the browser's own `[hidden]` rule unless explicitly re-declared. Added a `label[hidden] { display: none; }` override so the fields now correctly show/hide with the selection everywhere on the site, not just these two spots.
 - Digital sushi punch card (`/rewards` + `/loyalty-admin.html`) — phone-number identity, 1 punch per sushi order,
   10 punches = free roll. Photo/social shares are staff-reviewed and worth 1/10 of a punch each (10 approved shares = 1 punch), capped at the first 2 approved shares per calendar day per phone number — extra shares that day can still be submitted and approved, they just don't add points, so posting many photos of one meal doesn't multiply the reward.
 - Events & specials calendar (`/events-admin.html` + public display on `/local`)
