@@ -363,6 +363,18 @@ h1 {
   gap: 0.5rem;
 }
 
+@media (max-width: 860px) {
+  /* On mobile the hamburger (.nav-toggle) lives in this same top-right
+     corner — without this, the alerts container's higher z-index sits
+     directly on top of it, so taps meant for the hamburger hit the mute
+     toggle/alert badge instead and the nav menu becomes unreachable.
+     Dropping below the ~60px sticky header clears it entirely. */
+  .staff-alerts-container {
+    top: 4.25rem;
+    right: 0.75rem;
+  }
+}
+
 .staff-order-alert {
   background: var(--gradient-brand);
   color: #fff;
