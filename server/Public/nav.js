@@ -36,6 +36,7 @@ document.querySelectorAll('.nav-dropdown-toggle').forEach((btn) => {
     if (staffResponse.ok) {
       makeLogoutLink('/api/auth/logout');
       insertStaffNavDropdown();
+      enableSpeechPrimingForStaff();
       startStaffAlertMuteToggle();
       startStaffTableOrderAlerts();
       startStaffFeedbackAlerts();
@@ -95,10 +96,78 @@ function setAlertsMuted(muted) {
   localStorage.setItem(ALERTS_MUTED_KEY, muted ? '1' : '0');
 }
 
+// iOS (every browser there, including Chrome — they're all WebKit under the
+// hood, since Apple requires it) only lets speechSynthesis.speak() actually
+// produce audio if speak() has been called at least once directly inside a
+// real tap/click handler. A call made later from our poll()'s setInterval
+// — exactly how the order alerts fire — is silently swallowed on iOS until
+// that's happened once. This "primes" it on the very first tap anywhere on
+// the page, so normal use of the site (tapping a nav link, logging in,
+// anything) unlocks it without staff needing to know to do anything special.
+//
+// Only wired up for a confirmed logged-in staff member (see the IIFE
+// above) — a random customer tapping the nav menu should never suddenly
+// hear "Voice alerts on" spoken at them.
+let speechPrimed = false;
+function primeSpeechSynthesisOnce() {
+  if (speechPrimed || !window.speechSynthesis) return;
+  speechPrimed = true;
+  speakNow('Voice alerts on');
+}
+function enableSpeechPrimingForStaff() {
+  document.addEventListener('touchend', primeSpeechSynthesisOnce, { once: true, capture: true });
+  document.addEventListener('click', primeSpeechSynthesisOnce, { once: true, capture: true });
+}
+
+// Deliberately does NOT cancel() any in-progress utterance first — several
+// orders can legitimately arrive in the same poll, and cancelling every time
+// would only ever let the last one be heard. See visibilitychange below for
+// where the actual iOS "stuck queue" recovery happens instead.
+function speakNow(text) {
+  if (!window.speechSynthesis) return;
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 0.95;
+  window.speechSynthesis.speak(utterance);
+}
+
+// Keeps the screen from auto-locking while alerts are on — iOS suspends a
+// backgrounded/locked tab's timers entirely, which would silently stop the
+// order-alert polling (visual and spoken both) until someone taps the
+// screen again. Best-effort: only recent browsers support this, and it has
+// to be re-requested every time the tab becomes visible again (the OS
+// releases it automatically when hidden).
+let wakeLock = null;
+async function requestWakeLockIfPossible() {
+  if (!('wakeLock' in navigator) || alertsMuted()) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+  } catch {
+    // e.g. Low Power Mode, or unsupported — alerts still work as long as
+    // the staff member's screen happens to stay on and the tab stays open.
+  }
+}
+
 // A small always-visible toggle (not just shown when there's an active
 // alert) so a staff member can mute/unmute regardless of what's happening
 // right now, from any page.
 function startStaffAlertMuteToggle() {
+  // Registered here (rather than unconditionally at the top of the file)
+  // since this whole function only ever runs for a confirmed logged-in
+  // staff member — a customer's tab shouldn't be grabbing a screen wake
+  // lock or fiddling with speechSynthesis just because they switched apps
+  // and came back.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    requestWakeLockIfPossible();
+    // iOS Safari/WebKit has a well-known bug where speechSynthesis can get
+    // stuck reporting "still speaking" after the tab was backgrounded, and
+    // silently swallows every speak() call from then on. Cancelling right
+    // as the tab becomes visible again clears that stuck state without
+    // risking cutting off a legitimate in-progress announcement (which
+    // only happens while the tab is actually visible and running).
+    window.speechSynthesis?.cancel();
+  });
+
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'staff-alert-mute-toggle';
@@ -112,10 +181,22 @@ function startStaffAlertMuteToggle() {
 
   paint();
   btn.addEventListener('click', () => {
-    setAlertsMuted(!alertsMuted());
+    const nowMuted = !alertsMuted();
+    setAlertsMuted(nowMuted);
     paint();
+    if (nowMuted) {
+      window.speechSynthesis?.cancel();
+    } else {
+      // Tapping this button is itself a real user gesture — use it to
+      // (re-)prime iOS and grab the wake lock right away, instead of
+      // waiting for the next unrelated tap.
+      speechPrimed = true;
+      speakNow('Voice alerts on');
+      requestWakeLockIfPossible();
+    }
   });
   getStaffAlertsContainer().appendChild(btn);
+  requestWakeLockIfPossible();
 }
 
 function getStaffAlertsContainer() {
@@ -155,9 +236,7 @@ async function getTableSection(tableId) {
 function announceNewOrder(tableId, section) {
   if (alertsMuted() || !window.speechSynthesis) return;
   const sectionLabel = section ? `, ${section}` : '';
-  const utterance = new SpeechSynthesisUtterance(`New order, table ${tableId}${sectionLabel}`);
-  utterance.rate = 0.95;
-  window.speechSynthesis.speak(utterance);
+  speakNow(`New order, table ${tableId}${sectionLabel}`);
 }
 
 // Speaks once a table has plausibly had enough time to cook — see
@@ -167,9 +246,7 @@ function announceNewOrder(tableId, section) {
 function announceOrderUp(tableId, section) {
   if (alertsMuted() || !window.speechSynthesis) return;
   const sectionLabel = section ? `, ${section}` : '';
-  const utterance = new SpeechSynthesisUtterance(`Order up, table ${tableId}${sectionLabel}`);
-  utterance.rate = 0.95;
-  window.speechSynthesis.speak(utterance);
+  speakNow(`Order up, table ${tableId}${sectionLabel}`);
 }
 
 // A table shouldn't be announced/flashed as ready for delivery the instant
