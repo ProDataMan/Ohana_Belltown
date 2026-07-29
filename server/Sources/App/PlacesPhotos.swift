@@ -43,6 +43,25 @@ struct PlaceReviewsSummary: Content {
     var reviews: [PlaceReview]
     var overallRating: Double?
     var totalRatings: Int?
+
+    /// 1-star reviews are excluded from the on-site widget — the review
+    /// itself is untouched on Google, just not amplified here. overallRating
+    /// and totalRatings still reflect Google's real totals, unfiltered, so
+    /// the site never misrepresents the actual rating.
+    static func build(from details: GooglePlaceDetailsResult) -> PlaceReviewsSummary {
+        let reviews = (details.reviews ?? [])
+            .filter { ($0.rating ?? 0) > 1 }
+            .map { review in
+                PlaceReview(
+                    authorName: review.author_name,
+                    profilePhotoUrl: review.profile_photo_url,
+                    rating: review.rating ?? 0,
+                    relativeTime: review.relative_time_description ?? "",
+                    text: review.text ?? ""
+                )
+            }
+        return PlaceReviewsSummary(reviews: reviews, overallRating: details.rating, totalRatings: details.user_ratings_total)
+    }
 }
 
 extension String {
@@ -170,16 +189,7 @@ func registerPlacesPhotoRoutes(_ app: Application) {
         }
 
         let details = try await PlacesPhotoCache.shared.getDetails(client: req.client, apiKey: apiKey, placeId: placeId)
-        let reviews = (details.reviews ?? []).map { review in
-            PlaceReview(
-                authorName: review.author_name,
-                profilePhotoUrl: review.profile_photo_url,
-                rating: review.rating ?? 0,
-                relativeTime: review.relative_time_description ?? "",
-                text: review.text ?? ""
-            )
-        }
-        return PlaceReviewsSummary(reviews: reviews, overallRating: details.rating, totalRatings: details.user_ratings_total)
+        return PlaceReviewsSummary.build(from: details)
     }
 
     app.get("places-photo", "**") { req async throws -> Response in
