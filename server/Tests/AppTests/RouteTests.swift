@@ -348,6 +348,32 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testAIExtractionStatusAndExtractReflectNoAPIKeyConfigured() throws {
+        let bootstrapBody = ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"], body: bootstrapBody) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        // No ANTHROPIC_API_KEY in the test environment — the status check
+        // should report unavailable, and attempting the extraction anyway
+        // should fail with a clear "not configured" reason (503) rather
+        // than a confusing crash or generic error.
+        try app.test(.GET, "api/competitor-pricing/ai-extraction-status", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+            let status = try res.content.decode(AIExtractionStatus.self)
+            XCTAssertFalse(status.available)
+        }
+
+        let extractBody = ByteBuffer(string: #"{"photoUrl":"/uploads/does-not-exist.jpg"}"#)
+        try app.test(.POST, "api/competitor-pricing/extract-menu", headers: ["Cookie": cookie, "Content-Type": "application/json"], body: extractBody) { res in
+            XCTAssertEqual(res.status, .serviceUnavailable)
+        }
+    }
+
     func testMenuAPIReturnsSeedMenuWithoutAuth() throws {
         try app.test(.GET, "api/menu") { res in
             XCTAssertEqual(res.status, .ok)

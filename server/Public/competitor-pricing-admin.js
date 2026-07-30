@@ -15,6 +15,7 @@ let menuItems = [];
 let groups = [];
 let restaurants = [];
 let entries = [];
+let aiExtractionAvailable = false;
 
 function restaurantName(id) {
   return restaurants.find((r) => r.id === id)?.name || '(removed restaurant)';
@@ -186,15 +187,22 @@ document.getElementById('groups-form').addEventListener('submit', (event) => {
   refreshEntryFormSelects();
 });
 
-document.getElementById('save-groups-btn').addEventListener('click', async () => {
-  const statusEl = document.getElementById('groups-status');
+// Reads whatever's currently typed into each group row's inputs — used both
+// by the Save button and by the AI-extraction flow, which needs to append a
+// brand-new group without clobbering any not-yet-saved edits to existing ones.
+function currentGroupsFromDOM() {
   const rows = document.querySelectorAll('#groups-list tr[data-index]');
-  const updated = Array.from(rows).map((row, i) => ({
+  return Array.from(rows).map((row, i) => ({
     id: groups[i].id,
     label: row.querySelector('.group-label-input').value.trim(),
     ourMenuItemId: row.querySelector('.group-item-select').value || null,
     notes: row.querySelector('.group-notes-input').value.trim() || null,
   }));
+}
+
+document.getElementById('save-groups-btn').addEventListener('click', async () => {
+  const statusEl = document.getElementById('groups-status');
+  const updated = currentGroupsFromDOM();
   statusEl.textContent = 'Saving...';
   statusEl.classList.remove('status-error', 'status-ok');
   try {
@@ -259,11 +267,18 @@ function renderRestaurantsList() {
                   ${(r.menuPhotoUrls || [])
                     .map(
                       (url, photoIndex) => `
-                    <div class="item-thumb-wrap">
-                      <a href="${escapeHtmlCompetitor(url)}" target="_blank" rel="noopener">
-                        <img class="item-thumb" src="${escapeHtmlCompetitor(url)}" alt="Menu photo" />
-                      </a>
-                      <button type="button" class="thumb-remove-btn menu-photo-remove-btn" data-photo-index="${photoIndex}" aria-label="Remove this menu photo">&times;</button>
+                    <div class="menu-photo-item">
+                      <div class="item-thumb-wrap">
+                        <a href="${escapeHtmlCompetitor(url)}" target="_blank" rel="noopener">
+                          <img class="item-thumb" src="${escapeHtmlCompetitor(url)}" alt="Menu photo" />
+                        </a>
+                        <button type="button" class="thumb-remove-btn menu-photo-remove-btn" data-photo-index="${photoIndex}" aria-label="Remove this menu photo">&times;</button>
+                      </div>
+                      ${
+                        aiExtractionAvailable
+                          ? `<button type="button" class="secondary menu-photo-extract-btn" data-photo-url="${escapeHtmlCompetitor(url)}">Extract Items</button>`
+                          : ''
+                      }
                     </div>
                   `
                     )
@@ -304,6 +319,12 @@ function renderRestaurantsList() {
   listEl.querySelectorAll('.menu-photo-upload-input').forEach((input) => {
     input.addEventListener('change', (event) => uploadMenuPhoto(event, Number(input.closest('tr').dataset.index)));
   });
+  listEl.querySelectorAll('.menu-photo-extract-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const restaurantIndex = Number(btn.closest('tr').dataset.index);
+      extractMenuItems(btn.dataset.photoUrl, restaurantIndex, btn);
+    });
+  });
 }
 
 async function uploadMenuPhoto(event, restaurantIndex) {
@@ -332,6 +353,155 @@ async function uploadMenuPhoto(event, restaurantIndex) {
   } catch (error) {
     statusEl.textContent = error.message;
     statusEl.classList.add('status-error');
+  }
+}
+
+// ---- AI menu extraction (gated on ANTHROPIC_API_KEY being configured) ----
+
+async function loadAIExtractionStatus() {
+  try {
+    const response = await staffFetch('/api/competitor-pricing/ai-extraction-status');
+    if (!response.ok) return;
+    const status = await response.json();
+    aiExtractionAvailable = status.available;
+  } catch {
+    aiExtractionAvailable = false;
+  }
+}
+
+async function extractMenuItems(photoUrl, restaurantIndex, btn) {
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Reading...';
+  try {
+    const response = await staffFetch('/api/competitor-pricing/extract-menu', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ photoUrl }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.reason || `Extraction failed (${response.status}).`);
+    }
+    const result = await response.json();
+    renderExtractionResults(result.items, restaurantIndex, photoUrl);
+  } catch (error) {
+    alert(error.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
+function renderExtractionResults(items, restaurantIndex, photoUrl) {
+  const panel = document.getElementById('ai-extraction-panel');
+  const listEl = document.getElementById('ai-extraction-list');
+  const restaurant = restaurants[restaurantIndex];
+  panel.hidden = false;
+
+  if (!items.length) {
+    listEl.innerHTML = `<p class="hint">No items could be read from that photo of ${escapeHtmlCompetitor(restaurant.name)}'s menu.</p>`;
+    return;
+  }
+
+  listEl.innerHTML = `
+    <p class="hint">From ${escapeHtmlCompetitor(restaurant.name)}'s menu photo — review each before adding:</p>
+    <div class="data-table">
+      <table>
+        <thead><tr><th>Name</th><th>Price</th><th>Compare To</th><th></th></tr></thead>
+        <tbody>
+          ${items
+            .map(
+              (item, i) => `
+            <tr data-index="${i}">
+              <td><input type="text" class="extracted-name-input" value="${escapeHtmlCompetitor(item.name)}" /></td>
+              <td><input type="number" min="0" step="0.01" class="extracted-price-input" value="${item.price ?? ''}" style="max-width: 6rem;" /></td>
+              <td>
+                <select class="extracted-group-select">
+                  <option value="__new__">+ New comparison group</option>
+                  ${groups.map((g) => `<option value="${g.id}">${escapeHtmlCompetitor(g.label)}</option>`).join('')}
+                </select>
+              </td>
+              <td><button type="button" class="secondary extracted-add-btn">Add as Price Entry</button></td>
+            </tr>
+          `
+            )
+            .join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  listEl.querySelectorAll('.extracted-add-btn').forEach((btn) => {
+    btn.addEventListener('click', () => addExtractedItemAsEntry(btn, restaurantIndex, photoUrl));
+  });
+}
+
+async function addExtractedItemAsEntry(btn, restaurantIndex, photoUrl) {
+  const row = btn.closest('tr');
+  const name = row.querySelector('.extracted-name-input').value.trim();
+  const priceRaw = row.querySelector('.extracted-price-input').value;
+  const groupSelect = row.querySelector('.extracted-group-select');
+  if (!name || !priceRaw) return alert('Enter both a name and a price first.');
+
+  btn.disabled = true;
+  btn.textContent = 'Adding...';
+
+  try {
+    // Make sure the restaurant this photo belongs to actually exists
+    // server-side before pointing an entry at it — it may have only been
+    // added via the Nearby Search picker moments ago and never explicitly
+    // saved.
+    const restaurantsResponse = await staffFetch('/api/competitor-pricing/restaurants', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(currentRestaurantsFromDOM()),
+    });
+    if (!restaurantsResponse.ok) throw new Error(`Failed to save the restaurant (${restaurantsResponse.status}).`);
+    restaurants = await restaurantsResponse.json();
+    renderRestaurantsList();
+
+    let groupId = groupSelect.value;
+    if (groupId === '__new__') {
+      const newGroup = { id: `group-${Date.now()}`, label: name, ourMenuItemId: null, notes: null };
+      const groupsResponse = await staffFetch('/api/competitor-pricing/groups', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([...currentGroupsFromDOM(), newGroup]),
+      });
+      if (!groupsResponse.ok) throw new Error(`Failed to create the comparison group (${groupsResponse.status}).`);
+      groups = await groupsResponse.json();
+      renderGroupsList();
+      refreshEntryFormSelects();
+      groupId = newGroup.id;
+    }
+
+    const restaurant = restaurants[restaurantIndex];
+    const newEntry = {
+      id: `entry-${Date.now()}`,
+      groupId,
+      restaurantId: restaurant.id,
+      price: Number(priceRaw),
+      itemName: name,
+      sourceURL: photoUrl,
+      checkedAt: todayDateInputValue(),
+    };
+    const entriesResponse = await staffFetch('/api/competitor-pricing/entries', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([...currentEntriesFromDOM(), newEntry]),
+    });
+    if (!entriesResponse.ok) throw new Error(`Failed to save the price entry (${entriesResponse.status}).`);
+    entries = await entriesResponse.json();
+    renderEntriesList();
+    refreshEntryFormSelects();
+    await loadReport();
+
+    btn.textContent = 'Added ✓';
+  } catch (error) {
+    alert(error.message);
+    btn.disabled = false;
+    btn.textContent = 'Add as Price Entry';
   }
 }
 
@@ -416,10 +586,15 @@ document.getElementById('find-nearby-btn').addEventListener('click', async () =>
   }
 });
 
-document.getElementById('save-restaurants-btn').addEventListener('click', async () => {
-  const statusEl = document.getElementById('restaurants-status');
+// Same idea as currentGroupsFromDOM()/currentEntriesFromDOM() — also used
+// by the AI-extraction flow, which needs the restaurant it's attaching a
+// price entry to to actually exist server-side first (a restaurant added
+// via the Nearby Search picker but not yet explicitly saved otherwise
+// leaves that entry referencing a restaurant nothing else knows about, so
+// it silently doesn't show up in the report).
+function currentRestaurantsFromDOM() {
   const rows = document.querySelectorAll('#restaurants-list tr[data-index]');
-  const updated = Array.from(rows).map((row, i) => {
+  return Array.from(rows).map((row, i) => {
     const distanceRaw = row.querySelector('.restaurant-distance-input').value;
     return {
       id: restaurants[i].id,
@@ -432,6 +607,11 @@ document.getElementById('save-restaurants-btn').addEventListener('click', async 
       menuPhotoUrls: restaurants[i].menuPhotoUrls || null,
     };
   });
+}
+
+document.getElementById('save-restaurants-btn').addEventListener('click', async () => {
+  const statusEl = document.getElementById('restaurants-status');
+  const updated = currentRestaurantsFromDOM();
   statusEl.textContent = 'Saving...';
   statusEl.classList.remove('status-error', 'status-ok');
   try {
@@ -538,10 +718,11 @@ document.getElementById('entries-form').addEventListener('submit', (event) => {
   renderEntriesList();
 });
 
-document.getElementById('save-entries-btn').addEventListener('click', async () => {
-  const statusEl = document.getElementById('entries-status');
+// Same idea as currentGroupsFromDOM() — reused by the AI-extraction flow so
+// adding one new entry can't silently drop an unsaved edit to another row.
+function currentEntriesFromDOM() {
   const rows = document.querySelectorAll('#entries-list tr[data-index]');
-  const updated = Array.from(rows).map((row, i) => ({
+  return Array.from(rows).map((row, i) => ({
     id: entries[i].id,
     groupId: row.querySelector('.entry-group-select').value,
     restaurantId: row.querySelector('.entry-restaurant-select').value,
@@ -550,6 +731,11 @@ document.getElementById('save-entries-btn').addEventListener('click', async () =
     sourceURL: row.querySelector('.entry-source-input').value.trim() || null,
     checkedAt: row.querySelector('.entry-checked-input').value || todayDateInputValue(),
   }));
+}
+
+document.getElementById('save-entries-btn').addEventListener('click', async () => {
+  const statusEl = document.getElementById('entries-status');
+  const updated = currentEntriesFromDOM();
   statusEl.textContent = 'Saving...';
   statusEl.classList.remove('status-error', 'status-ok');
   try {
@@ -572,6 +758,7 @@ document.getElementById('save-entries-btn').addEventListener('click', async () =
 
 (async () => {
   await loadMenuItems();
+  await loadAIExtractionStatus();
   await loadRestaurants();
   await loadGroups();
   await loadEntries();

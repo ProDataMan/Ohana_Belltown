@@ -39,7 +39,7 @@
         <ol>
           <li><strong>Find a restaurant.</strong> In "Competitor Restaurants" below, click <strong>Find Nearby Restaurants</strong> and add any worth comparing against — no need to type a name or address.</li>
           <li><strong>Create a comparison group.</strong> In "Comparison Groups," name the dish you're comparing (e.g. "Ohana Burger" or a generic "Classic Cheeseburger") — link it to one of our own menu items if there's a direct match, so our side of the comparison always shows the live current price.</li>
-          <li><strong>Look up the competitor's price.</strong> Check the restaurant's own site, a menu photo you've uploaded (see "Menu Photos" in Competitor Restaurants), or their delivery-app listing for what they charge for that dish.</li>
+          <li><strong>Look up the competitor's price.</strong> Check the restaurant's own site, their delivery-app listing, or upload a photo of their menu in "Menu Photos" (Competitor Restaurants) — if AI extraction is available, click <strong>Extract Items</strong> under a photo to read off item names/prices automatically (always double-check against the photo before using them).</li>
           <li><strong>Log it as a Price Entry.</strong> In "Price Entries," pick the group and restaurant, enter their price, and optionally a source link/date. Add one entry per competitor for the same group to build out the comparison.</li>
           <li><strong>Check the report.</strong> The "Price Comparison Report" below updates automatically — it shows our price alongside the competitor average/min/max and how far off we are.</li>
         </ol>
@@ -100,6 +100,14 @@
 
         <button id="save-restaurants-btn" type="button" style="margin-top: 0.75rem;">Save Restaurants</button>
         <p id="restaurants-status" class="status"></p>
+      </section>
+
+      <section class="panel" id="ai-extraction-panel" hidden>
+        <div class="editor-toolbar">
+          <h2>AI-Extracted Items</h2>
+        </div>
+        <p class="hint">Reviewed, not trusted blindly — check each name/price against the photo before adding it as a Price Entry.</p>
+        <div id="ai-extraction-list"></div>
       </section>
 
       <section class="panel">

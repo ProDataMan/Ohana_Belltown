@@ -797,6 +797,19 @@ button.secondary:hover {
   margin-bottom: 0.5rem;
 }
 
+.menu-photo-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.menu-photo-item .menu-photo-extract-btn {
+  font-size: 0.65rem;
+  padding: 0.2rem 0.45rem;
+  white-space: nowrap;
+}
+
 .item-thumb-wrap {
   position: relative;
   width: 60px;

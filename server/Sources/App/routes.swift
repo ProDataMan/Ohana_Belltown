@@ -412,6 +412,36 @@ func routes(_ app: Application) throws {
         return try CompetitorPricingStore.shared.report()
     }
 
+    // Whether ANTHROPIC_API_KEY is set — a separate credential from any
+    // claude.ai chat subscription. The client uses this to decide whether
+    // to show the "Extract Items with AI" button at all, same as how the
+    // Apple/Facebook Sign-In buttons stay hidden until configured.
+    app.get("api", "competitor-pricing", "ai-extraction-status") { req throws -> AIExtractionStatus in
+        try requireAdmin(req)
+        return AIExtractionStatus(available: Environment.get("ANTHROPIC_API_KEY") != nil)
+    }
+
+    app.post("api", "competitor-pricing", "extract-menu") { req async throws -> AnthropicMenuExtraction.ExtractionResult in
+        try requireAdmin(req)
+        guard let apiKey = Environment.get("ANTHROPIC_API_KEY") else {
+            throw AnthropicMenuExtraction.ExtractionError.notConfigured
+        }
+        let body = try req.content.decode(MenuExtractionRequest.self)
+        guard body.photoUrl.hasPrefix("/uploads/"), !body.photoUrl.contains("..") else {
+            throw Abort(.badRequest)
+        }
+        let filename = String(body.photoUrl.dropFirst("/uploads/".count))
+        let path = Uploads.directory + filename
+        guard let imageData = FileManager.default.contents(atPath: path) else {
+            throw Abort(.notFound, reason: "Photo not found.")
+        }
+        let ext = filename.split(separator: ".").last.map(String.init)?.lowercased() ?? ""
+        let items = try await AnthropicMenuExtraction.extractItems(
+            client: req.client, apiKey: apiKey, imageData: imageData, mediaType: AnthropicMenuExtraction.mediaType(forExtension: ext)
+        )
+        return AnthropicMenuExtraction.ExtractionResult(items: items)
+    }
+
     app.post("api", "loyalty", "lookup") { req throws -> LoyaltyStatus in
         let body = try req.content.decode(PhoneRequest.self)
         return try LoyaltyStore.shared.lookup(phone: body.phone)
