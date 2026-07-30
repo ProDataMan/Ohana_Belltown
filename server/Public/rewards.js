@@ -67,7 +67,10 @@ document.getElementById('bonus-form').addEventListener('submit', async (event) =
       const formData = new FormData();
       formData.append('image', file);
       const uploadResponse = await fetch('/api/upload', { method: 'POST', body: formData });
-      if (!uploadResponse.ok) throw new Error(`Photo upload failed (${uploadResponse.status}).`);
+      if (!uploadResponse.ok) {
+        const uploadBody = await uploadResponse.json().catch(() => ({}));
+        throw new Error(uploadBody.reason || `Photo upload failed (${uploadResponse.status}).`);
+      }
       const uploadResult = await uploadResponse.json();
       content = uploadResult.url;
     } else {

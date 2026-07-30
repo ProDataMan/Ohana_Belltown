@@ -177,12 +177,15 @@ func routes(_ app: Application) throws {
         return .noContent
     }
 
-    app.on(.POST, "api", "upload", body: .collect(maxSize: "8mb")) { req async throws -> UploadResponse in
+    // maxSize raised from the original 8mb — real phone photos (especially
+    // newer high-res cameras) routinely land in the 8-15mb range and were
+    // getting a bare 413, which is what staff were seeing as "upload failed."
+    app.on(.POST, "api", "upload", body: .collect(maxSize: "20mb")) { req async throws -> UploadResponse in
         let upload = try req.content.decode(ImageUpload.self)
-        let allowedExtensions = ["jpg", "jpeg", "png", "webp", "gif"]
+        let allowedExtensions = ["jpg", "jpeg", "png", "webp", "gif", "heic", "heif"]
         let ext = (upload.image.extension ?? "").lowercased()
         guard allowedExtensions.contains(ext) else {
-            throw Abort(.unsupportedMediaType, reason: "Only jpg, png, webp, or gif images are allowed.")
+            throw Abort(.unsupportedMediaType, reason: "Only jpg, png, webp, gif, or heic/heif images are allowed.")
         }
         guard let data = upload.image.data.getData(
             at: upload.image.data.readerIndex,
@@ -190,6 +193,24 @@ func routes(_ app: Application) throws {
         ) else {
             throw Abort(.badRequest)
         }
+
+        // iPhones default to saving photos as HEIC, which no major browser
+        // can render — convert to JPEG rather than save+link a file that
+        // would just show up broken everywhere it's used.
+        if ext == "heic" || ext == "heif" {
+            let sourceFilename = UUID().uuidString + "." + ext
+            let sourcePath = Uploads.directory + sourceFilename
+            try data.write(to: URL(fileURLWithPath: sourcePath))
+            let jpegFilename = UUID().uuidString + ".jpg"
+            let jpegPath = Uploads.directory + jpegFilename
+            let converted = try await ImageOptimizer.convertHEICToJPEG(sourcePath: sourcePath, outputPath: jpegPath, on: req.application)
+            try? FileManager.default.removeItem(atPath: sourcePath)
+            guard converted else {
+                throw Abort(.unprocessableEntity, reason: "This photo couldn't be converted — try a JPEG or PNG instead.")
+            }
+            return UploadResponse(url: "/uploads/\(jpegFilename)")
+        }
+
         let filename = UUID().uuidString + "." + ext
         let path = Uploads.directory + filename
         try data.write(to: URL(fileURLWithPath: path))

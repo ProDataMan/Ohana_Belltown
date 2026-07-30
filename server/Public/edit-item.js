@@ -167,7 +167,10 @@ async function uploadItemImage(event) {
 
   try {
     const response = await fetch('/api/upload', { method: 'POST', body: formData });
-    if (!response.ok) throw new Error(`Upload failed (${response.status}).`);
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.reason || `Upload failed (${response.status}).`);
+    }
     const result = await response.json();
     currentImages.push(result.url);
     renderThumbGallery();
