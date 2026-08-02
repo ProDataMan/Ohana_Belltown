@@ -1810,6 +1810,76 @@ select {
   display: none;
 }
 
+/* ---- Shop / Swag ---- */
+
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.25rem;
+  margin-top: 1.5rem;
+}
+
+.shop-card {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(36, 20, 45, 0.06);
+}
+
+.shop-card-photo {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  display: block;
+}
+
+.shop-card-photo-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  background: #f3ecee;
+}
+
+.shop-card-body {
+  padding: 1rem;
+}
+
+.shop-card-body h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.shop-card-body .price {
+  font-size: 1.1rem;
+  margin-bottom: 0.7rem;
+}
+
+.qty-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.qty-stepper button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.qty-value {
+  font-weight: 700;
+  min-width: 1.2rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 .sold-out-badge {
   display: inline-block;
   font-size: 0.7rem;

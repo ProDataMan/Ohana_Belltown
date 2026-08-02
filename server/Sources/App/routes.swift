@@ -442,6 +442,101 @@ func routes(_ app: Application) throws {
         return AnthropicMenuExtraction.ExtractionResult(items: items)
     }
 
+    // MARK: - Swag / Shop
+
+    app.get("api", "swag", "products") { req throws -> [SwagProduct] in
+        try SwagStore.shared.list()
+    }
+
+    app.put("api", "swag", "products") { req throws -> [SwagProduct] in
+        try requireLogin(req)
+        let items = try req.content.decode([SwagProduct].self)
+        return try SwagStore.shared.save(items)
+    }
+
+    // Whether STRIPE_SECRET_KEY is set — the Shop page uses this to decide
+    // whether to offer checkout at all, same "hidden until configured"
+    // pattern as AI menu extraction / Apple / Facebook sign-in.
+    app.get("api", "swag", "checkout-status") { req throws -> StripeCheckoutStatus in
+        StripeCheckoutStatus(available: Environment.get("STRIPE_SECRET_KEY") != nil)
+    }
+
+    // Creates a pending SwagOrder from the customer's cart, then a Stripe
+    // Checkout Session for it, and hands back the URL to redirect to.
+    // Requires a scanned table (same as food ordering) so staff know where
+    // to deliver it once it's paid.
+    app.post("api", "swag", "checkout") { req async throws -> SwagCheckoutResponse in
+        guard let secretKey = Environment.get("STRIPE_SECRET_KEY"), !secretKey.isEmpty else {
+            throw SwagError.checkoutNotConfigured
+        }
+        let body = try req.content.decode(SwagCheckoutRequest.self)
+        let tableId = body.tableId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !tableId.isEmpty, !body.items.isEmpty else {
+            throw Abort(.badRequest, reason: "A table and at least one item are required.")
+        }
+
+        let productsById = Dictionary(uniqueKeysWithValues: try SwagStore.shared.list().map { ($0.id, $0) })
+        var orderItems: [SwagOrderItem] = []
+        for requested in body.items {
+            guard requested.quantity > 0 else { continue }
+            guard let product = productsById[requested.productId], product.available else {
+                throw Abort(.badRequest, reason: "One of the items in your cart is no longer available.")
+            }
+            orderItems.append(SwagOrderItem(productId: product.id, name: product.name, price: product.price, quantity: requested.quantity))
+        }
+        guard !orderItems.isEmpty else { throw SwagError.emptyCart }
+
+        let customerId = try? currentCustomer(req)?.id
+        let order = try SwagOrdersStore.shared.createPendingOrder(tableId: tableId, customerId: customerId, items: orderItems)
+
+        let base = PublicBaseURL.get()
+        let encodedTable = tableId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? tableId
+        let session = try await StripeCheckout.createSession(
+            client: req.client, secretKey: secretKey, orderId: order.id, tableId: tableId, items: orderItems,
+            successURL: "\(base)/shop?table=\(encodedTable)&checkout=success",
+            cancelURL: "\(base)/shop?table=\(encodedTable)&checkout=cancelled"
+        )
+        try SwagOrdersStore.shared.attachStripeSession(orderId: order.id, sessionId: session.id)
+        return SwagCheckoutResponse(checkoutURL: session.url)
+    }
+
+    // Stripe calls this once a Checkout Session actually completes payment —
+    // this is the only place a SwagOrder gets marked "paid," never the
+    // client redirect (a customer can land on the success URL without
+    // actually having paid, e.g. by hitting back). Verifies the raw body
+    // against Stripe's signature so this can't be spoofed by a random POST.
+    app.on(.POST, "api", "swag", "stripe-webhook", body: .collect(maxSize: "1mb")) { req async throws -> HTTPStatus in
+        guard let webhookSecret = Environment.get("STRIPE_WEBHOOK_SECRET") else {
+            throw Abort(.serviceUnavailable)
+        }
+        guard let signatureHeader = req.headers.first(name: "Stripe-Signature") else {
+            throw Abort(.badRequest)
+        }
+        guard let bodyBuffer = req.body.data,
+              let payload = bodyBuffer.getString(at: bodyBuffer.readerIndex, length: bodyBuffer.readableBytes) else {
+            throw Abort(.badRequest)
+        }
+        guard StripeCheckout.verifyWebhookSignature(payload: payload, signatureHeader: signatureHeader, secret: webhookSecret) else {
+            throw Abort(.unauthorized)
+        }
+        let event = try JSONDecoder().decode(StripeWebhookEvent.self, from: Data(payload.utf8))
+        if event.type == "checkout.session.completed", let orderId = event.data.object.metadata?["orderId"] {
+            try SwagOrdersStore.shared.markPaid(orderId: orderId)
+        }
+        return .ok
+    }
+
+    app.get("api", "swag", "orders") { req throws -> [SwagOrder] in
+        try requireLogin(req)
+        return try SwagOrdersStore.shared.all()
+    }
+
+    app.post("api", "swag", "orders", ":id", "deliver") { req throws -> SwagOrder in
+        try requireLogin(req)
+        guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
+        return try SwagOrdersStore.shared.markDelivered(id: id)
+    }
+
     app.post("api", "loyalty", "lookup") { req throws -> LoyaltyStatus in
         let body = try req.content.decode(PhoneRequest.self)
         return try LoyaltyStore.shared.lookup(phone: body.phone)
@@ -652,6 +747,7 @@ func routes(_ app: Application) throws {
         ("terms", "pages/terms.html"),
         ("waitlist", "pages/waitlist.html"),
         ("faq", "pages/faq.html"),
+        ("shop", "pages/shop.html"),
     ]
     for (route, file) in cleanPages {
         app.get(PathComponent(stringLiteral: route)) { req in
@@ -674,6 +770,7 @@ func routes(_ app: Application) throws {
         ("staff-rewards-admin.html", "staff/staff-rewards-admin.html", true),
         ("competitor-pricing-admin.html", "staff/competitor-pricing-admin.html", true),
         ("competitor-pricing-findings.html", "staff/competitor-pricing-findings.html", true),
+        ("swag-admin.html", "staff/swag-admin.html", false),
     ]
     for (route, file, adminOnly) in staffPages {
         app.get(PathComponent(stringLiteral: route)) { req in

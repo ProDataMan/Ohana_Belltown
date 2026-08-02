@@ -27,6 +27,8 @@ final class RouteTests: XCTestCase {
         FeedbackStore.shared.configure(dataDirectory: tempDir.path)
         StaffRewardsStore.shared.configure(dataDirectory: tempDir.path)
         CompetitorPricingStore.shared.configure(dataDirectory: tempDir.path)
+        SwagStore.shared.configure(dataDirectory: tempDir.path)
+        SwagOrdersStore.shared.configure(dataDirectory: tempDir.path)
     }
 
     override func tearDown() async throws {
@@ -1018,6 +1020,71 @@ final class RouteTests: XCTestCase {
             XCTAssertEqual(res.status, .ok)
             let items = try res.content.decode([MenuItem].self)
             XCTAssertEqual(items.map { $0.name }, ["Volcano Roll", "Rainbow Roll"], "sold-out item should be excluded despite having the most views")
+        }
+    }
+
+    func testSwagProductsListIsPublicButSavingRequiresLogin() throws {
+        try app.test(.GET, "api/swag/products") { res in
+            XCTAssertEqual(res.status, .ok)
+            let products = try res.content.decode([SwagProduct].self)
+            XCTAssertEqual(products, [])
+        }
+
+        let body = ByteBuffer(string: #"[{"id":"p1","name":"Bandana","price":10,"images":[],"available":true}]"#)
+        try app.test(.PUT, "api/swag/products", headers: ["Content-Type": "application/json"], body: body) { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        try app.test(.PUT, "api/swag/products", headers: ["Content-Type": "application/json", "Cookie": cookie], body: body) { res in
+            XCTAssertEqual(res.status, .ok)
+            let products = try res.content.decode([SwagProduct].self)
+            XCTAssertEqual(products.map(\.name), ["Bandana"])
+        }
+
+        try app.test(.GET, "api/swag/products") { res in
+            let products = try res.content.decode([SwagProduct].self)
+            XCTAssertEqual(products.map(\.price), [10])
+        }
+    }
+
+    func testSwagCheckoutRequiresStripeConfigAndValidatesTheCart() throws {
+        // No STRIPE_SECRET_KEY in the test environment — checkout-status
+        // should report unavailable, mirroring the AI-extraction-status
+        // "hidden until configured" pattern.
+        try app.test(.GET, "api/swag/checkout-status") { res in
+            XCTAssertEqual(res.status, .ok)
+            let status = try res.content.decode(StripeCheckoutStatus.self)
+            XCTAssertFalse(status.available)
+        }
+
+        let checkoutBody = ByteBuffer(string: #"{"tableId":"5","items":[{"productId":"p1","quantity":1}]}"#)
+        try app.test(.POST, "api/swag/checkout", headers: ["Content-Type": "application/json"], body: checkoutBody) { res in
+            XCTAssertEqual(res.status, .serviceUnavailable, "checkout should refuse to start without a configured Stripe key")
+        }
+    }
+
+    func testSwagOrdersRequireLogin() throws {
+        try app.test(.GET, "api/swag/orders") { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+        try app.test(.POST, "api/swag/orders/does-not-exist/deliver") { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+    }
+
+    func testSwagStripeWebhookRequiresConfiguredSecretAndSignature() throws {
+        // No STRIPE_WEBHOOK_SECRET in the test environment.
+        try app.test(.POST, "api/swag/stripe-webhook", body: ByteBuffer(string: "{}")) { res in
+            XCTAssertEqual(res.status, .serviceUnavailable)
         }
     }
 }
