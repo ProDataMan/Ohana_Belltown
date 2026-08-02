@@ -673,6 +673,7 @@ func routes(_ app: Application) throws {
         ("analytics.html", "staff/analytics.html", true),
         ("staff-rewards-admin.html", "staff/staff-rewards-admin.html", true),
         ("competitor-pricing-admin.html", "staff/competitor-pricing-admin.html", true),
+        ("competitor-pricing-findings.html", "staff/competitor-pricing-findings.html", true),
     ]
     for (route, file, adminOnly) in staffPages {
         app.get(PathComponent(stringLiteral: route)) { req in
