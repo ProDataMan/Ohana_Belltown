@@ -57,6 +57,58 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    // analytics.html itself is admin-gated at the page level, but its data
+    // came from a mix of requireLogin/requireAdmin endpoints underneath —
+    // meaning a logged-in-but-non-admin employee could hit those APIs
+    // directly and read analytics data the page would never have shown
+    // them. Verifies the tightened endpoints now reject a plain employee
+    // (403) while still allowing an admin (200).
+    func testAnalyticsDataEndpointsRequireAdminNotJustAnyStaffLogin() throws {
+        var adminCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                adminCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let admin = adminCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        let createBody = ByteBuffer(string: #"{"username":"employee1","displayName":"Employee","password":"employeepass","role":"employee"}"#)
+        try app.test(.POST, "api/users", headers: ["Content-Type": "application/json", "Cookie": admin], body: createBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+
+        var employeeCookie: String?
+        try app.test(.POST, "api/auth/login", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"employee1","password":"employeepass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                employeeCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let employee = employeeCookie else { return XCTFail("expected a session cookie from login") }
+
+        let endpoints: [(HTTPMethod, String)] = [
+            (.GET, "api/table-orders/delivery-stats"),
+            (.GET, "api/table-orders/occupancy-stats"),
+            (.GET, "api/feedback"),
+            (.POST, "api/feedback/acknowledge-all"),
+        ]
+        for (method, path) in endpoints {
+            try app.test(method, path, headers: ["Cookie": employee]) { res in
+                XCTAssertEqual(res.status, .forbidden, "\(path) should reject a non-admin employee")
+            }
+            try app.test(method, path, headers: ["Cookie": admin]) { res in
+                XCTAssertEqual(res.status, .ok, "\(path) should still allow an admin")
+            }
+        }
+
+        // The site-wide feedback-badge count is deliberately exempt — any
+        // logged-in staff member sees it, not just admins.
+        try app.test(.GET, "api/feedback/unacknowledged-count", headers: ["Cookie": employee]) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+    }
+
     func testTableOrderFullLifecycleFlow() throws {
         let orderBody = ByteBuffer(string: #"{"tableId":"5","itemName":"Spam Musubi","section":"menu"}"#)
         var orderId: String?

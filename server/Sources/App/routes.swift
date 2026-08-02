@@ -559,14 +559,17 @@ func routes(_ app: Application) throws {
         return try TableOrdersStore.shared.markDelivered(id: id)
     }
 
+    // Admin-only — both are analytics.html data, and that page itself is
+    // already admin-gated; this keeps the API from being a back door for a
+    // non-admin employee who calls it directly.
     app.get("api", "table-orders", "delivery-stats") { req throws -> DeliveryStatsSummary in
-        try requireLogin(req)
+        try requireAdmin(req)
         let days = req.query[Int.self, at: "days"] ?? 30
         return try TableOrdersStore.shared.deliveryStats(days: days)
     }
 
     app.get("api", "table-orders", "occupancy-stats") { req throws -> TableOccupancyStatsSummary in
-        try requireLogin(req)
+        try requireAdmin(req)
         let days = req.query[Int.self, at: "days"] ?? 30
         return try TableOrdersStore.shared.tableOccupancyStats(days: days)
     }
@@ -606,8 +609,13 @@ func routes(_ app: Application) throws {
         )
     }
 
+    // Admin-only, same reasoning as delivery-stats/occupancy-stats above —
+    // reading the actual feedback content/list is analytics.html's job.
+    // unacknowledged-count stays open to any staff member below: it only
+    // exposes a bare number, and drives the site-wide "N new feedback"
+    // badge every logged-in staff member sees, not just admins.
     app.get("api", "feedback") { req throws -> [FeedbackEntry] in
-        try requireLogin(req)
+        try requireAdmin(req)
         let days = req.query[Int.self, at: "days"] ?? 30
         return try FeedbackStore.shared.recent(days: days)
     }
@@ -618,7 +626,7 @@ func routes(_ app: Application) throws {
     }
 
     app.post("api", "feedback", "acknowledge-all") { req throws -> HTTPStatus in
-        try requireLogin(req)
+        try requireAdmin(req)
         try FeedbackStore.shared.acknowledgeAll()
         return .ok
     }
