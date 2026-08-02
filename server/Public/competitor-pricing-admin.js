@@ -67,7 +67,7 @@ async function loadReport() {
     listEl.innerHTML = `
       <div class="data-table">
         <table>
-          <thead><tr><th>Comparison</th><th>Our Price</th><th>Competitor Avg</th><th>Range</th><th>Vs. Average</th><th>Details</th></tr></thead>
+          <thead><tr><th>Comparison</th><th>Vs. Average</th><th>Our Price</th><th>Competitor Avg</th><th>Range</th><th>Details</th></tr></thead>
           <tbody>
             ${rows
               .map((row) => {
@@ -102,10 +102,10 @@ async function loadReport() {
                 return `
                 <tr>
                   <td>${escapeHtmlCompetitor(row.label)}${row.ourMenuItemName ? `<div class="hint">${escapeHtmlCompetitor(row.ourMenuItemName)}</div>` : ''}</td>
+                  <td>${deltaText}</td>
                   <td>${ourPriceText}</td>
                   <td>${avgText}</td>
                   <td>${rangeText}</td>
-                  <td>${deltaText}</td>
                   <td>${entriesDetail}</td>
                 </tr>
               `;
