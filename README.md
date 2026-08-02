@@ -22,8 +22,10 @@ now historical background rather than the current plan.
 [Pages & routes](#pages--routes) ·
 [What's shipped](#whats-shipped) ·
 [Known gaps](#known-gaps--not-yet-implemented) ·
+[Payment Processing](#payment-processing-square) ·
 [Google/Apple/Facebook Sign-In setup](#setting-up-googleapplefacebook-sign-in) ·
 [Local development](#local-development) ·
+[Suggestions for future development](#suggestions-for-future-development) ·
 [Other docs](#other-docs-in-this-repo)
 
 ## Live site
@@ -69,10 +71,10 @@ now historical background rather than the current plan.
 | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` | Google Sign-In. Not set yet — see [`docs/oauth-setup.md`](docs/oauth-setup.md). |
 | `APPLE_OAUTH_CLIENT_ID`, `APPLE_OAUTH_TEAM_ID`, `APPLE_OAUTH_KEY_ID`, `APPLE_OAUTH_PRIVATE_KEY` | Sign in with Apple. Not set yet — needs a paid Apple Developer Program enrollment first. See [`docs/oauth-setup.md`](docs/oauth-setup.md). |
 | `FACEBOOK_OAUTH_APP_ID`, `FACEBOOK_OAUTH_APP_SECRET` | Facebook Login — free, no paid tier required. Not set yet — see [`docs/oauth-setup.md`](docs/oauth-setup.md). |
-| `SQUARE_ACCESS_TOKEN` | Server-side only — powers real card checkout on the Shop page (Square's Payment Links API). Not set yet. Get one at [developer.squareup.com](https://developer.squareup.com) → your app → Credentials (use the **production** access token, not sandbox, once ready to take real payments — the restaurant already has a Square account). |
-| `SQUARE_LOCATION_ID` | Which Square location swag sales post to. Find it in the Square Dashboard under Account & Settings → Business → Locations, or via Square's `GET /v2/locations` API. Not set yet. |
-| `SQUARE_WEBHOOK_SIGNATURE_KEY` | Server-side only — verifies that `POST /api/swag/square-webhook` calls genuinely came from Square before marking a swag order paid. Created when you add a webhook subscription in the Square Developer Dashboard pointed at `<PUBLIC_BASE_URL>/api/swag/square-webhook`, subscribed to the `payment.updated` event. Not set yet. |
-| `SQUARE_ENVIRONMENT` | `sandbox` to test against Square's sandbox API host before going live, otherwise omit (defaults to production, `connect.squareup.com`). |
+| `SQUARE_ACCESS_TOKEN` | Server-side only — powers real card checkout on Shop (`/shop`) and Gift Cards (`/gift-cards`), Square's Payment Links API. **Set, but currently the sandbox token** (2026-08-02) — swap for the production token (Developer Dashboard → Credentials → Production Access Token) when ready to take real payments. See [Payment Processing](#payment-processing-square). |
+| `SQUARE_LOCATION_ID` | Which Square location Shop/Gift Card sales post to. **Set** (2026-08-02, sandbox test location) — find your real location's ID under Account & Settings → Business → Locations, or via Square's `GET /v2/locations` API. |
+| `SQUARE_WEBHOOK_SIGNATURE_KEY` | Server-side only — verifies that `POST /api/swag/square-webhook` calls genuinely came from Square before marking a Shop/Gift Card order paid. **Set** (2026-08-02, sandbox webhook subscription) — created via a webhook subscription in the Square Developer Dashboard pointed at `<PUBLIC_BASE_URL>/api/swag/square-webhook`, subscribed to `payment.updated`. |
+| `SQUARE_ENVIRONMENT` | **Set to `sandbox`** (2026-08-02) — requests go to `connect.squareupsandbox.com`, fake test cards only. Unset (or set to anything else) to hit production (`connect.squareup.com`) once the token above is swapped too. |
 
 `STAFF_PIN` is no longer used — it was retired in favor of real per-user login (see below) and can be removed from the Container App if still set.
 
@@ -272,7 +274,6 @@ actually shipped as of this README. Not in priority order.
 
 **Discovery & conversion**
 - Self-serve/live reservation booking — deliberately not built. Evaluated OpenTable ($149–499/mo + $1–1.50/cover on network bookings), Resy ($0–399/mo flat, no per-cover fee on direct bookings), and Tock (merging into Resy); none are worth the cost against Ohana's walk-in-friendly positioning without a concrete signal (e.g. regularly turning away walk-in groups) that it's needed. Shipped the free call/text CTA instead — revisit if that signal shows up.
-- Online gift card purchase (still "call us and we'll mail one")
 
 **Engagement & retention**
 - Email/SMS signup for specials
@@ -290,13 +291,99 @@ actually shipped as of this README. Not in priority order.
 
 **Known deliberate tradeoffs (not bugs)**
 - **AI menu-photo extraction is built but not live yet.** Needs `ANTHROPIC_API_KEY` (see the env table above) — a separate credential/billing setup from any claude.ai chat subscription, not yet configured. Until then, the "Extract Items" button on Competitor Pricing simply doesn't appear (checked via `GET /api/competitor-pricing/ai-extraction-status`), same pattern as Apple/Facebook Sign-In staying hidden until their credentials exist.
-- **Shop and Gift Card checkout are configured against Square's SANDBOX, not production yet.** `SQUARE_ACCESS_TOKEN`/`SQUARE_LOCATION_ID`/`SQUARE_WEBHOOK_SIGNATURE_KEY` are set (2026-08-02) with `SQUARE_ENVIRONMENT=sandbox`, so `/shop` and `/gift-cards` fully work end-to-end but only with Square's fake test cards — no real money moves yet. Switching to real payments needs two things: swap `SQUARE_ACCESS_TOKEN` for the **production** access token (Developer Dashboard → Credentials — the sandbox one won't work against the production API host), and either unset `SQUARE_ENVIRONMENT` or set it to anything other than `sandbox`.
+- **Shop and Gift Card checkout are configured against Square's SANDBOX, not production yet** — see [Payment Processing](#payment-processing-square) below for the full picture and exactly what's needed to go live.
 - **No real email delivery yet.** `EmailSenderFactory` (`server/Sources/App/EmailSender.swift`) currently returns a placeholder that logs the email server-side instead of sending it — so customer email verification and password-reset links don't reach anyone's inbox right now. Swapping in a real provider (Resend, SendGrid, etc. — still deciding, was going to be GoDaddy but that isn't a transactional-email API provider in the usual sense) is a single-file change once an API key is available. Until then, self-service password reset for customers is not actually functional end-to-end.
 - Sessions use Vapor's in-memory driver — a deploy or restart logs everyone out. Fine for a ~9-person staff team and low-stakes customer accounts; would need a persistent session store (e.g. file- or Redis-backed) to survive restarts.
 - Every new/reset staff account gets a caller-chosen temporary password and must change it on next login — there's no forced password-strength policy beyond that.
 - Bonus punch claims (photo/social shares) are staff-reviewed, not auto-verified — there's no reliable API to check a social tag automatically.
 - Google Places photos are capped at 10 per API call (a hard Google limit, not a bug) and matched to menu items manually.
 - Sign in with Apple needs a client-secret JWT that's re-signed on every token exchange (Apple doesn't accept a static secret like Google does) — implemented with `swift-crypto`'s `P256.Signing` rather than pulling in a full JWT library, since that's the only cryptographic operation needed.
+
+## Payment Processing (Square)
+
+Real online card payments exist in exactly two places on this site: **Shop**
+(`/shop`, swag) and **Gift Cards** (`/gift-cards`). Both were built
+2026-08-01/02, both go through **Square**, and both share the same
+credentials, the same "is checkout configured" check, and even the same
+webhook subscription.
+
+**Why Square (not Stripe):** the integration was originally built against
+Stripe, then switched the same day after confirming — by having the user log
+into `app.squareup.com/dashboard` — that the restaurant already has an active
+Square account. That meant no new merchant signup, unlike Stripe. The Stripe
+code was fully removed, not kept alongside.
+
+**Current state: SANDBOX, not production.** `SQUARE_ACCESS_TOKEN` /
+`SQUARE_LOCATION_ID` / `SQUARE_WEBHOOK_SIGNATURE_KEY` are all set on the
+Container App with `SQUARE_ENVIRONMENT=sandbox` — checkout works completely
+end-to-end (verified with a real sandbox purchase) but only with Square's fake
+test card (`4111 1111 1111 1111`, any future expiry/CVV, any ZIP). **No real
+money has moved yet.**
+
+**To go live**, two changes on the Container App:
+1. Swap `SQUARE_ACCESS_TOKEN` for the **production** access token — Square
+   Developer Dashboard → your app → **Credentials** → Production Access Token
+   (click "Show" to reveal it; it's hidden by default). The token the user
+   first provided turned out to be the *sandbox* token (`EAAAl...`, confirmed
+   by calling `GET /v2/locations` and getting back a fake "Default Test
+   Account" location, not Ohana) — worth double-checking which one gets
+   copied next time, since sandbox and production tokens look similar.
+2. Unset `SQUARE_ENVIRONMENT` (or set it to anything other than `sandbox`) so
+   requests hit `connect.squareup.com` instead of
+   `connect.squareupsandbox.com`.
+
+No code changes needed for either step — both are pure environment/secret
+changes on the existing Container App (`az containerapp secret set` +
+`az containerapp update --set-env-vars`, same pattern as every other
+credential in the env table above).
+
+**How it actually works** (`server/Sources/App/SquareCheckout.swift`):
+- Calls Square's plain REST API directly (`https://connect.squareup.com/v2/...`)
+  — no SDK dependency, mirroring how `GoogleOAuth.swift`/`AppleOAuth.swift`
+  already call their providers with `req.client`. API version is pinned
+  (`Square-Version: 2026-07-15`) rather than left to drift.
+- **Payment Links API** (`POST /v2/online-checkout/payment-links`) creates a
+  Square-hosted checkout page with the cart's line items; the customer is
+  redirected there to enter their card. This app **never touches a raw card
+  number** — Square's own page collects it.
+- A `SwagOrder`/`GiftCardOrder` is created as `pendingPayment` *before* the
+  redirect, with Square's returned `order_id` attached. The customer landing
+  back on `/shop` or `/gift-cards` with `?checkout=success` is **not** what
+  marks it paid — that's just a redirect URL a guest could reach without
+  actually paying (hitting back/forward). Only the signature-verified webhook
+  does that.
+- **Webhook**: `POST /api/swag/square-webhook` (one shared endpoint despite
+  the "swag" in the path — Square only allows one subscription per
+  `payment.updated` event per notification URL, and both features fire that
+  same event, so splitting into two endpoints would just mean two
+  subscriptions to keep in sync for no benefit). Verifies
+  `x-square-hmacsha256-signature` — `base64(HMAC-SHA256(signature key,
+  notification URL + raw body))` — using `swift-crypto`, then checks the
+  payment's `order_id` against both `SwagOrdersStore` and
+  `GiftCardOrdersStore` for a match. Whichever store has it gets marked paid.
+- **Gift Cards deliberately doesn't call Square's Gift Card / Gift Card
+  Activities API** to create or activate a real Square gift card. Ohana
+  already sells physical gift cards in person — the ask was "let customers
+  pay for one online," not "issue one via API" — so it only needed to solve
+  payment collection. A staff member activates a physical card by hand once
+  an order shows "Paid" on `/gift-cards-admin.html`. Building the real
+  create/activate flow is a plausible future upgrade (see below) but wasn't
+  needed to satisfy the actual request.
+- Neither checkout requires a customer account/login. **Shop requires a
+  scanned table** (`?table=`, same QR-scan flow as food ordering) so staff
+  know where to deliver the merch; **Gift Cards deliberately does not** —
+  most gift cards are bought as a gift, not while dining in, so the buyer
+  gives name/email/optional-recipient-name/note at checkout instead, and
+  staff follow up directly.
+
+**Unresolved loose end:** the user separately mentioned their bookkeeper said
+they use a card processor called "spaced" (2026-08-02) — not a real processor
+name, never identified (best guess was **SpotOn**, phonetically close). The
+decision was made to proceed with Square regardless, since the Square account
+was already confirmed real and working. If "spaced" ever gets identified as
+something genuinely different from Square, it's worth asking whether that's
+actually what processes in-restaurant card payments today, separate from the
+Square account this integration uses.
 
 ## Setting up Google/Apple/Facebook Sign-In
 
@@ -334,6 +421,85 @@ Customer verification and password-reset links aren't emailed (see the email
 caveat above) — after registering at `/signup` or requesting a reset at
 `/forgot-password.html`, grab the link from the server's console output
 (`EMAIL (not sent — no provider configured) ...`) to complete the flow locally.
+
+## Suggestions for future development
+
+Roughly in priority order — not a committed roadmap, just where the next
+session's effort would likely pay off most. Written 2026-08-02.
+
+1. **Flip Square to production.** Highest leverage item on this list: Shop
+   and Gift Cards are fully built and tested, just sitting behind a sandbox
+   flag. See [Payment Processing](#payment-processing-square) above for the
+   exact two-step swap. Nothing else blocks this.
+2. **Pick an email provider and wire it in** — self-service password reset
+   and email verification are dead ends right now (the link just gets logged
+   server-side, never delivered). Resend is recommended (generous free tier,
+   simple REST API). Two paths, don't let one block the other:
+   - **Fast path (do this first):** skip domain verification, send from
+     Resend's own `onboarding@resend.dev` address. Five minutes, unblocks
+     real delivery today, just not `@ohanasushigrill.com`-branded.
+   - **Branded path (needs DNS work first):** verify `ohanasushigrill.com`
+     (or a subdomain) with Resend — but the domain's current DNS host
+     (Weebly's manager) only exposes MX records and nameservers, not the TXT
+     records Resend's SPF/DKIM verification needs. Blocked on item 3.
+   - Once there's an API key, wiring it in is a single-file change:
+     implement `EmailSender` in `server/Sources/App/EmailSender.swift` and
+     branch on `Environment.get("EMAIL_PROVIDER")` in
+     `EmailSenderFactory.make` — the placeholder `ConsoleEmailSender` is
+     already structured for exactly this swap.
+3. **Move DNS to Cloudflare (free)** — unblocks two things at once: branded
+   email above, and binding `ohanasushigrill.com` as a real custom domain on
+   the Container App (free managed cert included). Plan already scoped: move
+   DNS to Cloudflare, keep the registration wherever it is now (no transfer
+   needed), recreate the existing Google MX records there, then add the
+   custom domain in Azure Container Apps using the TXT+CNAME it provides.
+   Once live, re-point the 43 printed table-card QR codes
+   (`/table-card.html`) from the Azure hostname back to the real domain —
+   they were deliberately left on Azure for testing.
+4. **Resolve the "spaced" processor question** — see the loose end noted in
+   Payment Processing above. Worth a two-minute follow-up before assuming
+   Square is the restaurant's only/primary card processor.
+5. **Quick-win OAuth credentials, if still wanted:** Facebook Login is free
+   and ~10 minutes (steps in `docs/oauth-setup.md`) — the backend and hidden
+   UI are already built and tested, just needs `FACEBOOK_OAUTH_APP_ID`/
+   `FACEBOOK_OAUTH_APP_SECRET`. Apple Sign-In needs a paid ($99/yr) Developer
+   Program enrollment first, so it's a real cost decision, not just a
+   time cost — confirm it's still wanted before spending on it.
+6. **`ANTHROPIC_API_KEY` for AI menu-photo extraction** — cheap (pay-per-use,
+   fractions of a cent per photo), fully built, just needs billing set up at
+   console.anthropic.com (separate from any claude.ai chat subscription).
+7. **Decide on the Yakisoba pricing inconsistency** found during the
+   description-cleanup pass (2026-08-02): its "With chicken: $27 / YOSH
+   $51.30" note doesn't reconcile with simple base+modifier math (base $23 +
+   Add Chicken $4 + Yosh Size $20.70 = $47.70, not $51.30) — left as-is
+   pending a human call on which number is actually correct, since silently
+   "fixing" a real menu price without knowing the intent seemed riskier than
+   flagging it.
+8. **Consider real Square Gift Card API integration** as a later upgrade —
+   today, `/gift-cards` only collects payment; a staff member manually
+   activates a physical card. If volume justifies it, Square's Gift Cards +
+   Gift Card Activities API could auto-create and activate a real, scannable
+   digital gift card server-side once a webhook confirms payment, emailing
+   (or displaying) the resulting GAN to the buyer. Bigger build — this is
+   why it was deliberately skipped for the initial version.
+9. **Uptime monitoring** — steps are ready in `docs/uptime-monitoring.md`,
+   just needs a free UptimeRobot account created (can't be done on your
+   behalf) pointed at the existing `/healthz` endpoint.
+10. **Session persistence** — Vapor's in-memory session driver means every
+    deploy logs everyone out. Fine today for a ~9-person staff team; worth
+    revisiting (file- or Redis-backed sessions) if that friction starts to
+    matter more, or once customer-account usage grows.
+11. **The bigger long-term idea worth naming:** table ordering
+    (`/menu` → "Add to Order" → `/table-orders-admin.html`) is currently just
+    a "heads up" queue — staff still ring everything up on the real POS, and
+    payment happens the traditional way. Now that real Square payment rails
+    exist in this codebase (Payment Links, webhooks, signature verification,
+    all proven out by Shop/Gift Cards), a natural next evolution — if ever
+    wanted — is extending that same pattern to actual dine-in checkout:
+    charge the table's card for the full order Square already knows about,
+    rather than just notifying staff. Not scoped or estimated, just flagged
+    as the logical next step once the smaller payment surfaces (Shop, Gift
+    Cards) have some real usage behind them.
 
 ## Other docs in this repo
 
