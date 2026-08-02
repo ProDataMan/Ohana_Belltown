@@ -101,6 +101,11 @@
             <label><input type="radio" name="bonus-type" value="social" /> A social media tag</label>
           </fieldset>
 
+          <label id="bonus-menu-item-label">Which dish is this? <span class="hint" id="bonus-menu-item-hint">(required for a photo)</span>
+            <input type="text" id="bonus-menu-item-input" list="bonus-menu-item-options" placeholder="Start typing a menu item..." autocomplete="off" />
+            <datalist id="bonus-menu-item-options"></datalist>
+          </label>
+
           <label id="bonus-photo-label">Choose a photo
             <input type="file" id="bonus-photo-input" accept="image/*" />
           </label>

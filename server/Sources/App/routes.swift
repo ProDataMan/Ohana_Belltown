@@ -9,6 +9,8 @@ struct BonusClaimRequest: Content {
     var type: String
     var content: String
     var note: String?
+    var menuItemId: String?
+    var menuItemName: String?
 }
 
 struct BonusReviewRequest: Content {
@@ -620,8 +622,16 @@ func routes(_ app: Application) throws {
         guard ["photo", "social"].contains(body.type) else {
             throw Abort(.badRequest, reason: "type must be 'photo' or 'social'")
         }
+        // A photo needs a dish to land in once approved; a social tag isn't
+        // always about one specific dish, so it's optional there.
+        if body.type == "photo" {
+            guard let menuItemId = body.menuItemId, !menuItemId.isEmpty else {
+                throw Abort(.badRequest, reason: "Please select which dish this photo is of.")
+            }
+        }
         return try LoyaltyStore.shared.submitBonusRequest(
-            phone: body.phone, type: body.type, content: body.content, note: body.note
+            phone: body.phone, type: body.type, content: body.content, note: body.note,
+            menuItemId: body.menuItemId, menuItemName: body.menuItemName
         )
     }
 

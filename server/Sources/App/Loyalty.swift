@@ -46,14 +46,22 @@ struct BonusRequest: Codable, Content {
     /// Tenths of a punch this specific claim actually earned (0 or 1) —
     /// 0 once the daily cap on rewarded claims has already been hit that day.
     var pointsAwarded: Int
+    /// Which dish this is about — required for a "photo" claim (so the
+    /// photo has somewhere to go once approved), optional for "social"
+    /// (a social tag isn't always about one specific dish). `menuItemName`
+    /// is denormalized purely for display in the staff review queue, since
+    /// the item could be renamed or deleted before anyone reviews this.
+    var menuItemId: String?
+    var menuItemName: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, phone, type, content, note, status, createdAt, reviewedAt, pointsAwarded
+        case id, phone, type, content, note, status, createdAt, reviewedAt, pointsAwarded, menuItemId, menuItemName
     }
 
     init(
         id: String, phone: String, type: String, content: String, note: String?,
-        status: String, createdAt: String, reviewedAt: String?, pointsAwarded: Int = 0
+        status: String, createdAt: String, reviewedAt: String?, pointsAwarded: Int = 0,
+        menuItemId: String? = nil, menuItemName: String? = nil
     ) {
         self.id = id
         self.phone = phone
@@ -64,6 +72,8 @@ struct BonusRequest: Codable, Content {
         self.createdAt = createdAt
         self.reviewedAt = reviewedAt
         self.pointsAwarded = pointsAwarded
+        self.menuItemId = menuItemId
+        self.menuItemName = menuItemName
     }
 
     init(from decoder: Decoder) throws {
@@ -77,6 +87,8 @@ struct BonusRequest: Codable, Content {
         createdAt = try container.decode(String.self, forKey: .createdAt)
         reviewedAt = try container.decodeIfPresent(String.self, forKey: .reviewedAt)
         pointsAwarded = try container.decodeIfPresent(Int.self, forKey: .pointsAwarded) ?? 0
+        menuItemId = try container.decodeIfPresent(String.self, forKey: .menuItemId)
+        menuItemName = try container.decodeIfPresent(String.self, forKey: .menuItemName)
     }
 }
 
@@ -228,7 +240,10 @@ final class LoyaltyStore: @unchecked Sendable {
     }
 
     @discardableResult
-    func submitBonusRequest(phone rawPhone: String, type: String, content: String, note: String?) throws -> BonusRequest {
+    func submitBonusRequest(
+        phone rawPhone: String, type: String, content: String, note: String?,
+        menuItemId: String? = nil, menuItemName: String? = nil
+    ) throws -> BonusRequest {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
@@ -240,7 +255,9 @@ final class LoyaltyStore: @unchecked Sendable {
             note: note,
             status: "pending",
             createdAt: now(),
-            reviewedAt: nil
+            reviewedAt: nil,
+            menuItemId: menuItemId,
+            menuItemName: menuItemName
         )
         data.bonusRequests.append(request)
         try persist()
@@ -284,6 +301,19 @@ final class LoyaltyStore: @unchecked Sendable {
                 data.customers[customerIdx].updatedAt = now()
             } else {
                 data.bonusRequests[idx].pointsAwarded = 0
+            }
+
+            // Publish the photo into the dish's own gallery, if the customer
+            // linked one — best-effort: the item could have been renamed or
+            // deleted since submission, and that should never block the
+            // punch-awarding logic above.
+            if data.bonusRequests[idx].type == "photo", let menuItemId = data.bonusRequests[idx].menuItemId {
+                let photoURL = data.bonusRequests[idx].content
+                try? MenuStore.shared.updateItem(id: menuItemId) { item in
+                    if !item.images.contains(photoURL) {
+                        item.images.append(photoURL)
+                    }
+                }
             }
         }
         try persist()

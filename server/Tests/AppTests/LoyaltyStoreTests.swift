@@ -125,4 +125,46 @@ final class LoyaltyStoreTests: XCTestCase {
         let status = try LoyaltyStore.shared.lookup(phone: "2065551234")
         XCTAssertEqual(status.punches, 3)
     }
+
+    func testApprovingAPhotoBonusRequestPublishesToTheLinkedMenuItemsGallery() throws {
+        let menuTempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: menuTempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: menuTempDir) }
+        MenuStore.shared.configure(dataDirectory: menuTempDir.path, resourcesDirectory: menuTempDir.path)
+        let saved = try MenuStore.shared.save(Menu(
+            restaurant: "Ohana Belltown", lastUpdated: "",
+            categories: [MenuCategory(section: "menu", name: "Rolls", note: nil, items: [MenuItem(name: "Volcano Roll", price: 15)])]
+        ))
+        let itemId = saved.categories[0].items[0].id
+
+        let request = try LoyaltyStore.shared.submitBonusRequest(
+            phone: "2065550000", type: "photo", content: "/uploads/dish.jpg", note: nil,
+            menuItemId: itemId, menuItemName: "Volcano Roll"
+        )
+        _ = try LoyaltyStore.shared.reviewBonusRequest(id: request.id, approve: true)
+
+        let location = try MenuStore.shared.findItem(id: itemId)
+        XCTAssertTrue(location.item.images.contains("/uploads/dish.jpg"), "approving should publish the photo into the linked item's gallery")
+    }
+
+    func testDenyingAPhotoBonusRequestDoesNotPublishToTheMenuItem() throws {
+        let menuTempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: menuTempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: menuTempDir) }
+        MenuStore.shared.configure(dataDirectory: menuTempDir.path, resourcesDirectory: menuTempDir.path)
+        let saved = try MenuStore.shared.save(Menu(
+            restaurant: "Ohana Belltown", lastUpdated: "",
+            categories: [MenuCategory(section: "menu", name: "Rolls", note: nil, items: [MenuItem(name: "Volcano Roll", price: 15)])]
+        ))
+        let itemId = saved.categories[0].items[0].id
+
+        let request = try LoyaltyStore.shared.submitBonusRequest(
+            phone: "2065550001", type: "photo", content: "/uploads/dish2.jpg", note: nil,
+            menuItemId: itemId, menuItemName: "Volcano Roll"
+        )
+        _ = try LoyaltyStore.shared.reviewBonusRequest(id: request.id, approve: false)
+
+        let location = try MenuStore.shared.findItem(id: itemId)
+        XCTAssertFalse(location.item.images.contains("/uploads/dish2.jpg"), "denying shouldn't publish anything to the menu item")
+    }
 }

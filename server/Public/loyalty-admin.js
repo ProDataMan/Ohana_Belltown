@@ -106,7 +106,7 @@ async function loadBonusRequests() {
       <div class="data-table">
         <table>
           <thead>
-            <tr><th>Phone</th><th>Type</th><th>Content</th><th>Note</th><th>Status</th><th>Points</th><th></th></tr>
+            <tr><th>Phone</th><th>Type</th><th>Dish</th><th>Content</th><th>Note</th><th>Status</th><th>Points</th><th></th></tr>
           </thead>
           <tbody>
             ${requests
@@ -115,6 +115,7 @@ async function loadBonusRequests() {
               <tr data-id="${r.id}">
                 <td>${escapeHtmlLoyalty(r.phone)}</td>
                 <td>${escapeHtmlLoyalty(r.type)}</td>
+                <td>${r.menuItemName ? escapeHtmlLoyalty(r.menuItemName) : '<span class="hint">&mdash;</span>'}</td>
                 <td>${r.type === 'photo'
                   ? `<a href="${escapeHtmlLoyalty(r.content)}" target="_blank" rel="noopener">View photo</a>`
                   : escapeHtmlLoyalty(r.content)}</td>

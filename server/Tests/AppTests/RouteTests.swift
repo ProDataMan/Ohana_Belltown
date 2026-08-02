@@ -1105,4 +1105,24 @@ final class RouteTests: XCTestCase {
             XCTAssertEqual(res.status, .unauthorized)
         }
     }
+
+    func testPhotoBonusRequestRequiresAMenuItemButSocialDoesNot() throws {
+        let photoWithoutItem = ByteBuffer(string: #"{"phone":"2065550100","type":"photo","content":"/uploads/x.jpg"}"#)
+        try app.test(.POST, "api/loyalty/bonus-request", headers: ["Content-Type": "application/json"], body: photoWithoutItem) { res in
+            XCTAssertEqual(res.status, .badRequest, "a photo claim needs a dish to publish into once approved")
+        }
+
+        let photoWithItem = ByteBuffer(string: #"{"phone":"2065550100","type":"photo","content":"/uploads/x.jpg","menuItemId":"item-1","menuItemName":"Volcano Roll"}"#)
+        try app.test(.POST, "api/loyalty/bonus-request", headers: ["Content-Type": "application/json"], body: photoWithItem) { res in
+            XCTAssertEqual(res.status, .ok)
+            let request = try res.content.decode(BonusRequest.self)
+            XCTAssertEqual(request.menuItemId, "item-1")
+            XCTAssertEqual(request.menuItemName, "Volcano Roll")
+        }
+
+        let socialWithoutItem = ByteBuffer(string: #"{"phone":"2065550100","type":"social","content":"@someone"}"#)
+        try app.test(.POST, "api/loyalty/bonus-request", headers: ["Content-Type": "application/json"], body: socialWithoutItem) { res in
+            XCTAssertEqual(res.status, .ok, "a social tag isn't always about one specific dish, so it should stay optional")
+        }
+    }
 }

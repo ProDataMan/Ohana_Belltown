@@ -40,14 +40,51 @@ document.getElementById('check-btn').addEventListener('click', async () => {
 const typeRadios = document.querySelectorAll('input[name="bonus-type"]');
 const photoLabel = document.getElementById('bonus-photo-label');
 const socialLabel = document.getElementById('bonus-social-label');
+const menuItemHint = document.getElementById('bonus-menu-item-hint');
 
 typeRadios.forEach((radio) => {
   radio.addEventListener('change', () => {
     const isPhoto = document.querySelector('input[name="bonus-type"]:checked').value === 'photo';
     photoLabel.hidden = !isPhoto;
     socialLabel.hidden = isPhoto;
+    menuItemHint.textContent = isPhoto ? '(required for a photo)' : '(optional)';
   });
 });
+
+// A dish picker with real search, since there are ~250 menu items — a
+// <datalist> gives free substring-filtered autocomplete without a custom
+// dropdown widget. Keeps a name->id map since the datalist itself can only
+// carry display text, not the id the backend actually needs.
+const menuItemInput = document.getElementById('bonus-menu-item-input');
+const menuItemOptionsEl = document.getElementById('bonus-menu-item-options');
+let menuItemsByName = {};
+
+async function loadMenuItemsForPicker() {
+  try {
+    const response = await fetch('/api/menu');
+    if (!response.ok) return;
+    const menu = await response.json();
+    (menu.categories || []).forEach((category) => {
+      (category.items || []).forEach((item) => {
+        menuItemsByName[item.name] = item.id;
+      });
+    });
+    menuItemOptionsEl.innerHTML = Object.keys(menuItemsByName)
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => `<option value="${name.replaceAll('"', '&quot;')}"></option>`)
+      .join('');
+  } catch {
+    // The picker just won't offer suggestions — submission still validates
+    // against whatever was typed, which will simply fail to match anything.
+  }
+}
+loadMenuItemsForPicker();
+
+function selectedMenuItem() {
+  const typed = menuItemInput.value.trim();
+  const id = menuItemsByName[typed];
+  return id ? { id, name: typed } : null;
+}
 
 document.getElementById('bonus-form').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -57,6 +94,11 @@ document.getElementById('bonus-form').addEventListener('submit', async (event) =
   const note = document.getElementById('bonus-note-input').value.trim() || null;
 
   if (!phone) return setRewardsStatus(statusEl, 'Enter your phone number first.', true);
+
+  const menuItem = selectedMenuItem();
+  if (type === 'photo' && !menuItem) {
+    return setRewardsStatus(statusEl, 'Please select which dish this photo is of, from the list.', true);
+  }
 
   setRewardsStatus(statusEl, 'Submitting...', false);
   try {
@@ -81,13 +123,30 @@ document.getElementById('bonus-form').addEventListener('submit', async (event) =
     const response = await fetch('/api/loyalty/bonus-request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, type, content, note }),
+      body: JSON.stringify({
+        phone,
+        type,
+        content,
+        note,
+        menuItemId: menuItem ? menuItem.id : null,
+        menuItemName: menuItem ? menuItem.name : null,
+      }),
     });
-    if (!response.ok) throw new Error(`Submission failed (${response.status}).`);
-    setRewardsStatus(statusEl, "Thanks! We'll review it soon — approved shares are worth 1/10 of a punch, up to 2 per visit.", false);
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.reason || `Submission failed (${response.status}).`);
+    }
+    setRewardsStatus(
+      statusEl,
+      type === 'photo'
+        ? "Thanks! Once approved, your photo joins that dish's gallery — approved shares are worth 1/10 of a punch, up to 2 per visit."
+        : "Thanks! We'll review it soon — approved shares are worth 1/10 of a punch, up to 2 per visit.",
+      false
+    );
     event.target.reset();
     photoLabel.hidden = false;
     socialLabel.hidden = true;
+    menuItemHint.textContent = '(required for a photo)';
   } catch (error) {
     setRewardsStatus(statusEl, error.message, true);
   }
