@@ -94,6 +94,8 @@ struct MenuItemUpdateRequest: Content {
     var available: Bool
     var happyHour: Bool
     var modifiers: [MenuItemModifier]?
+    var choiceGroups: [MenuItemChoiceGroup]?
+    var requiresModifierSelection: Bool?
 }
 
 func routes(_ app: Application) throws {
@@ -167,6 +169,8 @@ func routes(_ app: Application) throws {
             item.available = body.available
             item.modifiers = body.modifiers ?? []
             item.happyHour = body.happyHour
+            item.choiceGroups = body.choiceGroups ?? []
+            item.requiresModifierSelection = body.requiresModifierSelection ?? false
         }
         StaffRewardsStore.shared.awardForMenuEdit(staffId: staff.id, before: before, after: updated)
         return updated

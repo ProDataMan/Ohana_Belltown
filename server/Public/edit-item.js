@@ -311,6 +311,7 @@ async function loadItem() {
     document.getElementById('item-featured-input').checked = Boolean(item.featured);
     document.getElementById('item-sold-out-input').checked = item.available === false;
     document.getElementById('item-happy-hour-input').checked = Boolean(item.happyHour);
+    document.getElementById('item-requires-modifier-input').checked = Boolean(item.requiresModifierSelection);
 
     currentImages = item.images || [];
     renderThumbGallery();
@@ -356,6 +357,7 @@ async function saveItem() {
     happyHour: document.getElementById('item-happy-hour-input').checked,
     modifiers: currentModifiers,
     choiceGroups: currentChoiceGroups,
+    requiresModifierSelection: document.getElementById('item-requires-modifier-input').checked,
   };
 
   document.getElementById('save-btn').disabled = true;

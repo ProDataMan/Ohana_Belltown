@@ -1830,6 +1830,16 @@ select {
   color: #b91c1c;
 }
 
+.item-modifiers-error {
+  margin: 0.3rem 0 0;
+  font-size: 0.78rem;
+  color: #b91c1c;
+}
+
+.item-modifiers-error[hidden] {
+  display: none;
+}
+
 .item-choice-group-error[hidden] {
   display: none;
 }

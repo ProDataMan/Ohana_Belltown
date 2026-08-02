@@ -51,9 +51,15 @@ struct MenuItem: Codable, Content {
     /// Required single-pick choices bundled into this dish (e.g. a bento's
     /// choice of protein) — empty for the vast majority of items.
     var choiceGroups: [MenuItemChoiceGroup]
+    /// When true, at least one modifier must be checked before this item can
+    /// be added to an order — e.g. Extra Sauces (all checkboxes, no base
+    /// price of its own) wouldn't make sense ordered with none picked.
+    /// False for the vast majority of items, where every modifier really is
+    /// optional. Meaningless without at least one modifier defined.
+    var requiresModifierSelection: Bool
 
     enum CodingKeys: String, CodingKey {
-        case id, name, description, price, images, image, tags, featured, available, happyHour, modifiers, choiceGroups
+        case id, name, description, price, images, image, tags, featured, available, happyHour, modifiers, choiceGroups, requiresModifierSelection
     }
 
     init(
@@ -67,7 +73,8 @@ struct MenuItem: Codable, Content {
         available: Bool = true,
         happyHour: Bool = false,
         modifiers: [MenuItemModifier] = [],
-        choiceGroups: [MenuItemChoiceGroup] = []
+        choiceGroups: [MenuItemChoiceGroup] = [],
+        requiresModifierSelection: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -80,6 +87,7 @@ struct MenuItem: Codable, Content {
         self.happyHour = happyHour
         self.modifiers = modifiers
         self.choiceGroups = choiceGroups
+        self.requiresModifierSelection = requiresModifierSelection
     }
 
     init(from decoder: Decoder) throws {
@@ -104,6 +112,7 @@ struct MenuItem: Codable, Content {
         happyHour = try container.decodeIfPresent(Bool.self, forKey: .happyHour) ?? false
         modifiers = try container.decodeIfPresent([MenuItemModifier].self, forKey: .modifiers) ?? []
         choiceGroups = try container.decodeIfPresent([MenuItemChoiceGroup].self, forKey: .choiceGroups) ?? []
+        requiresModifierSelection = try container.decodeIfPresent(Bool.self, forKey: .requiresModifierSelection) ?? false
     }
 
     func encode(to encoder: Encoder) throws {
@@ -119,6 +128,7 @@ struct MenuItem: Codable, Content {
         try container.encode(happyHour, forKey: .happyHour)
         try container.encode(modifiers, forKey: .modifiers)
         try container.encode(choiceGroups, forKey: .choiceGroups)
+        try container.encode(requiresModifierSelection, forKey: .requiresModifierSelection)
     }
 }
 

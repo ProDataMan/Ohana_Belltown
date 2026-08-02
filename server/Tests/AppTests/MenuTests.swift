@@ -75,6 +75,17 @@ final class MenuTests: XCTestCase {
         XCTAssertEqual(decoded.choiceGroups.map { $0.options }, [["Chicken Teriyaki", "Beef Teriyaki"]])
     }
 
+    func testRequiresModifierSelectionDefaultsFalseAndRoundTrips() throws {
+        let json = #"{ "name": "Extra Sauces", "price": 0 }"#
+        let item = try JSONDecoder().decode(MenuItem.self, from: Data(json.utf8))
+        XCTAssertFalse(item.requiresModifierSelection, "items predating this field should default to not-required")
+
+        let required = MenuItem(name: "Extra Sauces", price: 0, requiresModifierSelection: true)
+        let data = try JSONEncoder().encode(required)
+        let decoded = try JSONDecoder().decode(MenuItem.self, from: data)
+        XCTAssertTrue(decoded.requiresModifierSelection)
+    }
+
     func testItemWithoutPersistedIdGetsAFreshOneEachDecode() throws {
         let json = """
         { "name": "No ID Yet", "price": 10 }

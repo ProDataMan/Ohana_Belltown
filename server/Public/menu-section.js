@@ -121,6 +121,19 @@ function addItemToCart(button) {
   const modifierCheckboxes = ownContainer ? Array.from(ownContainer.querySelectorAll('.item-modifiers input')) : [];
   const modifiers = modifierCheckboxes.filter((cb) => cb.checked).map((cb) => cb.dataset.modifierName);
 
+  // Some items (e.g. Extra Sauces — all checkboxes, no meaningful base
+  // price) require at least one modifier checked before they can be
+  // ordered at all — refuses silently rather than sending a $0 order.
+  const modifiersContainer = ownContainer ? ownContainer.querySelector('.item-modifiers') : null;
+  if (modifiersContainer && modifiersContainer.dataset.requiresSelection === 'true') {
+    const errorEl = modifiersContainer.querySelector('.item-modifiers-error');
+    if (!modifiers.length) {
+      if (errorEl) errorEl.hidden = false;
+      return;
+    }
+    if (errorEl) errorEl.hidden = true;
+  }
+
   // Required choice groups (e.g. Shogun Bento's choice of protein) must
   // each have a selection before this can be added — refuses silently
   // rather than sending an order the kitchen can't act on.
@@ -365,6 +378,29 @@ function injectMenuSchema(categories, tableId) {
   document.head.appendChild(script);
 }
 
+// Shared between the inline card and the detail modal, so a change to one
+// doesn't quietly drift from the other. Returns just the inner content of
+// the `.item-modifiers` wrapper (checkboxes + an optional "must pick one"
+// error message) — the wrapper itself carries `data-requires-selection`
+// so addItemToCart knows whether to enforce it.
+function renderModifiersInnerMarkup(item, orderLocked) {
+  const modifiers = item.modifiers || [];
+  const checkboxesMarkup = modifiers
+    .map(
+      (m) => `
+    <label class="item-modifier-checkbox">
+      <input type="checkbox" data-modifier-name="${escapeHtml(m.name)}" data-modifier-price="${m.priceDelta}" ${orderLocked ? 'disabled' : ''} />
+      ${escapeHtml(m.name)} (+$${Number(m.priceDelta).toFixed(2)})
+    </label>
+  `
+    )
+    .join('');
+  const errorMarkup = item.requiresModifierSelection
+    ? '<p class="item-modifiers-error" hidden>Please select at least one.</p>'
+    : '';
+  return checkboxesMarkup + errorMarkup;
+}
+
 // A required, mutually-exclusive choice bundled into one dish (e.g. Shogun
 // Bento's "your choice of chicken or beef teriyaki") — radio buttons, not
 // checkboxes, since exactly one option must be picked and none of them
@@ -464,17 +500,8 @@ function renderMenu(data) {
           const modifiers = item.modifiers || [];
           const modifiersMarkup =
             tableId && !soldOut && modifiers.length
-              ? `<div class="item-modifiers">
-                  ${modifiers
-                    .map(
-                      (m) => `
-                    <label class="item-modifier-checkbox">
-                      <input type="checkbox" data-modifier-name="${escapeHtml(m.name)}" data-modifier-price="${m.priceDelta}" ${orderLocked ? 'disabled' : ''} />
-                      ${escapeHtml(m.name)} (+$${Number(m.priceDelta).toFixed(2)})
-                    </label>
-                  `
-                    )
-                    .join('')}
+              ? `<div class="item-modifiers" data-requires-selection="${item.requiresModifierSelection ? 'true' : 'false'}">
+                  ${renderModifiersInnerMarkup(item, orderLocked)}
                 </div>`
               : '';
           const choiceGroupsMarkup = renderChoiceGroupsMarkup(item, tableId, soldOut, orderLocked, `item-${index}`);
@@ -577,6 +604,8 @@ function ensureItemModal() {
   modal.addEventListener('change', (event) => {
     if (event.target.matches('.item-modifiers input')) {
       updateItemPriceDisplay(modal);
+      const errorEl = event.target.closest('.item-modifiers')?.querySelector('.item-modifiers-error');
+      if (errorEl) errorEl.hidden = true;
       return;
     }
     if (event.target.matches('.item-choice-group input')) {
@@ -657,19 +686,12 @@ async function openItemModal(index) {
   const modifiers = item.modifiers || [];
   if (tableId && !soldOut && modifiers.length) {
     modifiersEl.hidden = false;
-    modifiersEl.innerHTML = modifiers
-      .map(
-        (m) => `
-          <label class="item-modifier-checkbox">
-            <input type="checkbox" data-modifier-name="${escapeHtml(m.name)}" data-modifier-price="${m.priceDelta}" ${orderLocked ? 'disabled' : ''} />
-            ${escapeHtml(m.name)} (+$${Number(m.priceDelta).toFixed(2)})
-          </label>
-        `
-      )
-      .join('');
+    modifiersEl.dataset.requiresSelection = item.requiresModifierSelection ? 'true' : 'false';
+    modifiersEl.innerHTML = renderModifiersInnerMarkup(item, orderLocked);
   } else {
     modifiersEl.hidden = true;
     modifiersEl.innerHTML = '';
+    delete modifiersEl.dataset.requiresSelection;
   }
 
   modal.querySelector('.item-modal-choice-groups').innerHTML = renderChoiceGroupsMarkup(item, tableId, soldOut, orderLocked, 'modal');
@@ -793,6 +815,8 @@ menuContainer.addEventListener('change', (event) => {
   if (event.target.matches('.item-modifiers input')) {
     const articleEl = event.target.closest('.item');
     if (articleEl) updateItemPriceDisplay(articleEl);
+    const errorEl = event.target.closest('.item-modifiers')?.querySelector('.item-modifiers-error');
+    if (errorEl) errorEl.hidden = true;
     return;
   }
   if (event.target.matches('.item-choice-group input')) {
