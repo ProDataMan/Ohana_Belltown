@@ -376,14 +376,14 @@ credential in the env table above).
   gives name/email/optional-recipient-name/note at checkout instead, and
   staff follow up directly.
 
-**Unresolved loose end:** the user separately mentioned their bookkeeper said
-they use a card processor called "spaced" (2026-08-02) — not a real processor
-name, never identified (best guess was **SpotOn**, phonetically close). The
-decision was made to proceed with Square regardless, since the Square account
-was already confirmed real and working. If "spaced" ever gets identified as
-something genuinely different from Square, it's worth asking whether that's
-actually what processes in-restaurant card payments today, separate from the
-Square account this integration uses.
+**Resolved loose end:** the earlier mention of a card processor called
+"spaced" (misheard over the phone) was clarified to **Echelon**
+(echelonpayments.com) — a real traditional payment processor with its own
+online-payment products. Whether Echelon would actually be cheaper than
+Square for this site's web purchases is unresolved (Echelon doesn't publish
+pricing) — see `docs/payment-processing-plan.md` for the full comparison,
+what's verified about each, and exactly what to ask Echelon for before
+deciding whether to switch.
 
 ## Setting up Google/Apple/Facebook Sign-In
 
@@ -456,9 +456,11 @@ session's effort would likely pay off most. Written 2026-08-02.
    Once live, re-point the 43 printed table-card QR codes
    (`/table-card.html`) from the Azure hostname back to the real domain —
    they were deliberately left on Azure for testing.
-4. **Resolve the "spaced" processor question** — see the loose end noted in
-   Payment Processing above. Worth a two-minute follow-up before assuming
-   Square is the restaurant's only/primary card processor.
+4. **Get a real Echelon quote** — `docs/payment-processing-plan.md` has the
+   full comparison and exactly what to ask for (effective online rate,
+   pricing model, gateway/monthly/PCI fees, contract terms). Nothing to
+   decide until that quote exists; Square's rates are already verified and
+   documented in that file for comparison.
 5. **Quick-win OAuth credentials, if still wanted:** Facebook Login is free
    and ~10 minutes (steps in `docs/oauth-setup.md`) — the backend and hidden
    UI are already built and tested, just needs `FACEBOOK_OAUTH_APP_ID`/
@@ -503,6 +505,7 @@ session's effort would likely pay off most. Written 2026-08-02.
 
 ## Other docs in this repo
 
+- `docs/payment-processing-plan.md` — Square vs. Echelon comparison for web-purchase card processing (Shop/Gift Cards) — Echelon doesn't publish pricing, so this is a research/decision-framework doc pending a real quote, not a completed comparison
 - `docs/feature-roadmap.md` — original feature audit and phased plan (predates most of what's now shipped; see the gaps list above for current state)
 - `docs/visual-design-direction.md` — the palette/type direction used for the visual refresh
 - `docs/oauth-setup.md` — step-by-step Google/Apple/Facebook Sign-In credential setup
