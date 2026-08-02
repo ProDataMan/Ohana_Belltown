@@ -1056,19 +1056,19 @@ final class RouteTests: XCTestCase {
         }
     }
 
-    func testSwagCheckoutRequiresStripeConfigAndValidatesTheCart() throws {
-        // No STRIPE_SECRET_KEY in the test environment — checkout-status
-        // should report unavailable, mirroring the AI-extraction-status
-        // "hidden until configured" pattern.
+    func testSwagCheckoutRequiresSquareConfigAndValidatesTheCart() throws {
+        // No SQUARE_ACCESS_TOKEN/SQUARE_LOCATION_ID in the test environment —
+        // checkout-status should report unavailable, mirroring the
+        // AI-extraction-status "hidden until configured" pattern.
         try app.test(.GET, "api/swag/checkout-status") { res in
             XCTAssertEqual(res.status, .ok)
-            let status = try res.content.decode(StripeCheckoutStatus.self)
+            let status = try res.content.decode(SquareCheckoutStatus.self)
             XCTAssertFalse(status.available)
         }
 
         let checkoutBody = ByteBuffer(string: #"{"tableId":"5","items":[{"productId":"p1","quantity":1}]}"#)
         try app.test(.POST, "api/swag/checkout", headers: ["Content-Type": "application/json"], body: checkoutBody) { res in
-            XCTAssertEqual(res.status, .serviceUnavailable, "checkout should refuse to start without a configured Stripe key")
+            XCTAssertEqual(res.status, .serviceUnavailable, "checkout should refuse to start without configured Square credentials")
         }
     }
 
@@ -1081,9 +1081,9 @@ final class RouteTests: XCTestCase {
         }
     }
 
-    func testSwagStripeWebhookRequiresConfiguredSecretAndSignature() throws {
-        // No STRIPE_WEBHOOK_SECRET in the test environment.
-        try app.test(.POST, "api/swag/stripe-webhook", body: ByteBuffer(string: "{}")) { res in
+    func testSwagSquareWebhookRequiresConfiguredSecretAndSignature() throws {
+        // No SQUARE_WEBHOOK_SIGNATURE_KEY in the test environment.
+        try app.test(.POST, "api/swag/square-webhook", body: ByteBuffer(string: "{}")) { res in
             XCTAssertEqual(res.status, .serviceUnavailable)
         }
     }

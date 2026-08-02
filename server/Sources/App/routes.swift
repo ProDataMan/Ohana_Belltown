@@ -454,19 +454,22 @@ func routes(_ app: Application) throws {
         return try SwagStore.shared.save(items)
     }
 
-    // Whether STRIPE_SECRET_KEY is set — the Shop page uses this to decide
-    // whether to offer checkout at all, same "hidden until configured"
-    // pattern as AI menu extraction / Apple / Facebook sign-in.
-    app.get("api", "swag", "checkout-status") { req throws -> StripeCheckoutStatus in
-        StripeCheckoutStatus(available: Environment.get("STRIPE_SECRET_KEY") != nil)
+    // Whether Square's checkout credentials are set — the Shop page uses
+    // this to decide whether to offer checkout at all, same "hidden until
+    // configured" pattern as AI menu extraction / Apple / Facebook sign-in.
+    app.get("api", "swag", "checkout-status") { req throws -> SquareCheckoutStatus in
+        let accessToken = Environment.get("SQUARE_ACCESS_TOKEN")
+        let locationId = Environment.get("SQUARE_LOCATION_ID")
+        return SquareCheckoutStatus(available: accessToken?.isEmpty == false && locationId?.isEmpty == false)
     }
 
-    // Creates a pending SwagOrder from the customer's cart, then a Stripe
-    // Checkout Session for it, and hands back the URL to redirect to.
+    // Creates a pending SwagOrder from the customer's cart, then a Square
+    // Checkout payment link for it, and hands back the URL to redirect to.
     // Requires a scanned table (same as food ordering) so staff know where
     // to deliver it once it's paid.
     app.post("api", "swag", "checkout") { req async throws -> SwagCheckoutResponse in
-        guard let secretKey = Environment.get("STRIPE_SECRET_KEY"), !secretKey.isEmpty else {
+        guard let accessToken = Environment.get("SQUARE_ACCESS_TOKEN"), !accessToken.isEmpty,
+              let locationId = Environment.get("SQUARE_LOCATION_ID"), !locationId.isEmpty else {
             throw SwagError.checkoutNotConfigured
         }
         let body = try req.content.decode(SwagCheckoutRequest.self)
@@ -491,37 +494,40 @@ func routes(_ app: Application) throws {
 
         let base = PublicBaseURL.get()
         let encodedTable = tableId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? tableId
-        let session = try await StripeCheckout.createSession(
-            client: req.client, secretKey: secretKey, orderId: order.id, tableId: tableId, items: orderItems,
-            successURL: "\(base)/shop?table=\(encodedTable)&checkout=success",
-            cancelURL: "\(base)/shop?table=\(encodedTable)&checkout=cancelled"
+        let link = try await SquareCheckout.createPaymentLink(
+            client: req.client, accessToken: accessToken, locationId: locationId, orderId: order.id, tableId: tableId,
+            items: orderItems, redirectURL: "\(base)/shop?table=\(encodedTable)&checkout=success"
         )
-        try SwagOrdersStore.shared.attachStripeSession(orderId: order.id, sessionId: session.id)
-        return SwagCheckoutResponse(checkoutURL: session.url)
+        try SwagOrdersStore.shared.attachSquareOrderId(orderId: order.id, squareOrderId: link.squareOrderId)
+        return SwagCheckoutResponse(checkoutURL: link.url)
     }
 
-    // Stripe calls this once a Checkout Session actually completes payment —
-    // this is the only place a SwagOrder gets marked "paid," never the
-    // client redirect (a customer can land on the success URL without
-    // actually having paid, e.g. by hitting back). Verifies the raw body
-    // against Stripe's signature so this can't be spoofed by a random POST.
-    app.on(.POST, "api", "swag", "stripe-webhook", body: .collect(maxSize: "1mb")) { req async throws -> HTTPStatus in
-        guard let webhookSecret = Environment.get("STRIPE_WEBHOOK_SECRET") else {
+    // Square calls this once a payment actually completes — this is the
+    // only place a SwagOrder gets marked "paid," never the client redirect
+    // (a customer can land on the success URL without actually having
+    // paid, e.g. by hitting back). Verifies the raw body against Square's
+    // signature so this can't be spoofed by a random POST. The notification
+    // URL used for the signature must exactly match what's configured for
+    // this webhook subscription in the Square Developer Dashboard.
+    app.on(.POST, "api", "swag", "square-webhook", body: .collect(maxSize: "1mb")) { req async throws -> HTTPStatus in
+        guard let signatureKey = Environment.get("SQUARE_WEBHOOK_SIGNATURE_KEY") else {
             throw Abort(.serviceUnavailable)
         }
-        guard let signatureHeader = req.headers.first(name: "Stripe-Signature") else {
+        guard let signatureHeader = req.headers.first(name: "x-square-hmacsha256-signature") else {
             throw Abort(.badRequest)
         }
         guard let bodyBuffer = req.body.data,
               let payload = bodyBuffer.getString(at: bodyBuffer.readerIndex, length: bodyBuffer.readableBytes) else {
             throw Abort(.badRequest)
         }
-        guard StripeCheckout.verifyWebhookSignature(payload: payload, signatureHeader: signatureHeader, secret: webhookSecret) else {
+        let notificationURL = "\(PublicBaseURL.get())/api/swag/square-webhook"
+        guard SquareCheckout.verifyWebhookSignature(payload: payload, notificationURL: notificationURL, signatureHeader: signatureHeader, signatureKey: signatureKey) else {
             throw Abort(.unauthorized)
         }
-        let event = try JSONDecoder().decode(StripeWebhookEvent.self, from: Data(payload.utf8))
-        if event.type == "checkout.session.completed", let orderId = event.data.object.metadata?["orderId"] {
-            try SwagOrdersStore.shared.markPaid(orderId: orderId)
+        let event = try JSONDecoder().decode(SquareWebhookEvent.self, from: Data(payload.utf8))
+        if event.type == "payment.updated", let payment = event.data.object.payment,
+           payment.status == "COMPLETED", let squareOrderId = payment.order_id {
+            try SwagOrdersStore.shared.markPaid(squareOrderId: squareOrderId)
         }
         return .ok
     }

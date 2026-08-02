@@ -8,11 +8,11 @@ struct SwagOrderItem: Codable, Content, Equatable {
     var quantity: Int
 }
 
-/// A table's swag purchase, paid for online via Stripe Checkout — unlike a
+/// A table's swag purchase, paid for online via Square Checkout — unlike a
 /// food TableOrderEntry (which just queues for staff and gets paid in
 /// person), this actually collects a real card payment before staff bring
-/// the item to the table. Lifecycle: pendingPayment (cart submitted, Stripe
-/// session created) -> paid (Stripe webhook confirmed the charge) ->
+/// the item to the table. Lifecycle: pendingPayment (cart submitted, Square
+/// payment link created) -> paid (Square webhook confirmed the charge) ->
 /// delivered (staff brought it to the table).
 struct SwagOrder: Codable, Content, Equatable {
     var id: String
@@ -21,7 +21,7 @@ struct SwagOrder: Codable, Content, Equatable {
     var items: [SwagOrderItem]
     var totalAmount: Double
     var status: String
-    var stripeSessionId: String?
+    var squareOrderId: String?
     var createdAt: String
     var paidAt: String?
     var deliveredAt: String?
@@ -70,7 +70,7 @@ final class SwagOrdersStore: @unchecked Sendable {
         let total = items.reduce(0.0) { $0 + $1.price * Double($1.quantity) }
         let order = SwagOrder(
             id: UUID().uuidString, tableId: tableId, customerId: customerId, items: items,
-            totalAmount: total, status: "pendingPayment", stripeSessionId: nil,
+            totalAmount: total, status: "pendingPayment", squareOrderId: nil,
             createdAt: Self.iso.string(from: Date()), paidAt: nil, deliveredAt: nil
         )
         orders.append(order)
@@ -79,24 +79,27 @@ final class SwagOrdersStore: @unchecked Sendable {
     }
 
     @discardableResult
-    func attachStripeSession(orderId: String, sessionId: String) throws -> SwagOrder {
+    func attachSquareOrderId(orderId: String, squareOrderId: String) throws -> SwagOrder {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
         guard let index = orders.firstIndex(where: { $0.id == orderId }) else { throw SwagError.orderNotFound }
-        orders[index].stripeSessionId = sessionId
+        orders[index].squareOrderId = squareOrderId
         try persist()
         return orders[index]
     }
 
-    /// Idempotent — Stripe may redeliver the same webhook event more than
+    /// Idempotent — Square may redeliver the same webhook event more than
     /// once, and re-marking an already-paid order shouldn't stomp paidAt.
+    /// Matched by squareOrderId (captured at payment-link creation time),
+    /// not our own order id, since that's all the payment.updated webhook
+    /// payload actually gives us.
     @discardableResult
-    func markPaid(orderId: String) throws -> SwagOrder {
+    func markPaid(squareOrderId: String) throws -> SwagOrder {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
-        guard let index = orders.firstIndex(where: { $0.id == orderId }) else { throw SwagError.orderNotFound }
+        guard let index = orders.firstIndex(where: { $0.squareOrderId == squareOrderId }) else { throw SwagError.orderNotFound }
         if orders[index].status == "pendingPayment" {
             orders[index].status = "paid"
             orders[index].paidAt = Self.iso.string(from: Date())
