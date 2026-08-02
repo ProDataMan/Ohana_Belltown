@@ -121,7 +121,26 @@ function addItemToCart(button) {
   const modifierCheckboxes = ownContainer ? Array.from(ownContainer.querySelectorAll('.item-modifiers input')) : [];
   const modifiers = modifierCheckboxes.filter((cb) => cb.checked).map((cb) => cb.dataset.modifierName);
 
-  setPendingCartItem(itemName, { itemId, section: window.MENU_SECTION, modifiers });
+  // Required choice groups (e.g. Shogun Bento's choice of protein) must
+  // each have a selection before this can be added — refuses silently
+  // rather than sending an order the kitchen can't act on.
+  const choiceGroupEls = ownContainer ? Array.from(ownContainer.querySelectorAll('.item-choice-group')) : [];
+  const choiceSelections = [];
+  let missingChoice = false;
+  choiceGroupEls.forEach((groupEl) => {
+    const checked = groupEl.querySelector('input:checked');
+    const errorEl = groupEl.querySelector('.item-choice-group-error');
+    if (!checked) {
+      missingChoice = true;
+      if (errorEl) errorEl.hidden = false;
+      return;
+    }
+    if (errorEl) errorEl.hidden = true;
+    choiceSelections.push(`${groupEl.dataset.groupLabel}: ${checked.value}`);
+  });
+  if (missingChoice) return;
+
+  setPendingCartItem(itemName, { itemId, section: window.MENU_SECTION, modifiers: [...modifiers, ...choiceSelections] });
 
   findOrderButtons(itemName).forEach((btn) => {
     btn.textContent = 'Added — Tap to Remove';
@@ -129,6 +148,7 @@ function addItemToCart(button) {
   });
   findItemContainers(itemName).forEach((c) => {
     c.querySelectorAll('.item-modifiers input').forEach((cb) => { cb.disabled = true; });
+    c.querySelectorAll('.item-choice-group input').forEach((r) => { r.disabled = true; });
   });
   updateCartBadge();
 }
@@ -143,6 +163,7 @@ function removeItemFromCart(button) {
   });
   findItemContainers(itemName).forEach((c) => {
     c.querySelectorAll('.item-modifiers input').forEach((cb) => { cb.disabled = false; });
+    c.querySelectorAll('.item-choice-group input').forEach((r) => { r.disabled = false; });
   });
   updateCartBadge();
 }
@@ -210,6 +231,10 @@ async function markOrderDelivered(button) {
       c.querySelectorAll('.item-modifiers input').forEach((cb) => {
         cb.disabled = false;
         cb.checked = false;
+      });
+      c.querySelectorAll('.item-choice-group input').forEach((r) => {
+        r.disabled = false;
+        r.checked = false;
       });
     });
   } catch {
@@ -340,6 +365,41 @@ function injectMenuSchema(categories, tableId) {
   document.head.appendChild(script);
 }
 
+// A required, mutually-exclusive choice bundled into one dish (e.g. Shogun
+// Bento's "your choice of chicken or beef teriyaki") — radio buttons, not
+// checkboxes, since exactly one option must be picked and none of them
+// change the price. `namePrefix` keeps each rendered instance's radio
+// `name` attributes from colliding with the same item shown elsewhere on
+// the page (e.g. both the inline card and the detail modal at once).
+function renderChoiceGroupsMarkup(item, tableId, soldOut, orderLocked, namePrefix) {
+  const groups = item.choiceGroups || [];
+  if (!tableId || soldOut || !groups.length) return '';
+  return `
+    <div class="item-choice-groups">
+      ${groups
+        .map(
+          (g) => `
+        <div class="item-choice-group" data-group-id="${escapeHtml(g.id)}" data-group-label="${escapeHtml(g.label)}">
+          <p class="item-choice-group-label">${escapeHtml(g.label)}</p>
+          ${g.options
+            .map(
+              (option) => `
+            <label class="item-choice-option">
+              <input type="radio" name="choice-${escapeHtml(namePrefix)}-${escapeHtml(g.id)}" value="${escapeHtml(option)}" ${orderLocked ? 'disabled' : ''} />
+              ${escapeHtml(option)}
+            </label>
+          `
+            )
+            .join('')}
+          <p class="item-choice-group-error" hidden>Please make a selection.</p>
+        </div>
+      `
+        )
+        .join('')}
+    </div>
+  `;
+}
+
 function renderMenu(data) {
   const categories = (data.categories || []).filter((c) => c.section === window.MENU_SECTION);
 
@@ -417,6 +477,7 @@ function renderMenu(data) {
                     .join('')}
                 </div>`
               : '';
+          const choiceGroupsMarkup = renderChoiceGroupsMarkup(item, tableId, soldOut, orderLocked, `item-${index}`);
           return `
             <article class="item${soldOut ? ' item-sold-out' : ''}" data-search="${escapeHtml(searchText)}" data-index="${index}" data-tags="${escapeHtml(tags.join(','))}">
               ${imageMarkup}
@@ -426,6 +487,7 @@ function renderMenu(data) {
                 ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ''}
                 ${tagsMarkup}
                 ${modifiersMarkup}
+                ${choiceGroupsMarkup}
               </div>
               ${priceMarkup}
               ${orderButton}
@@ -486,6 +548,7 @@ function ensureItemModal() {
       <p class="item-modal-desc"></p>
       <div class="item-tags item-modal-tags"></div>
       <div class="item-modifiers item-modal-modifiers" hidden></div>
+      <div class="item-modal-choice-groups"></div>
       <button type="button" class="order-btn item-modal-order-btn" hidden></button>
       <div class="item-modal-google-section" hidden>
         <p class="item-modal-google-label"></p>
@@ -512,7 +575,14 @@ function ensureItemModal() {
     }
   });
   modal.addEventListener('change', (event) => {
-    if (event.target.matches('.item-modifiers input')) updateItemPriceDisplay(modal);
+    if (event.target.matches('.item-modifiers input')) {
+      updateItemPriceDisplay(modal);
+      return;
+    }
+    if (event.target.matches('.item-choice-group input')) {
+      const errorEl = event.target.closest('.item-choice-group')?.querySelector('.item-choice-group-error');
+      if (errorEl) errorEl.hidden = true;
+    }
   });
   modal.querySelector('.item-modal-close').addEventListener('click', closeItemModal);
   document.addEventListener('keydown', (event) => {
@@ -601,6 +671,8 @@ async function openItemModal(index) {
     modifiersEl.hidden = true;
     modifiersEl.innerHTML = '';
   }
+
+  modal.querySelector('.item-modal-choice-groups').innerHTML = renderChoiceGroupsMarkup(item, tableId, soldOut, orderLocked, 'modal');
 
   const orderBtnEl = modal.querySelector('.item-modal-order-btn');
   if (tableId && !soldOut) {
@@ -718,9 +790,15 @@ function updateItemPriceDisplay(articleEl) {
 }
 
 menuContainer.addEventListener('change', (event) => {
-  if (!event.target.matches('.item-modifiers input')) return;
-  const articleEl = event.target.closest('.item');
-  if (articleEl) updateItemPriceDisplay(articleEl);
+  if (event.target.matches('.item-modifiers input')) {
+    const articleEl = event.target.closest('.item');
+    if (articleEl) updateItemPriceDisplay(articleEl);
+    return;
+  }
+  if (event.target.matches('.item-choice-group input')) {
+    const errorEl = event.target.closest('.item-choice-group')?.querySelector('.item-choice-group-error');
+    if (errorEl) errorEl.hidden = true;
+  }
 });
 
 menuContainer.addEventListener('click', (event) => {
@@ -739,6 +817,9 @@ menuContainer.addEventListener('click', (event) => {
     return;
   }
   if (event.target.closest('.item-modifiers')) {
+    return;
+  }
+  if (event.target.closest('.item-choice-groups')) {
     return;
   }
   const photo = event.target.closest('.item-photo');

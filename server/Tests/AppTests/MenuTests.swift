@@ -19,6 +19,7 @@ final class MenuTests: XCTestCase {
         XCTAssertFalse(item.happyHour, "items should default to not-happy-hour when the field predates that flag")
         XCTAssertFalse(item.id.isEmpty, "a pre-existing item without a persisted id should still get a usable one")
         XCTAssertEqual(item.modifiers, [], "items predating modifiers should default to none")
+        XCTAssertEqual(item.choiceGroups, [], "items predating choice groups should default to none")
     }
 
     func testDecodesModifiersWhenPresent() throws {
@@ -47,6 +48,31 @@ final class MenuTests: XCTestCase {
         let decoded = try JSONDecoder().decode(MenuItem.self, from: data)
         XCTAssertEqual(decoded.modifiers.map { $0.name }, ["Extra Tofu", "With Chicken"])
         XCTAssertEqual(decoded.modifiers.map { $0.priceDelta }, [3, 4])
+    }
+
+    func testDecodesChoiceGroupsWhenPresent() throws {
+        let json = """
+        {
+            "name": "Shogun Bento",
+            "price": 28,
+            "choiceGroups": [{ "id": "g1", "label": "Choice of Protein", "options": ["Chicken Teriyaki", "Beef Teriyaki"] }]
+        }
+        """
+        let item = try JSONDecoder().decode(MenuItem.self, from: Data(json.utf8))
+        XCTAssertEqual(item.choiceGroups.count, 1)
+        XCTAssertEqual(item.choiceGroups[0].label, "Choice of Protein")
+        XCTAssertEqual(item.choiceGroups[0].options, ["Chicken Teriyaki", "Beef Teriyaki"])
+    }
+
+    func testChoiceGroupsRoundTripEncodeDecode() throws {
+        let item = MenuItem(
+            name: "Shogun Bento", price: 28,
+            choiceGroups: [MenuItemChoiceGroup(label: "Choice of Protein", options: ["Chicken Teriyaki", "Beef Teriyaki"])]
+        )
+        let data = try JSONEncoder().encode(item)
+        let decoded = try JSONDecoder().decode(MenuItem.self, from: data)
+        XCTAssertEqual(decoded.choiceGroups.map { $0.label }, ["Choice of Protein"])
+        XCTAssertEqual(decoded.choiceGroups.map { $0.options }, [["Chicken Teriyaki", "Beef Teriyaki"]])
     }
 
     func testItemWithoutPersistedIdGetsAFreshOneEachDecode() throws {

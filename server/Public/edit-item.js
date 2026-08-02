@@ -28,6 +28,7 @@ const statusEl = document.getElementById('status');
 const panelEl = document.getElementById('editor-panel');
 let currentImages = [];
 let currentModifiers = [];
+let currentChoiceGroups = [];
 let additionsCatalog = [];
 
 async function loadAdditionsCatalog() {
@@ -119,6 +120,53 @@ function addModifier() {
   nameInput.value = '';
   priceInput.value = '';
   nameInput.focus();
+}
+
+function renderChoiceGroupsList() {
+  const el = document.getElementById('choice-groups-list');
+  if (!currentChoiceGroups.length) {
+    el.innerHTML = '<p class="hint">No required choices yet.</p>';
+    return;
+  }
+  el.innerHTML = `
+    <div class="data-table">
+      <table>
+        <thead><tr><th>Choice</th><th>Options</th><th></th></tr></thead>
+        <tbody>
+          ${currentChoiceGroups
+            .map(
+              (g, i) => `
+            <tr>
+              <td>${escapeAttrItem(g.label)}</td>
+              <td>${g.options.map(escapeAttrItem).join(', ')}</td>
+              <td><button type="button" class="secondary remove-choice-group-btn" data-index="${i}" style="padding: 0.35rem 0.7rem; font-size: 0.82rem;">Remove</button></td>
+            </tr>
+          `
+            )
+            .join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+  el.querySelectorAll('.remove-choice-group-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      currentChoiceGroups.splice(Number(btn.dataset.index), 1);
+      renderChoiceGroupsList();
+    });
+  });
+}
+
+function addChoiceGroup() {
+  const labelInput = document.getElementById('new-choice-group-label');
+  const optionsInput = document.getElementById('new-choice-group-options');
+  const label = labelInput.value.trim();
+  const options = optionsInput.value.split(',').map((s) => s.trim()).filter(Boolean);
+  if (!label || options.length < 2) return;
+  currentChoiceGroups.push({ id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`, label, options });
+  renderChoiceGroupsList();
+  labelInput.value = '';
+  optionsInput.value = '';
+  labelInput.focus();
 }
 
 function renderThumbGallery() {
@@ -270,6 +318,9 @@ async function loadItem() {
     currentModifiers = item.modifiers || [];
     renderModifiersList();
 
+    currentChoiceGroups = item.choiceGroups || [];
+    renderChoiceGroupsList();
+
     const tagsGrid = document.getElementById('item-tags-grid');
     tagsGrid.innerHTML = TAGS.map(
       (t) => `
@@ -304,6 +355,7 @@ async function saveItem() {
     available: !document.getElementById('item-sold-out-input').checked,
     happyHour: document.getElementById('item-happy-hour-input').checked,
     modifiers: currentModifiers,
+    choiceGroups: currentChoiceGroups,
   };
 
   document.getElementById('save-btn').disabled = true;
@@ -339,6 +391,7 @@ async function deleteItem() {
 }
 
 document.getElementById('add-modifier-btn').addEventListener('click', addModifier);
+document.getElementById('add-choice-group-btn').addEventListener('click', addChoiceGroup);
 document.getElementById('item-image-input').addEventListener('change', uploadItemImage);
 document.getElementById('photo-google-btn').addEventListener('click', openGooglePhotoPicker);
 document.getElementById('save-btn').addEventListener('click', saveItem);

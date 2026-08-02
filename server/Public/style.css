@@ -1793,6 +1793,47 @@ select {
   cursor: pointer;
 }
 
+.item-choice-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+.item-choice-group {
+  padding: 0.5rem 0.6rem;
+  border-radius: 10px;
+  background: #f9f5f7;
+}
+
+.item-choice-group-label {
+  margin: 0 0 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-family: var(--font-ui);
+  color: var(--ink-soft);
+}
+
+.item-choice-option {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-family: var(--font-ui);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.item-choice-group-error {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  color: #b91c1c;
+}
+
+.item-choice-group-error[hidden] {
+  display: none;
+}
+
 .special-badge {
   display: inline-block;
   font-size: 0.7rem;

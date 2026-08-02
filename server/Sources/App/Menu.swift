@@ -16,6 +16,23 @@ struct MenuItemModifier: Codable, Content, Equatable {
     }
 }
 
+/// A required, mutually-exclusive choice bundled into one dish — e.g. Shogun
+/// Bento's "your choice of chicken or beef teriyaki," or a burger's choice
+/// of fries or side salad. Unlike a modifier (an optional priced add-on), a
+/// customer must pick exactly one option and none of them change the price
+/// — the dish is priced as a whole either way.
+struct MenuItemChoiceGroup: Codable, Content, Equatable {
+    var id: String
+    var label: String
+    var options: [String]
+
+    init(id: String = UUID().uuidString, label: String, options: [String] = []) {
+        self.id = id
+        self.label = label
+        self.options = options
+    }
+}
+
 struct MenuItem: Codable, Content {
     var id: String
     var name: String
@@ -31,9 +48,12 @@ struct MenuItem: Codable, Content {
     /// Optional add-ons/upgrades a customer can check when placing a table
     /// order (see TableOrders.swift) — empty for the vast majority of items.
     var modifiers: [MenuItemModifier]
+    /// Required single-pick choices bundled into this dish (e.g. a bento's
+    /// choice of protein) — empty for the vast majority of items.
+    var choiceGroups: [MenuItemChoiceGroup]
 
     enum CodingKeys: String, CodingKey {
-        case id, name, description, price, images, image, tags, featured, available, happyHour, modifiers
+        case id, name, description, price, images, image, tags, featured, available, happyHour, modifiers, choiceGroups
     }
 
     init(
@@ -46,7 +66,8 @@ struct MenuItem: Codable, Content {
         featured: Bool = false,
         available: Bool = true,
         happyHour: Bool = false,
-        modifiers: [MenuItemModifier] = []
+        modifiers: [MenuItemModifier] = [],
+        choiceGroups: [MenuItemChoiceGroup] = []
     ) {
         self.id = id
         self.name = name
@@ -58,6 +79,7 @@ struct MenuItem: Codable, Content {
         self.available = available
         self.happyHour = happyHour
         self.modifiers = modifiers
+        self.choiceGroups = choiceGroups
     }
 
     init(from decoder: Decoder) throws {
@@ -81,6 +103,7 @@ struct MenuItem: Codable, Content {
         available = try container.decodeIfPresent(Bool.self, forKey: .available) ?? true
         happyHour = try container.decodeIfPresent(Bool.self, forKey: .happyHour) ?? false
         modifiers = try container.decodeIfPresent([MenuItemModifier].self, forKey: .modifiers) ?? []
+        choiceGroups = try container.decodeIfPresent([MenuItemChoiceGroup].self, forKey: .choiceGroups) ?? []
     }
 
     func encode(to encoder: Encoder) throws {
@@ -95,6 +118,7 @@ struct MenuItem: Codable, Content {
         try container.encode(available, forKey: .available)
         try container.encode(happyHour, forKey: .happyHour)
         try container.encode(modifiers, forKey: .modifiers)
+        try container.encode(choiceGroups, forKey: .choiceGroups)
     }
 }
 
