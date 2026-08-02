@@ -495,20 +495,29 @@ func routes(_ app: Application) throws {
         let base = PublicBaseURL.get()
         let encodedTable = tableId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? tableId
         let link = try await SquareCheckout.createPaymentLink(
-            client: req.client, accessToken: accessToken, locationId: locationId, orderId: order.id, tableId: tableId,
-            items: orderItems, redirectURL: "\(base)/shop?table=\(encodedTable)&checkout=success"
+            client: req.client, accessToken: accessToken, locationId: locationId, orderId: order.id,
+            items: orderItems.map { SquareCheckout.LineItemInput(name: $0.name, quantity: $0.quantity, priceCents: Int(($0.price * 100).rounded())) },
+            metadata: ["tableId": tableId],
+            redirectURL: "\(base)/shop?table=\(encodedTable)&checkout=success"
         )
         try SwagOrdersStore.shared.attachSquareOrderId(orderId: order.id, squareOrderId: link.squareOrderId)
         return SwagCheckoutResponse(checkoutURL: link.url)
     }
 
     // Square calls this once a payment actually completes — this is the
-    // only place a SwagOrder gets marked "paid," never the client redirect
-    // (a customer can land on the success URL without actually having
-    // paid, e.g. by hitting back). Verifies the raw body against Square's
-    // signature so this can't be spoofed by a random POST. The notification
-    // URL used for the signature must exactly match what's configured for
-    // this webhook subscription in the Square Developer Dashboard.
+    // only place a SwagOrder/GiftCardOrder gets marked "paid," never the
+    // client redirect (a customer can land on the success URL without
+    // actually having paid, e.g. by hitting back). Verifies the raw body
+    // against Square's signature so this can't be spoofed by a random POST.
+    // The notification URL used for the signature must exactly match what's
+    // configured for this webhook subscription in the Square Developer
+    // Dashboard. Despite the "swag" in the path, this single subscription
+    // now services both Swag and Gift Card payments — Square only lets you
+    // subscribe a given event type once per notification URL, and both
+    // features fire the same payment.updated event, so splitting them into
+    // two endpoints would just mean two webhook subscriptions to keep in
+    // sync instead of one. The order id is checked against both stores;
+    // whichever one actually has it wins.
     app.on(.POST, "api", "swag", "square-webhook", body: .collect(maxSize: "1mb")) { req async throws -> HTTPStatus in
         guard let signatureKey = Environment.get("SQUARE_WEBHOOK_SIGNATURE_KEY") else {
             throw Abort(.serviceUnavailable)
@@ -527,7 +536,8 @@ func routes(_ app: Application) throws {
         let event = try JSONDecoder().decode(SquareWebhookEvent.self, from: Data(payload.utf8))
         if event.type == "payment.updated", let payment = event.data.object.payment,
            payment.status == "COMPLETED", let squareOrderId = payment.order_id {
-            try SwagOrdersStore.shared.markPaid(squareOrderId: squareOrderId)
+            try SwagOrdersStore.shared.markPaidIfPresent(squareOrderId: squareOrderId)
+            try GiftCardOrdersStore.shared.markPaidIfPresent(squareOrderId: squareOrderId)
         }
         return .ok
     }
@@ -541,6 +551,63 @@ func routes(_ app: Application) throws {
         try requireLogin(req)
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
         return try SwagOrdersStore.shared.markDelivered(id: id)
+    }
+
+    // MARK: - Gift Cards
+
+    // Ohana already sells physical gift cards in person — this doesn't call
+    // Square's Gift Card API to create/activate one, it just collects
+    // payment online. Deliberately not tied to a table (unlike swag): most
+    // gift cards are bought as a gift, not while dining in, so staff follow
+    // up directly with the buyer using the contact info collected here.
+    // Shares SQUARE_ACCESS_TOKEN/SQUARE_LOCATION_ID with swag checkout, so
+    // reuses the same GET /api/swag/checkout-status the Shop page already
+    // checks — it's really just "is Square configured," not swag-specific.
+    app.post("api", "gift-cards", "checkout") { req async throws -> GiftCardCheckoutResponse in
+        guard let accessToken = Environment.get("SQUARE_ACCESS_TOKEN"), !accessToken.isEmpty,
+              let locationId = Environment.get("SQUARE_LOCATION_ID"), !locationId.isEmpty else {
+            throw SwagError.checkoutNotConfigured
+        }
+        let body = try req.content.decode(GiftCardCheckoutRequest.self)
+        let buyerName = body.buyerName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let buyerEmail = body.buyerEmail.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !buyerName.isEmpty, !buyerEmail.isEmpty else {
+            throw Abort(.badRequest, reason: "Your name and email are required.")
+        }
+        guard (giftCardMinAmount...giftCardMaxAmount).contains(body.amount) else {
+            throw GiftCardError.invalidAmount
+        }
+        let trimmedRecipientName = body.recipientName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let recipientName = (trimmedRecipientName?.isEmpty ?? true) ? nil : trimmedRecipientName
+        let trimmedNote = body.note?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let note = (trimmedNote?.isEmpty ?? true) ? nil : trimmedNote
+
+        let customerId = try? currentCustomer(req)?.id
+        let order = try GiftCardOrdersStore.shared.createPendingOrder(
+            amount: body.amount, buyerName: buyerName, buyerEmail: buyerEmail,
+            recipientName: recipientName, note: note, customerId: customerId
+        )
+
+        let base = PublicBaseURL.get()
+        let link = try await SquareCheckout.createPaymentLink(
+            client: req.client, accessToken: accessToken, locationId: locationId, orderId: order.id,
+            items: [SquareCheckout.LineItemInput(name: "Ohana Belltown Gift Card", quantity: 1, priceCents: Int((body.amount * 100).rounded()))],
+            metadata: ["buyerEmail": buyerEmail],
+            redirectURL: "\(base)/gift-cards?checkout=success"
+        )
+        try GiftCardOrdersStore.shared.attachSquareOrderId(orderId: order.id, squareOrderId: link.squareOrderId)
+        return GiftCardCheckoutResponse(checkoutURL: link.url)
+    }
+
+    app.get("api", "gift-cards", "orders") { req throws -> [GiftCardOrder] in
+        try requireLogin(req)
+        return try GiftCardOrdersStore.shared.all()
+    }
+
+    app.post("api", "gift-cards", "orders", ":id", "fulfill") { req throws -> GiftCardOrder in
+        try requireLogin(req)
+        guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
+        return try GiftCardOrdersStore.shared.markFulfilled(id: id)
     }
 
     app.post("api", "loyalty", "lookup") { req throws -> LoyaltyStatus in
@@ -754,6 +821,7 @@ func routes(_ app: Application) throws {
         ("waitlist", "pages/waitlist.html"),
         ("faq", "pages/faq.html"),
         ("shop", "pages/shop.html"),
+        ("gift-cards", "pages/gift-cards.html"),
     ]
     for (route, file) in cleanPages {
         app.get(PathComponent(stringLiteral: route)) { req in
@@ -777,6 +845,7 @@ func routes(_ app: Application) throws {
         ("competitor-pricing-admin.html", "staff/competitor-pricing-admin.html", true),
         ("competitor-pricing-findings.html", "staff/competitor-pricing-findings.html", true),
         ("swag-admin.html", "staff/swag-admin.html", false),
+        ("gift-cards-admin.html", "staff/gift-cards-admin.html", false),
     ]
     for (route, file, adminOnly) in staffPages {
         app.get(PathComponent(stringLiteral: route)) { req in

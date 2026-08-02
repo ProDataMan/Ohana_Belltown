@@ -3,15 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Photo Gallery | Ohana Belltown</title>
-    <meta name="description" content="Photos of Ohana Belltown's food, drinks, and atmosphere in Seattle." />
+    <title>Gift Cards | Ohana Belltown</title>
+    <meta name="description" content="Buy an Ohana Belltown gift card online, any amount from $5 to $500." />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Ohana Belltown" />
-    <meta property="og:title" content="Photo Gallery | Ohana Belltown" />
-    <meta property="og:description" content="Photos of Ohana Belltown's food, drinks, and atmosphere in Seattle." />
-    <meta property="og:url" content="https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/gallery" />
+    <meta property="og:title" content="Gift Cards | Ohana Belltown" />
+    <meta property="og:description" content="Buy an Ohana Belltown gift card online, any amount from $5 to $500." />
+    <meta property="og:url" content="https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/gift-cards" />
     <meta property="og:image" content="https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/images/hero-aloha.jpg" />
-    <link rel="canonical" href="https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/gallery" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Gift Cards | Ohana Belltown" />
+    <meta name="twitter:description" content="Buy an Ohana Belltown gift card online, any amount from $5 to $500." />
+    <link rel="canonical" href="https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/gift-cards" />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
@@ -43,11 +46,12 @@
           </div>
           <a href="/local">Local</a>
           <a href="/about">About</a>
-          <a href="/gallery" class="active">Gallery</a>
+          <a href="/gallery">Gallery</a>
+          <a href="/catering">Catering</a>
           <a href="/contact">Contact</a>
           <a href="/rewards">Rewards</a>
           <a href="/shop">Shop</a>
-          <a href="/gift-cards">Gift Cards</a>
+          <a href="/gift-cards" class="active">Gift Cards</a>
           <a href="/account-login" id="nav-login-link">Log In</a>
           <a class="nav-order-btn" href="https://ordering.chownow.com/order/24080/locations?add_cn_ordering_class=true" target="_blank" rel="noopener">Order Online</a>
         </nav>
@@ -57,17 +61,46 @@
     <section class="hero-banner" style="background-image: url('/images/hero-aloha.jpg');">
       <div class="hero-banner-inner">
         <p class="eyebrow">Ohana Belltown</p>
-        <h1>Photo Gallery</h1>
-        <p>Food, drinks, and the tiki bar itself &mdash; some from us, some from guests on Google.</p>
+        <h1>Gift Cards</h1>
       </div>
     </section>
 
-    <section class="content-section">
-      <div class="panel">
-        <div id="gallery-status" class="hint">Loading photos...</div>
-        <div id="gallery-grid" class="gallery-grid"></div>
-      </div>
-    </section>
+    <main class="page">
+      <p id="gc-checkout-banner" class="status" hidden></p>
+
+      <section class="panel" id="gc-form-panel">
+        <h2>Give the gift of Ohana</h2>
+        <p class="hint">Pick an amount, pay online, and we'll take care of the rest &mdash; a staff member will follow up using the contact info below to get the physical card to you (or the person you're sending it to).</p>
+
+        <form id="gc-form">
+          <div class="amount-picker" id="gc-amount-picker">
+            <button type="button" class="amount-btn" data-amount="25">$25</button>
+            <button type="button" class="amount-btn" data-amount="50">$50</button>
+            <button type="button" class="amount-btn" data-amount="100">$100</button>
+            <button type="button" class="amount-btn" data-amount="custom">Other</button>
+          </div>
+          <div id="gc-custom-amount-wrap" class="cta-row" hidden>
+            <input type="number" id="gc-custom-amount-input" min="5" max="500" step="1" placeholder="Amount ($5&ndash;$500)" />
+          </div>
+
+          <label>Your name
+            <input type="text" id="gc-buyer-name-input" required />
+          </label>
+          <label>Your email
+            <input type="email" id="gc-buyer-email-input" required />
+          </label>
+          <label>Who's it for? <span class="hint">(optional &mdash; leave blank if it's for you)</span>
+            <input type="text" id="gc-recipient-input" placeholder="Recipient's name" />
+          </label>
+          <label>Note <span class="hint">(optional)</span>
+            <textarea id="gc-note-input" rows="2" placeholder="Anything we should know &mdash; delivery instructions, a message to include, etc."></textarea>
+          </label>
+
+          <button type="submit" id="gc-submit-btn" style="margin-top: 1rem;">Continue to Payment</button>
+          <p id="gc-form-status" class="status"></p>
+        </form>
+      </section>
+    </main>
 
     <footer class="site-footer">
       <div class="site-footer-inner">
@@ -92,7 +125,6 @@
       <p class="footer-copyright">&copy; 2026 Ohana Belltown. All rights reserved. &middot; <a href="/faq">FAQ</a> &middot; <a href="/privacy">Privacy Policy</a> &middot; <a href="/terms">Terms of Service</a></p>
     </footer>
     <script src="/nav.js"></script>
-    <script src="/lightbox.js"></script>
-    <script src="/gallery.js"></script>
+    <script src="/gift-cards.js"></script>
   </body>
 </html>

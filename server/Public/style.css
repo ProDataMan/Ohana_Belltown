@@ -1880,6 +1880,32 @@ select {
   font-variant-numeric: tabular-nums;
 }
 
+/* ---- Gift card amount picker ---- */
+
+.amount-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.amount-btn {
+  background: #ffffff;
+  color: var(--pink-text);
+  border: 1px solid var(--pink);
+  border-radius: 999px;
+  padding: 0.6rem 1.4rem;
+  font-weight: 700;
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+
+.amount-btn.selected {
+  background: var(--gradient-brand);
+  color: #fff;
+  border-color: transparent;
+}
+
 .sold-out-badge {
   display: inline-block;
   font-size: 0.7rem;

@@ -93,13 +93,16 @@ final class SwagOrdersStore: @unchecked Sendable {
     /// once, and re-marking an already-paid order shouldn't stomp paidAt.
     /// Matched by squareOrderId (captured at payment-link creation time),
     /// not our own order id, since that's all the payment.updated webhook
-    /// payload actually gives us.
+    /// payload actually gives us. Returns nil (rather than throwing) when no
+    /// swag order matches — the shared Square webhook also checks
+    /// GiftCardOrdersStore for the same squareOrderId, so "not found here"
+    /// is an expected, non-error outcome.
     @discardableResult
-    func markPaid(squareOrderId: String) throws -> SwagOrder {
+    func markPaidIfPresent(squareOrderId: String) throws -> SwagOrder? {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
-        guard let index = orders.firstIndex(where: { $0.squareOrderId == squareOrderId }) else { throw SwagError.orderNotFound }
+        guard let index = orders.firstIndex(where: { $0.squareOrderId == squareOrderId }) else { return nil }
         if orders[index].status == "pendingPayment" {
             orders[index].status = "paid"
             orders[index].paidAt = Self.iso.string(from: Date())

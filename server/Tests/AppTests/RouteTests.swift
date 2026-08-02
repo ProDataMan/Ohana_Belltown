@@ -29,6 +29,7 @@ final class RouteTests: XCTestCase {
         CompetitorPricingStore.shared.configure(dataDirectory: tempDir.path)
         SwagStore.shared.configure(dataDirectory: tempDir.path)
         SwagOrdersStore.shared.configure(dataDirectory: tempDir.path)
+        GiftCardOrdersStore.shared.configure(dataDirectory: tempDir.path)
     }
 
     override func tearDown() async throws {
@@ -1085,6 +1086,23 @@ final class RouteTests: XCTestCase {
         // No SQUARE_WEBHOOK_SIGNATURE_KEY in the test environment.
         try app.test(.POST, "api/swag/square-webhook", body: ByteBuffer(string: "{}")) { res in
             XCTAssertEqual(res.status, .serviceUnavailable)
+        }
+    }
+
+    func testGiftCardCheckoutRequiresSquareConfigAndValidatesInput() throws {
+        // No SQUARE_ACCESS_TOKEN/SQUARE_LOCATION_ID in the test environment.
+        let validBody = ByteBuffer(string: #"{"amount":50,"buyerName":"Kai","buyerEmail":"kai@example.com"}"#)
+        try app.test(.POST, "api/gift-cards/checkout", headers: ["Content-Type": "application/json"], body: validBody) { res in
+            XCTAssertEqual(res.status, .serviceUnavailable, "checkout should refuse to start without configured Square credentials")
+        }
+    }
+
+    func testGiftCardOrdersRequireLogin() throws {
+        try app.test(.GET, "api/gift-cards/orders") { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+        try app.test(.POST, "api/gift-cards/orders/does-not-exist/fulfill") { res in
+            XCTAssertEqual(res.status, .unauthorized)
         }
     }
 }

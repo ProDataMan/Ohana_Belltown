@@ -100,22 +100,31 @@ enum SquareCheckout {
         let errors: [SquareError]?
     }
 
+    /// One line on a Square order — deliberately generic (not tied to
+    /// SwagOrderItem) so both swag carts and single-item gift card
+    /// purchases can share this one helper.
+    struct LineItemInput {
+        var name: String
+        var quantity: Int
+        var priceCents: Int
+    }
+
     static func createPaymentLink(
-        client: Client, accessToken: String, locationId: String, orderId: String, tableId: String,
-        items: [SwagOrderItem], redirectURL: String
+        client: Client, accessToken: String, locationId: String, orderId: String,
+        items: [LineItemInput], metadata: [String: String], redirectURL: String
     ) async throws -> (paymentLinkId: String, squareOrderId: String, url: String) {
         let lineItems = items.map { item in
             LineItem(
                 name: item.name,
                 quantity: String(item.quantity),
-                base_price_money: PriceMoney(amount: Int((item.price * 100).rounded()), currency: "USD")
+                base_price_money: PriceMoney(amount: item.priceCents, currency: "USD")
             )
         }
         let body = CreatePaymentLinkRequest(
             idempotency_key: UUID().uuidString,
             order: OrderPayload(
                 location_id: locationId, line_items: lineItems,
-                metadata: ["orderId": orderId, "tableId": tableId]
+                metadata: metadata.merging(["orderId": orderId]) { current, _ in current }
             ),
             checkout_options: CheckoutOptions(redirect_url: redirectURL)
         )

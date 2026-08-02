@@ -27,6 +27,7 @@ func configure(_ app: Application) throws {
     CompetitorPricingStore.shared.configure(dataDirectory: dataDirectory)
     SwagStore.shared.configure(dataDirectory: dataDirectory)
     SwagOrdersStore.shared.configure(dataDirectory: dataDirectory)
+    GiftCardOrdersStore.shared.configure(dataDirectory: dataDirectory)
 
     app.routes.defaultMaxBodySize = "10mb"
 
