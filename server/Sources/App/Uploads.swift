@@ -8,6 +8,15 @@ struct UploadResponse: Content {
     var url: String
 }
 
+struct UploadInfo: Content {
+    var filename: String
+    var sizeBytes: Int
+    var width: Int?
+    var height: Int?
+    var uploadedAt: String?
+    var uploadedByName: String?
+}
+
 enum Uploads {
     static var directory = "Data/uploads/"
 

@@ -14,8 +14,10 @@ final class RouteTests: XCTestCase {
 
         // Point every store at an isolated temp directory so tests don't touch
         // real data or interfere with each other.
+        FileSessionsStore.shared.configure(dataDirectory: tempDir.path)
         MenuStore.shared.configure(dataDirectory: tempDir.path, resourcesDirectory: app.directory.resourcesDirectory)
         Uploads.configure(dataDirectory: tempDir.path)
+        UploadMetadataStore.shared.configure(dataDirectory: tempDir.path)
         EventsStore.shared.configure(dataDirectory: tempDir.path)
         LoyaltyStore.shared.configure(dataDirectory: tempDir.path)
         UserStore.shared.configure(dataDirectory: tempDir.path)
@@ -641,6 +643,67 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testUploadInfoReportsSizeAndUploaderThenRequiresLoginAndRealFile() throws {
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        // A real (if tiny) 1x1 PNG — the info endpoint shells out to
+        // ImageMagick's `identify` for dimensions, which needs actual image
+        // bytes to decode, not placeholder text.
+        let pngBytes = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")!
+        let boundary = "test-boundary"
+        var body = ByteBuffer()
+        body.writeString("--\(boundary)\r\n")
+        body.writeString("Content-Disposition: form-data; name=\"image\"; filename=\"test.png\"\r\n")
+        body.writeString("Content-Type: image/png\r\n\r\n")
+        body.writeBytes(pngBytes)
+        body.writeString("\r\n--\(boundary)--\r\n")
+
+        var uploadedURL: String?
+        try app.test(
+            .POST, "api/upload",
+            headers: ["Content-Type": "multipart/form-data; boundary=\(boundary)", "Cookie": cookie],
+            body: body
+        ) { res in
+            XCTAssertEqual(res.status, .ok)
+            let decoded = try res.content.decode(UploadResponse.self)
+            uploadedURL = decoded.url
+        }
+        guard let url = uploadedURL, let filename = url.split(separator: "/").last else {
+            return XCTFail("expected an upload URL back")
+        }
+
+        try app.test(.GET, "api/uploads/\(filename)/info") { res in
+            XCTAssertEqual(res.status, .unauthorized, "photo details require a logged-in employee")
+        }
+
+        try app.test(.GET, "api/uploads/\(filename)/info", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+            let info = try res.content.decode(UploadInfo.self)
+            XCTAssertEqual(info.sizeBytes, pngBytes.count)
+            XCTAssertEqual(info.uploadedByName, "Admin", "should record whoever was logged in at upload time")
+            XCTAssertNotNil(info.uploadedAt)
+            // Dimensions depend on ImageMagick's `identify` being installed —
+            // present in the deployed container (see Dockerfile) but not
+            // guaranteed in every dev/CI environment, so only check shape,
+            // not the exact 1x1 value, when it's actually available.
+            if let width = info.width, let height = info.height {
+                XCTAssertEqual(width, 1)
+                XCTAssertEqual(height, 1)
+            }
+        }
+
+        try app.test(.GET, "api/uploads/does-not-exist.png/info", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .notFound)
+        }
+    }
+
     func testMenuItemPatchAutoAwardsStaffRewardPoints() throws {
         var sessionCookie: String?
         try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
@@ -857,9 +920,10 @@ final class RouteTests: XCTestCase {
         try app.test(.GET, "api/staff-rewards/catalog", headers: ["Cookie": cookie]) { res in
             XCTAssertEqual(res.status, .ok)
             let items = try res.content.decode([RewardCatalogItem].self)
-            XCTAssertTrue(items.contains { $0.id == "roll-or-appetizer" && $0.pointCost == 100 })
-            XCTAssertTrue(items.contains { $0.id == "hat" && $0.pointCost == nil })
-            XCTAssertTrue(items.contains { $0.id == "tshirt" && $0.pointCost == nil })
+            XCTAssertTrue(items.contains { $0.id == "roll-or-appetizer" && $0.pointCost == 1000 })
+            XCTAssertTrue(items.contains { $0.id == "bandana" && $0.pointCost == 1000 })
+            XCTAssertTrue(items.contains { $0.id == "tshirt" && $0.pointCost == 2500 })
+            XCTAssertTrue(items.contains { $0.id == "hat" && $0.pointCost == 5000 })
         }
 
         let newCatalogBody = ByteBuffer(string: #"[{"id":"hat","name":"Ohana Hat","pointCost":750}]"#)

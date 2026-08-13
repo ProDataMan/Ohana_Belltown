@@ -199,6 +199,11 @@ func routes(_ app: Application) throws {
         ) else {
             throw Abort(.badRequest)
         }
+        // Shared by staff menu-photo uploads and anonymous customer
+        // loyalty-bonus-claim photos — record whoever's actually logged in,
+        // nil for a guest, rather than requiring login on a route customers
+        // also use.
+        let uploaderName = (try? currentUser(req)).flatMap { $0 }?.displayName
 
         // iPhones default to saving photos as HEIC, which no major browser
         // can render — convert to JPEG rather than save+link a file that
@@ -214,6 +219,7 @@ func routes(_ app: Application) throws {
             guard converted else {
                 throw Abort(.unprocessableEntity, reason: "This photo couldn't be converted — try a JPEG or PNG instead.")
             }
+            UploadMetadataStore.shared.record(filename: jpegFilename, uploadedByName: uploaderName)
             return UploadResponse(url: "/uploads/\(jpegFilename)")
         }
 
@@ -223,6 +229,7 @@ func routes(_ app: Application) throws {
         if ImageOptimizer.optimizableExtensions.contains(ext) {
             try await ImageOptimizer.optimize(at: path, on: req.application)
         }
+        UploadMetadataStore.shared.record(filename: filename, uploadedByName: uploaderName)
         return UploadResponse(url: "/uploads/\(filename)")
     }
 
@@ -231,6 +238,33 @@ func routes(_ app: Application) throws {
             throw Abort(.badRequest)
         }
         return try await req.fileio.asyncStreamFile(at: Uploads.directory + filename)
+    }
+
+    // Backs the click-to-preview detail panel on the menu photo editors
+    // (edit.html / edit-item.html) — resolution and file size are read live
+    // off the file itself (no need to store them), date/uploader come from
+    // UploadMetadataStore and are simply absent for anything uploaded before
+    // that store existed.
+    app.get("api", "uploads", ":filename", "info") { req async throws -> UploadInfo in
+        try requireLogin(req)
+        guard let filename = req.parameters.get("filename"), !filename.contains("..") else {
+            throw Abort(.badRequest)
+        }
+        let path = Uploads.directory + filename
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: path) else {
+            throw Abort(.notFound)
+        }
+        let sizeBytes = (attributes[.size] as? Int) ?? 0
+        let dimensions = try await ImageOptimizer.dimensions(at: path, on: req.application)
+        let metadata = UploadMetadataStore.shared.entry(for: filename)
+        return UploadInfo(
+            filename: filename,
+            sizeBytes: sizeBytes,
+            width: dimensions?.width,
+            height: dimensions?.height,
+            uploadedAt: metadata?.uploadedAt,
+            uploadedByName: metadata?.uploadedByName
+        )
     }
 
     app.on(.DELETE, "api", "uploads", ":filename") { req throws -> HTTPStatus in

@@ -77,4 +77,35 @@ enum ImageOptimizer {
             convertHEICToJPEGSynchronously(sourcePath: sourcePath, outputPath: outputPath)
         }
     }
+
+    /// Pixel dimensions via ImageMagick's `identify` (ships alongside
+    /// `convert` in the same apt package, see Dockerfile) rather than
+    /// decoding the image ourselves — nothing else in this codebase parses
+    /// image formats directly, and shelling out matches how HEIC conversion
+    /// and resizing already work.
+    static func dimensionsSynchronously(at path: String) -> (width: Int, height: Int)? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/identify")
+        process.arguments = ["-format", "%w %h", path]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            let output = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0, let text = String(data: output, encoding: .utf8) else { return nil }
+            let parts = text.split(separator: " ")
+            guard parts.count >= 2, let width = Int(parts[0]), let height = Int(parts[1]) else { return nil }
+            return (width, height)
+        } catch {
+            return nil
+        }
+    }
+
+    static func dimensions(at path: String, on app: Application) async throws -> (width: Int, height: Int)? {
+        try await app.threadPool.runIfActive {
+            dimensionsSynchronously(at: path)
+        }
+    }
 }

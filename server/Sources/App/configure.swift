@@ -4,15 +4,27 @@ func configure(_ app: Application) throws {
     app.http.server.configuration.hostname = "0.0.0.0"
     app.http.server.configuration.port = Environment.get("PORT").flatMap(Int.init) ?? 8080
 
+    let dataDirectory = Environment.get("DATA_DIR") ?? app.directory.workingDirectory + "Data"
+
     app.middleware.use(NoCacheMiddleware())
     app.middleware.use(AnalyticsMiddleware())
-    app.sessions.use(.memory)
+    // File-backed rather than `.memory`, so logins survive a deploy/restart —
+    // stored on the same DATA_DIR volume every other store already persists
+    // to. See FileSessions.swift.
+    FileSessionsStore.shared.configure(dataDirectory: dataDirectory)
+    app.sessions.use { _ in FileSessions() }
     app.middleware.use(app.sessions.middleware)
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory, defaultFile: "index.html"))
+    if app.environment != .testing {
+        let oneDay: TimeInterval = 24 * 60 * 60
+        app.eventLoopGroup.next().scheduleRepeatedTask(initialDelay: .minutes(5), delay: .hours(24)) { _ in
+            FileSessionsStore.shared.pruneExpired(olderThan: 30 * oneDay)
+        }
+    }
 
-    let dataDirectory = Environment.get("DATA_DIR") ?? app.directory.workingDirectory + "Data"
     MenuStore.shared.configure(dataDirectory: dataDirectory, resourcesDirectory: app.directory.resourcesDirectory)
     Uploads.configure(dataDirectory: dataDirectory)
+    UploadMetadataStore.shared.configure(dataDirectory: dataDirectory)
     PlacesPhotoCache.shared.configure(dataDirectory: dataDirectory)
     EventsStore.shared.configure(dataDirectory: dataDirectory)
     LoyaltyStore.shared.configure(dataDirectory: dataDirectory)

@@ -184,6 +184,9 @@ function renderThumbGallery(row) {
     )
     .join('');
 
+  gallery.querySelectorAll('.item-thumb').forEach((thumb) => {
+    thumb.addEventListener('click', () => window.openPhotoDetail(thumb.src));
+  });
   gallery.querySelectorAll('.thumb-feature-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const idx = Number(btn.dataset.index);
