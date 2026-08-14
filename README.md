@@ -75,6 +75,8 @@ now historical background rather than the current plan.
 | `SQUARE_LOCATION_ID` | Which Square location Shop/Gift Card sales post to. **Set** (2026-08-02, sandbox test location) — find your real location's ID under Account & Settings → Business → Locations, or via Square's `GET /v2/locations` API. |
 | `SQUARE_WEBHOOK_SIGNATURE_KEY` | Server-side only — verifies that `POST /api/swag/square-webhook` calls genuinely came from Square before marking a Shop/Gift Card order paid. **Set** (2026-08-02, sandbox webhook subscription) — created via a webhook subscription in the Square Developer Dashboard pointed at `<PUBLIC_BASE_URL>/api/swag/square-webhook`, subscribed to `payment.updated`. |
 | `SQUARE_ENVIRONMENT` | **Set to `sandbox`** (2026-08-02) — requests go to `connect.squareupsandbox.com`, fake test cards only. Unset (or set to anything else) to hit production (`connect.squareup.com`) once the token above is swapped too. |
+| `RESEND_API_KEY` | Server-side only — powers real delivery of customer email-verification and password-reset emails via [Resend](https://resend.com)'s REST API (`server/Sources/App/EmailSender.swift`). **Not set yet.** Until it is, emails are only logged server-side (`ConsoleEmailSender`) — see the email caveat below. Get a key at resend.com; the fast path (no domain verification) works immediately with the default `RESEND_FROM_ADDRESS`. |
+| `RESEND_FROM_ADDRESS` | The `From:` address on outgoing email. Defaults to Resend's own `onboarding@resend.dev`, which works without verifying `ohanasushigrill.com`'s DNS. Set to a real `@ohanasushigrill.com` address once that domain is verified with Resend (needs DNS moved to a host that exposes TXT records — see "Suggestions for future development" below). |
 
 `STAFF_PIN` is no longer used — it was retired in favor of real per-user login (see below) and can be removed from the Container App if still set.
 
@@ -293,8 +295,8 @@ actually shipped as of this README. Not in priority order.
 **Known deliberate tradeoffs (not bugs)**
 - **AI menu-photo extraction is built but not live yet.** Needs `ANTHROPIC_API_KEY` (see the env table above) — a separate credential/billing setup from any claude.ai chat subscription, not yet configured. Until then, the "Extract Items" button on Competitor Pricing simply doesn't appear (checked via `GET /api/competitor-pricing/ai-extraction-status`), same pattern as Apple/Facebook Sign-In staying hidden until their credentials exist.
 - **Shop and Gift Card checkout are configured against Square's SANDBOX, not production yet** — see [Payment Processing](#payment-processing-square) below for the full picture and exactly what's needed to go live.
-- **No real email delivery yet.** `EmailSenderFactory` (`server/Sources/App/EmailSender.swift`) currently returns a placeholder that logs the email server-side instead of sending it — so customer email verification and password-reset links don't reach anyone's inbox right now. Swapping in a real provider (Resend, SendGrid, etc. — still deciding, was going to be GoDaddy but that isn't a transactional-email API provider in the usual sense) is a single-file change once an API key is available. Until then, self-service password reset for customers is not actually functional end-to-end.
-- Sessions use Vapor's in-memory driver — a deploy or restart logs everyone out. Fine for a ~9-person staff team and low-stakes customer accounts; would need a persistent session store (e.g. file- or Redis-backed) to survive restarts.
+- **No real email delivery yet.** `EmailSenderFactory` (`server/Sources/App/EmailSender.swift`) now has a real `ResendEmailSender` implementation (Resend's REST API, no SDK dependency) wired in and ready — it's just inactive until `RESEND_API_KEY` is set (see the env table above), same "built but hidden/inactive until configured" pattern as Square/Apple/Facebook. Until then, `ConsoleEmailSender` still logs the email server-side instead of sending it, so customer email verification and password-reset links don't reach anyone's inbox. Verification/reset links are now absolute (`PublicBaseURL.get()` + path) so they'll actually work once emailed, rather than the bare relative paths that only made sense read off the server console.
+- Sessions are now file-backed (`FileSessions`/`FileSessionsStore` in `server/Sources/App/FileSessions.swift`), persisted as one JSON file per session under `<DATA_DIR>/sessions/` — the same Azure Files–backed volume every other store uses — so a deploy or restart no longer logs everyone out. Stale session files (untouched 30+ days) are pruned daily. Replaces the prior in-memory driver, which lost every session on restart.
 - Every new/reset staff account gets a caller-chosen temporary password and must change it on next login — there's no forced password-strength policy beyond that.
 - Bonus punch claims (photo/social shares) are staff-reviewed, not auto-verified — there's no reliable API to check a social tag automatically.
 - Google Places photos are capped at 10 per API call (a hard Google limit, not a bug) and matched to menu items manually.
@@ -432,22 +434,21 @@ session's effort would likely pay off most. Written 2026-08-02.
    and Gift Cards are fully built and tested, just sitting behind a sandbox
    flag. See [Payment Processing](#payment-processing-square) above for the
    exact two-step swap. Nothing else blocks this.
-2. **Pick an email provider and wire it in** — self-service password reset
-   and email verification are dead ends right now (the link just gets logged
-   server-side, never delivered). Resend is recommended (generous free tier,
-   simple REST API). Two paths, don't let one block the other:
+2. **Set `RESEND_API_KEY`.** ~~Pick an email provider and wire it in~~ — code
+   is done: `ResendEmailSender` (`server/Sources/App/EmailSender.swift`) is
+   implemented and `EmailSenderFactory.make` already branches on
+   `RESEND_API_KEY`. Self-service password reset and email verification are
+   still dead ends until that key exists (the link just gets logged
+   server-side, never delivered). Two paths, don't let one block the other:
    - **Fast path (do this first):** skip domain verification, send from
-     Resend's own `onboarding@resend.dev` address. Five minutes, unblocks
-     real delivery today, just not `@ohanasushigrill.com`-branded.
+     Resend's own `onboarding@resend.dev` address (the current default for
+     `RESEND_FROM_ADDRESS`). Five minutes, unblocks real delivery today,
+     just not `@ohanasushigrill.com`-branded.
    - **Branded path (needs DNS work first):** verify `ohanasushigrill.com`
-     (or a subdomain) with Resend — but the domain's current DNS host
-     (Weebly's manager) only exposes MX records and nameservers, not the TXT
-     records Resend's SPF/DKIM verification needs. Blocked on item 3.
-   - Once there's an API key, wiring it in is a single-file change:
-     implement `EmailSender` in `server/Sources/App/EmailSender.swift` and
-     branch on `Environment.get("EMAIL_PROVIDER")` in
-     `EmailSenderFactory.make` — the placeholder `ConsoleEmailSender` is
-     already structured for exactly this swap.
+     (or a subdomain) with Resend, then set `RESEND_FROM_ADDRESS` to a real
+     address on it — but the domain's current DNS host (Weebly's manager)
+     only exposes MX records and nameservers, not the TXT records Resend's
+     SPF/DKIM verification needs. Blocked on item 3.
 3. **Move DNS to Cloudflare (free)** — unblocks two things at once: branded
    email above, and binding `ohanasushigrill.com` as a real custom domain on
    the Container App (free managed cert included). Plan already scoped: move
@@ -488,10 +489,10 @@ session's effort would likely pay off most. Written 2026-08-02.
 9. **Uptime monitoring** — steps are ready in `docs/uptime-monitoring.md`,
    just needs a free UptimeRobot account created (can't be done on your
    behalf) pointed at the existing `/healthz` endpoint.
-10. **Session persistence** — Vapor's in-memory session driver means every
-    deploy logs everyone out. Fine today for a ~9-person staff team; worth
-    revisiting (file- or Redis-backed sessions) if that friction starts to
-    matter more, or once customer-account usage grows.
+10. ~~**Session persistence**~~ — done: sessions are now file-backed
+    (`server/Sources/App/FileSessions.swift`), persisted under
+    `<DATA_DIR>/sessions/` on the same Azure Files volume every other store
+    uses, so a deploy no longer logs everyone out.
 11. **The bigger long-term idea worth naming:** table ordering
     (`/menu` → "Add to Order" → `/table-orders-admin.html`) is currently just
     a "heads up" queue — staff still ring everything up on the real POS, and

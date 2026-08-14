@@ -93,11 +93,11 @@ func registerCustomerAuthRoutes(_ app: Application) throws {
         let (customer, token) = try CustomerUserStore.shared.register(
             email: body.email, displayName: body.displayName, password: body.password
         )
-        let sender = EmailSenderFactory.make(logger: req.logger)
+        let sender = EmailSenderFactory.make(client: req.client, logger: req.logger)
         try? await sender.send(
             to: customer.email,
             subject: "Verify your Ohana Belltown account",
-            body: "Welcome to Ohana Belltown! Verify your email by visiting: /verify-email?token=\(token)"
+            body: "Welcome to Ohana Belltown! Verify your email by visiting: \(PublicBaseURL.get())/verify-email?token=\(token)"
         )
         req.session.data["customerId"] = customer.id
         return customer
@@ -125,11 +125,11 @@ func registerCustomerAuthRoutes(_ app: Application) throws {
     app.post("api", "customer", "forgot-password") { req async throws -> GenericOK in
         let body = try req.content.decode(CustomerForgotPasswordRequest.self)
         if let token = try CustomerUserStore.shared.requestPasswordReset(email: body.email) {
-            let sender = EmailSenderFactory.make(logger: req.logger)
+            let sender = EmailSenderFactory.make(client: req.client, logger: req.logger)
             try? await sender.send(
                 to: body.email,
                 subject: "Reset your Ohana Belltown password",
-                body: "Reset your password: /reset-password.html?token=\(token) (expires in 1 hour)"
+                body: "Reset your password: \(PublicBaseURL.get())/reset-password.html?token=\(token) (expires in 1 hour)"
             )
         }
         return GenericOK()

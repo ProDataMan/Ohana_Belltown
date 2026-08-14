@@ -73,7 +73,7 @@ enum FeedbackDigest {
             }
 
             let body = renderDigestBody(entries: entries, dayKey: yesterdayKey)
-            let sender = EmailSenderFactory.make(logger: app.logger)
+            let sender = EmailSenderFactory.make(client: app.client, logger: app.logger)
             for admin in admins {
                 guard let email = admin.email else { continue }
                 try? await sender.send(to: email, subject: "Ohana Belltown — Feedback from \(yesterdayKey)", body: body)
