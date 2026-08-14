@@ -35,6 +35,14 @@ function clearCart() {
   sessionStorage.removeItem('ohana_swag_cart');
 }
 
+// Online checkout is built and works (Square sandbox, verified end-to-end)
+// but deliberately switched off client-side until Square is flipped to a
+// production access token — same reasoning as gift-cards.js, plus most
+// swag actually gets bought in person while dining anyway. Flip back to
+// true once Square is live; the backend (routes, SquareCheckout.swift,
+// SwagOrdersStore) is untouched and ready to go.
+const ONLINE_CHECKOUT_ENABLED = false;
+
 let products = [];
 let checkoutAvailable = false;
 
@@ -52,7 +60,7 @@ async function loadShop() {
     return;
   }
   products = await productsRes.json();
-  checkoutAvailable = statusRes.ok ? (await statusRes.json()).available : false;
+  checkoutAvailable = ONLINE_CHECKOUT_ENABLED && (statusRes.ok ? (await statusRes.json()).available : false);
 
   renderShopBanner();
   renderGrid();
@@ -210,7 +218,7 @@ function renderCartModalBody() {
     <p style="font-weight: 700;">Total: $${total.toFixed(2)}</p>
     ${
       !checkoutAvailable
-        ? '<p class="hint">Online checkout isn’t turned on yet — ask your server about picking these up at the register.</p>'
+        ? '<p class="hint">Online checkout isn’t turned on yet — ask your server to pick these up at the register, or call us at <a href="tel:+12069569329">(206) 956-9329</a>.</p>'
         : !tableId
         ? '<p class="hint">Scan the QR code on your table to check out — that’s how we know where to bring it.</p>'
         : `<button type="button" id="shop-checkout-btn">Checkout with Card &mdash; $${total.toFixed(2)}</button>
