@@ -264,12 +264,16 @@ final class StaffRewardsStore: @unchecked Sendable {
     static let maxAutoPointsPerDay = 100
 
     /// Seeded the first time the catalog is loaded — the base food reward
-    /// (priced against real Happy Hour menu costs) plus swag placeholders
-    /// with no price yet, pending real supplier quotes.
+    /// (priced against real Happy Hour menu costs, rescaled to 1000 points
+    /// alongside the July 2026 point-value rescale, see `defaultPointValues`)
+    /// plus swag, priced at that same ~100 points per $1, against actual
+    /// shop prices from `/api/swag/products` (Bandana $10, 26th Anniversary
+    /// T-Shirt $25, Straw Hat $50 as of 2026-08-02).
     static let defaultCatalog: [RewardCatalogItem] = [
-        RewardCatalogItem(id: "roll-or-appetizer", name: "Classic Ohana Roll or Happy Hour Appetizer", pointCost: 100),
-        RewardCatalogItem(id: "hat", name: "Ohana Hat", pointCost: nil),
-        RewardCatalogItem(id: "tshirt", name: "Ohana T-Shirt", pointCost: nil),
+        RewardCatalogItem(id: "roll-or-appetizer", name: "Classic Ohana Roll or Happy Hour Appetizer", pointCost: 1000),
+        RewardCatalogItem(id: "bandana", name: "Bandana", pointCost: 1000),
+        RewardCatalogItem(id: "tshirt", name: "26th Anniversary T-Shirt", pointCost: 2500),
+        RewardCatalogItem(id: "hat", name: "Straw Hat", pointCost: 5000),
     ]
 
     private let lock = NSLock()

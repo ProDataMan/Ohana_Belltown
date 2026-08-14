@@ -17,9 +17,9 @@ final class StaffRewardsStoreTests: XCTestCase {
     func testStatusCreatesZeroPointCardForNewStaff() throws {
         let status = try StaffRewardsStore.shared.status(staffId: "staff-1")
         XCTAssertEqual(status.points, 0)
-        // Default catalog's only priced item ("roll-or-appetizer") costs 100;
-        // hat/tshirt are unpriced placeholders and don't count.
-        XCTAssertEqual(status.pointsNeeded, 100)
+        // Default catalog's cheapest priced items ("roll-or-appetizer" and
+        // "bandana") both cost 1000.
+        XCTAssertEqual(status.pointsNeeded, 1000)
         XCTAssertFalse(status.rewardReady)
     }
 
@@ -115,13 +115,13 @@ final class StaffRewardsStoreTests: XCTestCase {
 
     func testEnoughPointsMakeRewardReady() throws {
         // Manual grants (awardedBy set) aren't subject to the daily auto-award cap.
-        // "other" = 20 points, so 5 grants reach the 100-point threshold.
-        for _ in 1...5 {
+        // "other" = 20 points, so 50 grants reach the 1000-point threshold.
+        for _ in 1...50 {
             try StaffRewardsStore.shared.award(staffId: "staff-1", category: "other", note: nil, awardedBy: "admin-1")
         }
         let status = try StaffRewardsStore.shared.status(staffId: "staff-1")
         XCTAssertTrue(status.rewardReady)
-        XCTAssertEqual(status.points, 100)
+        XCTAssertEqual(status.points, 1000)
     }
 
     func testAutoAwardsCapAtDailyLimitButManualGrantsDoNot() throws {
@@ -137,13 +137,13 @@ final class StaffRewardsStoreTests: XCTestCase {
     }
 
     func testRedeemRequiresEnoughPointsForTheChosenCatalogItem() throws {
-        // "price" = 10 points each; the default "roll-or-appetizer" item costs 100.
-        for _ in 1...5 {
+        // "price" = 10 points each; the default "roll-or-appetizer" item costs 1000.
+        for _ in 1...50 {
             try StaffRewardsStore.shared.award(staffId: "staff-1", category: "price", note: nil, awardedBy: "admin-1")
         }
         XCTAssertThrowsError(try StaffRewardsStore.shared.redeem(staffId: "staff-1", catalogItemId: "roll-or-appetizer", note: nil))
 
-        for _ in 1...5 {
+        for _ in 1...50 {
             try StaffRewardsStore.shared.award(staffId: "staff-1", category: "price", note: nil, awardedBy: "admin-1")
         }
         let redeemed = try StaffRewardsStore.shared.redeem(staffId: "staff-1", catalogItemId: "roll-or-appetizer", note: "Free roll")
@@ -160,24 +160,29 @@ final class StaffRewardsStoreTests: XCTestCase {
     }
 
     func testRedeemRejectsAnUnpricedCatalogItem() throws {
-        // Plenty of points, but "hat" is a placeholder with no price yet.
+        // Plenty of points, but "sticker" is saved as a placeholder with no price yet.
+        try StaffRewardsStore.shared.saveCatalog([
+            RewardCatalogItem(id: "sticker", name: "Ohana Sticker", pointCost: nil),
+        ])
         for _ in 1...50 {
             try StaffRewardsStore.shared.award(staffId: "staff-1", category: "social", note: nil, awardedBy: "admin-1")
         }
-        XCTAssertThrowsError(try StaffRewardsStore.shared.redeem(staffId: "staff-1", catalogItemId: "hat", note: nil)) { error in
+        XCTAssertThrowsError(try StaffRewardsStore.shared.redeem(staffId: "staff-1", catalogItemId: "sticker", note: nil)) { error in
             guard let rewardError = error as? StaffRewardError else { return XCTFail("wrong error type") }
             XCTAssertEqual(rewardError, .catalogItemNotPriced)
         }
     }
 
-    func testDefaultCatalogSeedsFoodRewardPricedAndSwagAsPlaceholders() throws {
+    func testDefaultCatalogSeedsFoodRewardAndSwagAllPriced() throws {
         let items = try StaffRewardsStore.shared.catalog()
         let byId = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
-        XCTAssertEqual(byId["roll-or-appetizer"]?.pointCost, 100)
-        XCTAssertNotNil(byId["hat"], "hat should exist as a placeholder")
-        XCTAssertNil(byId["hat"]?.pointCost, "hat shouldn't have a price yet")
-        XCTAssertNotNil(byId["tshirt"], "tshirt should exist as a placeholder")
-        XCTAssertNil(byId["tshirt"]?.pointCost, "tshirt shouldn't have a price yet")
+        XCTAssertEqual(byId["roll-or-appetizer"]?.pointCost, 1000)
+        XCTAssertEqual(byId["bandana"]?.name, "Bandana")
+        XCTAssertEqual(byId["bandana"]?.pointCost, 1000)
+        XCTAssertEqual(byId["tshirt"]?.name, "26th Anniversary T-Shirt")
+        XCTAssertEqual(byId["tshirt"]?.pointCost, 2500)
+        XCTAssertEqual(byId["hat"]?.name, "Straw Hat")
+        XCTAssertEqual(byId["hat"]?.pointCost, 5000)
     }
 
     func testSaveCatalogReplacesItemsAndAffectsPointsNeeded() throws {
