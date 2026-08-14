@@ -257,7 +257,8 @@ function announceNewOrder(tableId, section, newCount, waitingCount) {
   if (alertsMuted() || !window.speechSynthesis) return;
   const sectionLabel = section ? `, ${section}` : '';
   const itemWord = newCount === 1 ? 'item' : 'items';
-  speakNow(`${newCount} new ${itemWord} added to order at table ${tableId}${sectionLabel}, waiting for ${waitingCount} to be delivered`);
+  const waitingClause = waitingCount > 0 ? `, waiting for ${waitingCount} to be delivered` : '';
+  speakNow(`${newCount} new ${itemWord} added to order at table ${tableId}${sectionLabel}${waitingClause}`);
 }
 
 // Speaks once a table has plausibly had enough time to cook — see
