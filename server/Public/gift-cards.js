@@ -37,7 +37,20 @@ function renderCheckoutBanner() {
   return false;
 }
 
+// Online checkout is built and works (Square sandbox, verified end-to-end)
+// but deliberately switched off client-side until Square is flipped to a
+// production access token — sandbox-only checkout could let a real
+// customer "pay" with a fake test card and think they'd bought something.
+// Flip back to true once Square is live; everything else (backend routes,
+// SquareCheckout.swift, GiftCardOrdersStore) is untouched and ready to go.
+const ONLINE_CHECKOUT_ENABLED = false;
+
 async function checkAvailability() {
+  if (!ONLINE_CHECKOUT_ENABLED) {
+    document.getElementById('gc-form-panel').innerHTML =
+      '<h2>Give the gift of Ohana</h2><p class="hint">Online gift card purchases aren\'t turned on yet — give us a call at <a href="tel:+12069569329">(206) 956-9329</a>, or stop by and talk to a server, and we\'ll take care of it in person.</p>';
+    return;
+  }
   // Shares Square config with the Shop page's checkout — same
   // "hidden until configured" pattern as AI menu extraction / Apple /
   // Facebook sign-in.
