@@ -3,7 +3,7 @@
 The server already exposes a lightweight health-check endpoint that's
 perfect for this:
 
-- `https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/healthz`
+- `https://www.ohanasushigrill.com/healthz`
 - Returns a plain `200 ok` with no auth required, no database/session
   overhead — safe to hit every few minutes forever.
 
@@ -16,7 +16,7 @@ needs your email — not something that can be done for you from here.
 2. Click **Add New Monitor**.
    - Monitor Type: **HTTP(s)**
    - Friendly Name: `Ohana Belltown`
-   - URL: `https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/healthz`
+   - URL: `https://www.ohanasushigrill.com/healthz`
    - Monitoring Interval: 5 minutes (the free plan's fastest option)
 3. Under **Alert Contacts**, make sure your email (and optionally phone via their SMS add-on) is selected so you actually get notified.
 4. Save. UptimeRobot will now check the site every 5 minutes and email you the moment it goes down — and again when it recovers.

@@ -1,67 +1,67 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/</loc>
+    <loc>https://www.ohanasushigrill.com/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/menu</loc>
+    <loc>https://www.ohanasushigrill.com/menu</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/sushi</loc>
+    <loc>https://www.ohanasushigrill.com/sushi</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/drinks</loc>
+    <loc>https://www.ohanasushigrill.com/drinks</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/happy-hour</loc>
+    <loc>https://www.ohanasushigrill.com/happy-hour</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/about</loc>
+    <loc>https://www.ohanasushigrill.com/about</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/local</loc>
+    <loc>https://www.ohanasushigrill.com/local</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/catering</loc>
+    <loc>https://www.ohanasushigrill.com/catering</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/contact</loc>
+    <loc>https://www.ohanasushigrill.com/contact</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/waitlist</loc>
+    <loc>https://www.ohanasushigrill.com/waitlist</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/faq</loc>
+    <loc>https://www.ohanasushigrill.com/faq</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/privacy</loc>
+    <loc>https://www.ohanasushigrill.com/privacy</loc>
     <changefreq>yearly</changefreq>
     <priority>0.2</priority>
   </url>
   <url>
-    <loc>https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/terms</loc>
+    <loc>https://www.ohanasushigrill.com/terms</loc>
     <changefreq>yearly</changefreq>
     <priority>0.2</priority>
   </url>

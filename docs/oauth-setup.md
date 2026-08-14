@@ -24,6 +24,15 @@ goes live immediately, no redeploy needed.
 
 ## Google (free, ~10 minutes)
 
+**Already configured, but needs a redirect URI update.** Google sign-in has
+real credentials set since 2026-07-25, registered against the old Azure
+hostname. Now that `PublicBaseURL.swift`'s fallback points at
+`www.ohanasushigrill.com`, the app requests that URI instead — go add
+`https://www.ohanasushigrill.com/auth/google/callback` to the **Authorized
+redirect URIs** list in step 4 below (the Azure one can stay too, no need to
+remove it) or Google sign-in will start failing with a redirect_uri_mismatch
+error as soon as this deploys.
+
 1. Go to the [Google Cloud Console](https://console.cloud.google.com/) and create a new project, or pick an existing one, from the project dropdown at the top of the page.
 2. In the left sidebar, go to **APIs & Services → OAuth consent screen**. If you haven't configured this before:
    - User type: **External**
@@ -32,7 +41,7 @@ goes live immediately, no redeploy needed.
    - Application type: **Web application**
    - Name it whatever you like (e.g. "Ohana Belltown Web")
 4. Under **Authorized redirect URIs**, add exactly this one URL — both customer and staff sign-in share it, dispatched internally by the app:
-   - `https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/auth/google/callback`
+   - `https://www.ohanasushigrill.com/auth/google/callback`
    - Optional, for testing locally: also add `http://localhost:8080/auth/google/callback`
 5. Click **Create**. Google shows you a **Client ID** and **Client Secret** — copy both.
 
@@ -51,10 +60,10 @@ staff to `/edit.html` and customers to `/my-account.html`.
    - If you don't already have an **App ID** for the site, register one, and make sure the **Sign in with Apple** capability is checked.
    - Then register a **Services ID** — this is a second, separate identifier (e.g. `com.ohanabelltown.web`). This Services ID string is your `APPLE_OAUTH_CLIENT_ID`.
    - Configure the Services ID's "Sign in with Apple" settings with:
-     - Domain: `ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io`
+     - Domain: `www.ohanasushigrill.com`
      - Return URLs:
-       - `https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/auth/apple/customer/callback`
-       - `https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/auth/apple/staff/callback`
+       - `https://www.ohanasushigrill.com/auth/apple/customer/callback`
+       - `https://www.ohanasushigrill.com/auth/apple/staff/callback`
 3. Go to **Certificates, IDs & Profiles → Keys** and create a new key:
    - Check **Sign in with Apple**, and associate it with the Services ID from step 2.
    - Click **Continue**, then **Register**, then **Download**. Apple only lets you download this `.p8` file **once** — save it somewhere safe immediately.
@@ -72,7 +81,7 @@ These become:
 1. Go to [developers.facebook.com/apps](https://developers.facebook.com/apps/) and create a new app (choose the "Consumer" or "None" use case — no business verification is needed for basic Facebook Login).
 2. From the app dashboard, add the **Facebook Login** product.
 3. Under **Facebook Login → Settings**, add this to **Valid OAuth Redirect URIs** — both customer and staff sign-in share it, dispatched internally by the app, same as Google:
-   - `https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io/auth/facebook/callback`
+   - `https://www.ohanasushigrill.com/auth/facebook/callback`
    - Optional, for testing locally: also add `http://localhost:8080/auth/facebook/callback`
 4. Under **App Settings → Basic**, copy the **App ID** and **App Secret**.
 5. While the app is in **Development Mode**, only accounts added as testers/admins under **App Roles** can sign in. Switch the app to **Live** (Basic Settings requires a privacy policy URL — `/privacy` already works for this) once you want anyone to be able to use it.

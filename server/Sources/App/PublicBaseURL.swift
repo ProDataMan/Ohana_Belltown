@@ -5,6 +5,6 @@ import Vapor
 enum PublicBaseURL {
     static func get() -> String {
         Environment.get("PUBLIC_BASE_URL")
-            ?? "https://ohana-belltown-server.thankfulwater-0725e291.centralus.azurecontainerapps.io"
+            ?? "https://www.ohanasushigrill.com"
     }
 }
