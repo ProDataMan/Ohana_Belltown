@@ -247,14 +247,17 @@ async function getTableSection(tableId) {
   return tableMapSections[tableId];
 }
 
-// Speaks a new table order aloud (table number + floor section) via the
+// Speaks a table's order counts aloud (table number + floor section) via the
 // browser's built-in text-to-speech, so staff away from a screen still hear
 // it. Best-effort: some browsers won't play audio at all until the page has
 // had a user interaction, and that's fine — the visual badge below still works.
-function announceNewOrder(tableId, section) {
+// newCount is items not yet confirmed/entered by a server; waitingCount is
+// items already entered but not yet delivered to the table.
+function announceNewOrder(tableId, section, newCount, waitingCount) {
   if (alertsMuted() || !window.speechSynthesis) return;
   const sectionLabel = section ? `, ${section}` : '';
-  speakNow(`New order, table ${tableId}${sectionLabel}`);
+  const itemWord = newCount === 1 ? 'item' : 'items';
+  speakNow(`${newCount} new ${itemWord} added to order at table ${tableId}${sectionLabel}, waiting for ${waitingCount} to be delivered`);
 }
 
 // Speaks once a table has plausibly had enough time to cook — see
@@ -330,16 +333,28 @@ function startStaffTableOrderAlerts() {
       const data = await response.json();
       const now = Date.now();
 
-      for (const order of data.needsEntry) {
-        const last = lastAnnouncedNewOrderAt[order.id];
+      // Batched per table rather than per item: a table with 3 pending items
+      // gets one "3 new items..." announcement, not three separate ones.
+      const pendingByTable = {};
+      data.needsEntry.forEach((order) => {
+        pendingByTable[order.tableId] = (pendingByTable[order.tableId] || 0) + 1;
+      });
+      const awaitingByTable = {};
+      data.awaitingDelivery.forEach((order) => {
+        awaitingByTable[order.tableId] = (awaitingByTable[order.tableId] || 0) + 1;
+      });
+
+      for (const [tableId, newCount] of Object.entries(pendingByTable)) {
+        const last = lastAnnouncedNewOrderAt[tableId];
         if (!last || now - last >= ANNOUNCE_REPEAT_MS) {
-          lastAnnouncedNewOrderAt[order.id] = now;
-          getTableSection(order.tableId).then((section) => announceNewOrder(order.tableId, section));
+          lastAnnouncedNewOrderAt[tableId] = now;
+          const waitingCount = awaitingByTable[tableId] || 0;
+          getTableSection(tableId).then((section) => announceNewOrder(tableId, section, newCount, waitingCount));
         }
       }
-      const stillPendingIds = new Set(data.needsEntry.map((order) => order.id));
-      Object.keys(lastAnnouncedNewOrderAt).forEach((id) => {
-        if (!stillPendingIds.has(id)) delete lastAnnouncedNewOrderAt[id];
+      const stillPendingTableIds = new Set(Object.keys(pendingByTable));
+      Object.keys(lastAnnouncedNewOrderAt).forEach((tableId) => {
+        if (!stillPendingTableIds.has(tableId)) delete lastAnnouncedNewOrderAt[tableId];
       });
 
       const currentEligibleTableIds = tablesEligibleForAwaitingFlash(data.awaitingDelivery);
