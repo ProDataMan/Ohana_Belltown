@@ -19,3 +19,5 @@ node_modules/
 
 # Local photo dumps (source images for one-off uploads — not version-controlled)
 chownow images/
+FoodPics/
+photo-review/

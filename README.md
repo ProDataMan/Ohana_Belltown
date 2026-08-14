@@ -513,5 +513,6 @@ session's effort would likely pay off most. Written 2026-08-02.
 - `docs/oauth-setup.md` — step-by-step Google/Apple/Facebook Sign-In credential setup
 - `docs/loyalty-points-migration.md` — future plan for switching the customer punch card to a points system (to support variable rewards and sellable/giveaway swag) once the punch card has real launch feedback — not scheduled yet
 - `docs/uptime-monitoring.md` — how to point UptimeRobot (free) at the existing `/healthz` endpoint
+- `docs/pricing-review-2026-08-06.md` — suggested menu price changes with reasoning, based on the real competitor data already gathered in the Competitor Pricing admin tool (`/competitor-pricing-admin.html`) plus general judgment where no local comparison data exists yet — not yet acted on
 - `docs/page-inventory.md`, `docs/migration-plan.md`, `docs/ohana-project-plan.md` — early planning docs from the static-site-capture phase, kept for history
 - `reference-site/` — the original Weebly site mirror this project was migrated from
