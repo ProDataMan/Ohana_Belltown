@@ -145,9 +145,14 @@ Request a **written quote**, specifically covering:
 
 1. Get a written Echelon quote using the question list above.
 2. Confirm which Square plan (Free/Plus/Premium) the existing account is on.
-3. Confirm whether Echelon is actually the in-person processor, or a
-   different relationship entirely — worth asking the bookkeeper directly
-   rather than assuming.
+3. ~~Confirm whether Echelon is actually the in-person processor~~ —
+   confirmed 2026-08-15: Echelon is the restaurant's real card processor.
 4. Bring the numbers back and decide — this doc intentionally stops short
    of a recommendation because the one number that actually matters
    (Echelon's real rate) isn't available yet.
+
+**Re-checked 2026-08-15:** echelonpayments.com/payments still discloses no
+pricing — same "Hosted Payment Pages"/"Ecommerce" products, same "easy API
+and shopping cart integrations" language with no actual docs/SDK linked, same
+generic "no hidden fees" marketing with zero numbers. Nothing has changed
+since the 2026-08-02 research above; step 1 is still the blocker.
