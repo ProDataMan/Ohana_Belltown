@@ -770,10 +770,12 @@ func routes(_ app: Application) throws {
             throw Abort(.badRequest, reason: "Table ID and item name are required.")
         }
         let customerId = try? currentCustomer(req)?.id
-        return try TableOrdersStore.shared.place(
+        let entry = try TableOrdersStore.shared.place(
             tableId: tableId, itemName: itemName, itemId: body.itemId, section: body.section, customerId: customerId,
             modifiers: body.modifiers ?? []
         )
+        Task { await LightNotifier.shared.notifyPlaced(entry) }
+        return entry
     }
 
     app.get("api", "table-map") { _ throws -> [TableMapEntry] in
@@ -793,14 +795,18 @@ func routes(_ app: Application) throws {
         try requireLogin(req)
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
         let staffOnDuty = try StaffingStore.shared.get().staffOnDuty
-        return try TableOrdersStore.shared.markEntered(id: id, staffOnDuty: staffOnDuty)
+        let entry = try TableOrdersStore.shared.markEntered(id: id, staffOnDuty: staffOnDuty)
+        Task { await LightNotifier.shared.notifyEntered(entry) }
+        return entry
     }
 
     // Public — either staff (from the admin queue) or the customer
     // themselves (a "Mark Received" tap on the menu page) can confirm this.
     app.post("api", "table-orders", ":id", "deliver") { req throws -> TableOrderEntry in
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
-        return try TableOrdersStore.shared.markDelivered(id: id)
+        let entry = try TableOrdersStore.shared.markDelivered(id: id)
+        Task { await LightNotifier.shared.notifyDelivered(entry) }
+        return entry
     }
 
     // Admin-only — both are analytics.html data, and that page itself is
