@@ -45,6 +45,8 @@ func configure(_ app: Application) throws {
 
     if app.environment != .testing {
         FeedbackDigest.schedule(app)
+        Task { await LightNotifier.shared.configureFromEnvironment() }
+        LightNotifier.scheduleReadyPoll(app)
     }
 
     try routes(app)
