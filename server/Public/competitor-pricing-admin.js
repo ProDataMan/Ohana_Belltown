@@ -16,6 +16,7 @@ let groups = [];
 let restaurants = [];
 let entries = [];
 let aiExtractionAvailable = false;
+let unreviewedPhotoUrls = new Set();
 
 function restaurantName(id) {
   return restaurants.find((r) => r.id === id)?.name || '(removed restaurant)';
@@ -226,83 +227,119 @@ document.getElementById('save-groups-btn').addEventListener('click', async () =>
 
 // ---- Competitor Restaurants ----
 
-// Reads whatever's currently typed into each row's inputs back into the
+async function loadUnreviewedPhotoURLs() {
+  try {
+    const response = await staffFetch('/api/competitor-pricing/photos/unreviewed');
+    if (!response.ok) return;
+    unreviewedPhotoUrls = new Set(await response.json());
+  } catch {
+    // badge dots just won't show — not worth blocking the page over
+  }
+}
+
+async function markPhotoReviewed(url) {
+  try {
+    const response = await staffFetch('/api/competitor-pricing/photos/mark-reviewed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    if (!response.ok) throw new Error(`Failed (${response.status}).`);
+    unreviewedPhotoUrls.delete(url);
+    renderRestaurantsList();
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+// Reads whatever's currently typed into each card's inputs back into the
 // `restaurants` array before a photo upload/remove triggers a re-render —
 // otherwise an in-progress, not-yet-saved text edit would be silently
-// wiped out when the table rebuilds from stale in-memory data.
+// wiped out when the grid rebuilds from stale in-memory data.
 function syncRestaurantsFromDOM() {
-  document.querySelectorAll('#restaurants-list tr[data-index]').forEach((row, i) => {
+  document.querySelectorAll('#restaurants-list .shop-card[data-index]').forEach((card, i) => {
     if (!restaurants[i]) return;
-    restaurants[i].name = row.querySelector('.restaurant-name-input').value.trim();
-    const distanceRaw = row.querySelector('.restaurant-distance-input').value;
+    restaurants[i].name = card.querySelector('.restaurant-name-input').value.trim();
+    const distanceRaw = card.querySelector('.restaurant-distance-input').value;
     restaurants[i].distanceMiles = distanceRaw ? Number(distanceRaw) : null;
-    restaurants[i].address = row.querySelector('.restaurant-address-input').value.trim() || null;
-    restaurants[i].website = row.querySelector('.restaurant-website-input').value.trim() || null;
-    restaurants[i].notes = row.querySelector('.restaurant-notes-input').value.trim() || null;
+    restaurants[i].address = card.querySelector('.restaurant-address-input').value.trim() || null;
+    restaurants[i].website = card.querySelector('.restaurant-website-input').value.trim() || null;
+    restaurants[i].notes = card.querySelector('.restaurant-notes-input').value.trim() || null;
   });
 }
 
 function renderRestaurantsList() {
   const listEl = document.getElementById('restaurants-list');
   if (!restaurants.length) {
-    listEl.innerHTML = '<p class="hint">No competitor restaurants yet — find some nearby below.</p>';
+    listEl.innerHTML = '<p class="hint">No competitor restaurants yet — find some nearby above.</p>';
     return;
   }
   listEl.innerHTML = `
-    <div class="data-table">
-      <table>
-        <thead><tr><th>Name</th><th>Miles</th><th>Address</th><th>Website</th><th>Notes</th><th>Menu Photos</th><th></th></tr></thead>
-        <tbody>
-          ${restaurants
-            .map(
-              (r, i) => `
-            <tr data-index="${i}">
-              <td><input type="text" class="restaurant-name-input" value="${escapeHtmlCompetitor(r.name)}" /></td>
-              <td><input type="number" min="0" step="0.1" class="restaurant-distance-input" value="${r.distanceMiles ?? ''}" style="max-width: 6rem;" /></td>
-              <td><input type="text" class="restaurant-address-input" value="${escapeHtmlCompetitor(r.address || '')}" /></td>
-              <td><input type="text" class="restaurant-website-input" value="${escapeHtmlCompetitor(r.website || '')}" /></td>
-              <td><input type="text" class="restaurant-notes-input" value="${escapeHtmlCompetitor(r.notes || '')}" /></td>
-              <td>
-                <div class="item-thumb-gallery">
-                  ${(r.menuPhotoUrls || [])
-                    .map(
-                      (url, photoIndex) => `
-                    <div class="menu-photo-item">
-                      <div class="item-thumb-wrap">
-                        <a href="${escapeHtmlCompetitor(url)}" target="_blank" rel="noopener">
-                          <img class="item-thumb" src="${escapeHtmlCompetitor(url)}" alt="Menu photo" />
-                        </a>
-                        <button type="button" class="thumb-remove-btn menu-photo-remove-btn" data-photo-index="${photoIndex}" aria-label="Remove this menu photo">&times;</button>
-                      </div>
-                      ${
-                        aiExtractionAvailable
-                          ? `<button type="button" class="secondary menu-photo-extract-btn" data-photo-url="${escapeHtmlCompetitor(url)}">Extract Items</button>`
-                          : ''
-                      }
-                    </div>
-                  `
-                    )
-                    .join('')}
+    <div class="shop-grid">
+      ${restaurants
+        .map((r, i) => {
+          const photosHtml = (r.menuPhotoUrls || [])
+            .map((url, photoIndex) => {
+              const unreviewed = unreviewedPhotoUrls.has(url);
+              return `
+              <div class="menu-photo-item">
+                <div class="item-thumb-wrap">
+                  <img class="item-thumb" src="${escapeHtmlCompetitor(url)}" alt="Menu photo" data-photo-url="${escapeHtmlCompetitor(url)}" />
+                  ${unreviewed ? '<span class="thumb-unreviewed-badge" title="Not yet reviewed for prices"></span>' : ''}
+                  ${
+                    unreviewed
+                      ? `<button type="button" class="thumb-mark-reviewed-btn" data-photo-url="${escapeHtmlCompetitor(url)}" aria-label="Mark reviewed without extracting prices" title="Mark reviewed">&check;</button>`
+                      : ''
+                  }
+                  <button type="button" class="thumb-remove-btn menu-photo-remove-btn" data-photo-index="${photoIndex}" aria-label="Remove this menu photo">&times;</button>
                 </div>
-                <label class="photo-upload-btn">
-                  + Add Photo
-                  <input type="file" accept="image/*" class="menu-photo-upload-input" hidden />
+                ${
+                  aiExtractionAvailable
+                    ? `<button type="button" class="secondary menu-photo-extract-btn" data-photo-url="${escapeHtmlCompetitor(url)}">Extract Items</button>`
+                    : ''
+                }
+              </div>
+            `;
+            })
+            .join('');
+          return `
+          <div class="shop-card" data-index="${i}">
+            <div class="shop-card-body">
+              <input type="text" class="restaurant-name-input" value="${escapeHtmlCompetitor(r.name)}" placeholder="Restaurant name" style="font-weight: 700; font-size: 1.05rem; width: 100%; margin-bottom: 0.35rem;" />
+              ${r.distanceMiles != null ? `<p class="hint" style="margin: 0 0 0.6rem;">${r.distanceMiles} mi</p>` : ''}
+              <div class="item-thumb-gallery">${photosHtml}</div>
+              <label class="photo-upload-btn">
+                + Add Photo
+                <input type="file" accept="image/*" class="menu-photo-upload-input" hidden />
+              </label>
+              <p class="hint menu-photo-status"></p>
+              <details style="margin-top: 0.6rem;">
+                <summary class="hint" style="cursor: pointer;">Edit details</summary>
+                <label style="margin-top: 0.6rem;">Distance (miles)
+                  <input type="number" min="0" step="0.1" class="restaurant-distance-input" value="${r.distanceMiles ?? ''}" />
                 </label>
-                <p class="hint menu-photo-status"></p>
-              </td>
-              <td><button type="button" class="secondary restaurant-remove-btn">Remove</button></td>
-            </tr>
-          `
-            )
-            .join('')}
-        </tbody>
-      </table>
+                <label>Address
+                  <input type="text" class="restaurant-address-input" value="${escapeHtmlCompetitor(r.address || '')}" />
+                </label>
+                <label>Website
+                  <input type="text" class="restaurant-website-input" value="${escapeHtmlCompetitor(r.website || '')}" />
+                </label>
+                <label>Notes
+                  <input type="text" class="restaurant-notes-input" value="${escapeHtmlCompetitor(r.notes || '')}" />
+                </label>
+                <button type="button" class="secondary restaurant-remove-btn">Remove Restaurant</button>
+              </details>
+            </div>
+          </div>
+        `;
+        })
+        .join('')}
     </div>
   `;
   listEl.querySelectorAll('.restaurant-remove-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       syncRestaurantsFromDOM();
-      const index = Number(btn.closest('tr').dataset.index);
+      const index = Number(btn.closest('.shop-card').dataset.index);
       restaurants.splice(index, 1);
       renderRestaurantsList();
     });
@@ -310,18 +347,27 @@ function renderRestaurantsList() {
   listEl.querySelectorAll('.menu-photo-remove-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       syncRestaurantsFromDOM();
-      const restaurantIndex = Number(btn.closest('tr').dataset.index);
+      const restaurantIndex = Number(btn.closest('.shop-card').dataset.index);
       const photoIndex = Number(btn.dataset.photoIndex);
       restaurants[restaurantIndex].menuPhotoUrls.splice(photoIndex, 1);
       renderRestaurantsList();
     });
   });
+  listEl.querySelectorAll('.thumb-mark-reviewed-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      syncRestaurantsFromDOM();
+      markPhotoReviewed(btn.dataset.photoUrl);
+    });
+  });
+  listEl.querySelectorAll('.item-thumb').forEach((thumb) => {
+    thumb.addEventListener('click', () => window.openPhotoDetail(thumb.src));
+  });
   listEl.querySelectorAll('.menu-photo-upload-input').forEach((input) => {
-    input.addEventListener('change', (event) => uploadMenuPhoto(event, Number(input.closest('tr').dataset.index)));
+    input.addEventListener('change', (event) => uploadMenuPhoto(event, Number(input.closest('.shop-card').dataset.index)));
   });
   listEl.querySelectorAll('.menu-photo-extract-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const restaurantIndex = Number(btn.closest('tr').dataset.index);
+      const restaurantIndex = Number(btn.closest('.shop-card').dataset.index);
       extractMenuItems(btn.dataset.photoUrl, restaurantIndex, btn);
     });
   });
@@ -330,7 +376,7 @@ function renderRestaurantsList() {
 async function uploadMenuPhoto(event, restaurantIndex) {
   const file = event.target.files[0];
   if (!file) return;
-  const statusEl = event.target.closest('td').querySelector('.menu-photo-status');
+  const statusEl = event.target.closest('.shop-card-body').querySelector('.menu-photo-status');
   statusEl.textContent = 'Uploading...';
   statusEl.classList.remove('status-error');
 
@@ -347,9 +393,20 @@ async function uploadMenuPhoto(event, restaurantIndex) {
     syncRestaurantsFromDOM();
     if (!restaurants[restaurantIndex].menuPhotoUrls) restaurants[restaurantIndex].menuPhotoUrls = [];
     restaurants[restaurantIndex].menuPhotoUrls.push(result.url);
+    // Save immediately — the whole point is a phone-camera-in-hand photo
+    // upload shouldn't require a separate "remember to click Save" step,
+    // and saving is also what registers the photo as unreviewed server-side.
+    const response2 = await staffFetch('/api/competitor-pricing/restaurants', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(currentRestaurantsFromDOM()),
+    });
+    if (response2.ok) restaurants = await response2.json();
+    await loadUnreviewedPhotoURLs();
     renderRestaurantsList();
-    document.getElementById('restaurants-status').textContent = 'Photo added — click Save Restaurants to keep it.';
-    document.getElementById('restaurants-status').classList.remove('status-error', 'status-ok');
+    document.getElementById('restaurants-status').textContent = 'Photo added!';
+    document.getElementById('restaurants-status').classList.remove('status-error');
+    document.getElementById('restaurants-status').classList.add('status-ok');
   } catch (error) {
     statusEl.textContent = error.message;
     statusEl.classList.add('status-error');
@@ -593,7 +650,7 @@ document.getElementById('find-nearby-btn').addEventListener('click', async () =>
 // leaves that entry referencing a restaurant nothing else knows about, so
 // it silently doesn't show up in the report).
 function currentRestaurantsFromDOM() {
-  const rows = document.querySelectorAll('#restaurants-list tr[data-index]');
+  const rows = document.querySelectorAll('#restaurants-list .shop-card[data-index]');
   return Array.from(rows).map((row, i) => {
     const distanceRaw = row.querySelector('.restaurant-distance-input').value;
     return {
@@ -759,6 +816,7 @@ document.getElementById('save-entries-btn').addEventListener('click', async () =
 (async () => {
   await loadMenuItems();
   await loadAIExtractionStatus();
+  await loadUnreviewedPhotoURLs();
   await loadRestaurants();
   await loadGroups();
   await loadEntries();

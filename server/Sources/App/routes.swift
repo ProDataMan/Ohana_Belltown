@@ -68,6 +68,14 @@ struct FeedbackUnacknowledgedCount: Content {
     var count: Int
 }
 
+struct CompetitorUnreviewedPhotoCount: Content {
+    var count: Int
+}
+
+struct MarkPhotoReviewedRequest: Content {
+    var url: String
+}
+
 struct WaitlistJoinRequest: Content {
     var name: String
     var phone: String
@@ -450,6 +458,26 @@ func routes(_ app: Application) throws {
     app.get("api", "competitor-pricing", "report") { req throws -> [CompetitorPriceReportRow] in
         try requireAdmin(req)
         return try CompetitorPricingStore.shared.report()
+    }
+
+    // Drives the site-wide staff notification badge (nav.js) telling the
+    // owner there are competitor menu photos still waiting to be read
+    // (by a future Claude session, or by hand) for prices/dishes.
+    app.get("api", "competitor-pricing", "unreviewed-photo-count") { req throws -> CompetitorUnreviewedPhotoCount in
+        try requireAdmin(req)
+        return CompetitorUnreviewedPhotoCount(count: CompetitorPhotoReviewStore.shared.unreviewedCount())
+    }
+
+    app.get("api", "competitor-pricing", "photos", "unreviewed") { req throws -> [String] in
+        try requireAdmin(req)
+        return CompetitorPhotoReviewStore.shared.unreviewedURLs()
+    }
+
+    app.post("api", "competitor-pricing", "photos", "mark-reviewed") { req throws -> HTTPStatus in
+        let user = try requireAdmin(req)
+        let body = try req.content.decode(MarkPhotoReviewedRequest.self)
+        CompetitorPhotoReviewStore.shared.markReviewed(url: body.url, reviewedByName: user.displayName)
+        return .noContent
     }
 
     // Whether ANTHROPIC_API_KEY is set — a separate credential from any

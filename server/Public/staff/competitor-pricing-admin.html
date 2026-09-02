@@ -37,27 +37,52 @@
       </header>
 
       <section class="panel">
-        <h2>How to Add a Comparison</h2>
+        <h2>How This Works</h2>
         <ol>
-          <li><strong>Find a restaurant.</strong> In "Competitor Restaurants" below, click <strong>Find Nearby Restaurants</strong> and add any worth comparing against — no need to type a name or address.</li>
-          <li><strong>Create a comparison group.</strong> In "Comparison Groups," name the dish you're comparing (e.g. "Ohana Burger" or a generic "Classic Cheeseburger") — link it to one of our own menu items if there's a direct match, so our side of the comparison always shows the live current price.</li>
-          <li><strong>Look up the competitor's price.</strong> Check the restaurant's own site, their delivery-app listing, or upload a photo of their menu in "Menu Photos" (Competitor Restaurants) — if AI extraction is available, click <strong>Extract Items</strong> under a photo to read off item names/prices automatically (always double-check against the photo before using them).</li>
-          <li><strong>Log it as a Price Entry.</strong> In "Price Entries," pick the group and restaurant, enter their price, and optionally a source link/date. Add one entry per competitor for the same group to build out the comparison.</li>
-          <li><strong>Check the report.</strong> The "Price Comparison Report" below updates automatically — it shows our price alongside the competitor average/min/max and how far off we are.</li>
+          <li><strong>Find a restaurant.</strong> Search nearby below and add any worth comparing against — no need to type a name or address.</li>
+          <li><strong>Upload photos of their menu.</strong> Snap a few photos next time you're there (or find their menu online) and add them to that restaurant's card. That's it — no typing prices in one at a time.</li>
+          <li><strong>Wait for the reminder.</strong> A badge shows up here and site-wide whenever there are photos still waiting to be read for prices/dishes — those get filled in during that review, not by hand. "Comparison Groups" and "Price Entries" below are for manual corrections only, not part of the everyday flow.</li>
         </ol>
       </section>
 
       <section class="panel">
         <div class="editor-toolbar">
-          <h2>Price Comparison Report</h2>
+          <h2>Find a Nearby Restaurant</h2>
           <div class="toolbar-actions">
-            <a href="/competitor-pricing-findings.html" class="cta-button secondary">Pricing Findings &amp; Suggestions</a>
-            <button id="reload-report-btn" type="button" class="secondary">Reload</button>
+            <label style="flex-direction: row; align-items: center; gap: 0.4rem; margin: 0;">
+              <input type="number" id="nearby-radius-input" min="0.5" step="0.5" value="3" style="max-width: 5rem;" />
+              miles
+            </label>
+            <button id="find-nearby-btn" type="button" class="secondary">Find Nearby Restaurants</button>
           </div>
         </div>
-        <p class="hint">Our price is pulled live from the current menu when a comparison group is linked to one of our items, so this can't go stale even if entries below haven't been rechecked. See <a href="/competitor-pricing-findings.html">Pricing Findings &amp; Suggestions</a> for a written breakdown of what this data means and what's worth acting on.</p>
-        <div id="report-list"></div>
+        <p class="hint">Sourced from Google Maps, not typed in by hand.</p>
+        <div id="nearby-list"></div>
       </section>
+
+      <section class="panel">
+        <div class="editor-toolbar">
+          <h2>Competitor Restaurants &amp; Menu Photos</h2>
+          <div class="toolbar-actions">
+            <button id="reload-restaurants-btn" type="button" class="secondary">Reload</button>
+          </div>
+        </div>
+        <p class="hint">A pink dot on a photo means it's still waiting to be read for prices/dishes. Click a photo for details, or the &times; to add it, remove it, or dismiss it without processing.</p>
+        <div id="restaurants-list"></div>
+        <button id="save-restaurants-btn" type="button" style="margin-top: 0.75rem;">Save Restaurants</button>
+        <p id="restaurants-status" class="status"></p>
+      </section>
+
+      <section class="panel" id="ai-extraction-panel" hidden>
+        <div class="editor-toolbar">
+          <h2>AI-Extracted Items</h2>
+        </div>
+        <p class="hint">Reviewed, not trusted blindly — check each name/price against the photo before adding it as a Price Entry.</p>
+        <div id="ai-extraction-list"></div>
+      </section>
+
+      <h2 style="margin-bottom: 0;">Manual Corrections</h2>
+      <p class="hint">Not part of the everyday flow — pricing normally gets filled in when menu photos are reviewed above. Use these only to fix a mistake or add something the photo review missed.</p>
 
       <section class="panel">
         <div class="editor-toolbar">
@@ -81,46 +106,12 @@
 
       <section class="panel">
         <div class="editor-toolbar">
-          <h2>Competitor Restaurants</h2>
-          <div class="toolbar-actions">
-            <button id="reload-restaurants-btn" type="button" class="secondary">Reload</button>
-          </div>
-        </div>
-        <p class="hint">Sourced from Google Maps, not typed in by hand — find nearby restaurants below and add the ones worth comparing against. Google doesn't publish a competitor's actual menu prices, so those still need to be checked and entered by hand in Price Entries below.</p>
-        <div id="restaurants-list"></div>
-
-        <div class="editor-toolbar" style="margin-top: 1.5rem;">
-          <h3 style="margin: 0;">Find Nearby Restaurants</h3>
-          <div class="toolbar-actions">
-            <label style="flex-direction: row; align-items: center; gap: 0.4rem; margin: 0;">
-              <input type="number" id="nearby-radius-input" min="0.5" step="0.5" value="3" style="max-width: 5rem;" />
-              miles
-            </label>
-            <button id="find-nearby-btn" type="button" class="secondary">Find Nearby Restaurants</button>
-          </div>
-        </div>
-        <div id="nearby-list"></div>
-
-        <button id="save-restaurants-btn" type="button" style="margin-top: 0.75rem;">Save Restaurants</button>
-        <p id="restaurants-status" class="status"></p>
-      </section>
-
-      <section class="panel" id="ai-extraction-panel" hidden>
-        <div class="editor-toolbar">
-          <h2>AI-Extracted Items</h2>
-        </div>
-        <p class="hint">Reviewed, not trusted blindly — check each name/price against the photo before adding it as a Price Entry.</p>
-        <div id="ai-extraction-list"></div>
-      </section>
-
-      <section class="panel">
-        <div class="editor-toolbar">
           <h2>Price Entries</h2>
           <div class="toolbar-actions">
             <button id="reload-entries-btn" type="button" class="secondary">Reload</button>
           </div>
         </div>
-        <p class="hint">One row per competitor price you've found for a comparison group. Add restaurants and groups above first.</p>
+        <p class="hint">One row per competitor price. Usually filled in automatically during a menu-photo review — add one by hand here only to fix or supplement that.</p>
         <div id="entries-list"></div>
         <form id="entries-form" style="margin-top: 1rem;">
           <div class="cta-row">
@@ -133,10 +124,23 @@
         <button id="save-entries-btn" type="button" style="margin-top: 0.75rem;">Save Entries</button>
         <p id="entries-status" class="status"></p>
       </section>
+
+      <section class="panel">
+        <div class="editor-toolbar">
+          <h2>Price Comparison Report</h2>
+          <div class="toolbar-actions">
+            <a href="/competitor-pricing-findings.html" class="cta-button secondary">Pricing Findings &amp; Suggestions</a>
+            <button id="reload-report-btn" type="button" class="secondary">Reload</button>
+          </div>
+        </div>
+        <p class="hint">Our price is pulled live from the current menu when a comparison group is linked to one of our items, so this can't go stale even if entries above haven't been rechecked. See <a href="/competitor-pricing-findings.html">Pricing Findings &amp; Suggestions</a> for a written breakdown of what this data means and what's worth acting on.</p>
+        <div id="report-list"></div>
+      </section>
     </main>
 
     <script src="/nav.js"></script>
     <script src="../staff-auth.js"></script>
+    <script src="../photo-detail-modal.js"></script>
     <script src="../competitor-pricing-admin.js"></script>
   </body>
 </html>

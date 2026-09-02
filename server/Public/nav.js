@@ -53,6 +53,10 @@ document.addEventListener('click', (event) => {
       startStaffAlertMuteToggle();
       startStaffTableOrderAlerts();
       startStaffFeedbackAlerts();
+      const staffData = await staffResponse.json().catch(() => null);
+      if (staffData?.role === 'admin') {
+        startStaffCompetitorPhotoAlerts();
+      }
     }
   } catch {
     // leave the "Log In" link as-is
@@ -413,6 +417,37 @@ function startStaffFeedbackAlerts() {
       const data = await response.json();
       if (data.count) {
         alertEl.textContent = `${data.count} new feedback submission${data.count === 1 ? '' : 's'}`;
+        alertEl.hidden = false;
+      } else {
+        alertEl.hidden = true;
+      }
+    } catch {
+      // leave the indicator as-is until the next successful poll
+    }
+  }
+
+  poll();
+  setInterval(poll, 20000);
+}
+
+// Same pattern again, for competitor menu photos still waiting to be read
+// for prices/dishes — admin-only (gated by the caller, see the staff-detection
+// block above) since competitor pricing is strategy data, not general staff
+// info. Links to the Competitor Pricing admin page, where the photos live.
+function startStaffCompetitorPhotoAlerts() {
+  const alertEl = document.createElement('a');
+  alertEl.href = '/competitor-pricing-admin.html';
+  alertEl.className = 'staff-order-alert';
+  alertEl.hidden = true;
+  getStaffAlertsContainer().appendChild(alertEl);
+
+  async function poll() {
+    try {
+      const response = await fetch('/api/competitor-pricing/unreviewed-photo-count');
+      if (!response.ok) return;
+      const data = await response.json();
+      if (data.count) {
+        alertEl.textContent = `${data.count} unreviewed menu photo${data.count === 1 ? '' : 's'}`;
         alertEl.hidden = false;
       } else {
         alertEl.hidden = true;

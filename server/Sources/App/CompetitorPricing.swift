@@ -251,10 +251,26 @@ final class CompetitorPricingStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
+        let oldPhotosByRestaurant = Dictionary(
+            uniqueKeysWithValues: data.restaurants.map { ($0.id, Set($0.menuPhotoUrls ?? [])) }
+        )
         let keptIds = Set(items.map(\.id))
         data.restaurants = items
         data.entries.removeAll { !keptIds.contains($0.restaurantId) }
         try persist()
+
+        // Every photo URL genuinely new to a restaurant starts tracked as
+        // unreviewed; anything no longer referenced by any restaurant (a
+        // removed photo, or a whole deleted restaurant) stops counting.
+        for restaurant in items {
+            let oldUrls = oldPhotosByRestaurant[restaurant.id] ?? []
+            for url in restaurant.menuPhotoUrls ?? [] where !oldUrls.contains(url) {
+                CompetitorPhotoReviewStore.shared.recordUnreviewed(url: url, restaurantId: restaurant.id)
+            }
+        }
+        let allCurrentPhotoUrls = Set(items.flatMap { $0.menuPhotoUrls ?? [] })
+        CompetitorPhotoReviewStore.shared.removeEntries(notIn: allCurrentPhotoUrls)
+
         return data.restaurants
     }
 

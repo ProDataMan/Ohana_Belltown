@@ -29,6 +29,7 @@ final class RouteTests: XCTestCase {
         FeedbackStore.shared.configure(dataDirectory: tempDir.path)
         StaffRewardsStore.shared.configure(dataDirectory: tempDir.path)
         CompetitorPricingStore.shared.configure(dataDirectory: tempDir.path)
+        CompetitorPhotoReviewStore.shared.configure(dataDirectory: tempDir.path)
         SwagStore.shared.configure(dataDirectory: tempDir.path)
         SwagOrdersStore.shared.configure(dataDirectory: tempDir.path)
         GiftCardOrdersStore.shared.configure(dataDirectory: tempDir.path)
@@ -428,6 +429,67 @@ final class RouteTests: XCTestCase {
         let extractBody = ByteBuffer(string: #"{"photoUrl":"/uploads/does-not-exist.jpg"}"#)
         try app.test(.POST, "api/competitor-pricing/extract-menu", headers: ["Cookie": cookie, "Content-Type": "application/json"], body: extractBody) { res in
             XCTAssertEqual(res.status, .serviceUnavailable)
+        }
+    }
+
+    func testCompetitorPhotoReviewTracksUnreviewedAndMarkReviewedAndPrunesOnRemoval() throws {
+        try app.test(.GET, "api/competitor-pricing/unreviewed-photo-count") { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+
+        let bootstrapBody = ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"], body: bootstrapBody) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        // Saving a restaurant with a new photo registers it as unreviewed.
+        let restaurantsBody = ByteBuffer(string: #"[{"id":"r1","name":"Test Place","menuPhotoUrls":["/uploads/photo1.jpg"]}]"#)
+        try app.test(.PUT, "api/competitor-pricing/restaurants", headers: ["Cookie": cookie, "Content-Type": "application/json"], body: restaurantsBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+        try app.test(.GET, "api/competitor-pricing/unreviewed-photo-count", headers: ["Cookie": cookie]) { res in
+            let count = try res.content.decode(CompetitorUnreviewedPhotoCount.self)
+            XCTAssertEqual(count.count, 1)
+        }
+        try app.test(.GET, "api/competitor-pricing/photos/unreviewed", headers: ["Cookie": cookie]) { res in
+            let urls = try res.content.decode([String].self)
+            XCTAssertEqual(urls, ["/uploads/photo1.jpg"])
+        }
+
+        // Marking it reviewed clears the count.
+        let markReviewedBody = ByteBuffer(string: #"{"url":"/uploads/photo1.jpg"}"#)
+        try app.test(.POST, "api/competitor-pricing/photos/mark-reviewed", headers: ["Cookie": cookie, "Content-Type": "application/json"], body: markReviewedBody) { res in
+            XCTAssertEqual(res.status, .noContent)
+        }
+        try app.test(.GET, "api/competitor-pricing/unreviewed-photo-count", headers: ["Cookie": cookie]) { res in
+            let count = try res.content.decode(CompetitorUnreviewedPhotoCount.self)
+            XCTAssertEqual(count.count, 0)
+        }
+
+        // Adding a second photo registers only the new one as unreviewed —
+        // the already-reviewed first photo doesn't get re-flagged.
+        let restaurantsBody2 = ByteBuffer(string: #"[{"id":"r1","name":"Test Place","menuPhotoUrls":["/uploads/photo1.jpg","/uploads/photo2.jpg"]}]"#)
+        try app.test(.PUT, "api/competitor-pricing/restaurants", headers: ["Cookie": cookie, "Content-Type": "application/json"], body: restaurantsBody2) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+        try app.test(.GET, "api/competitor-pricing/unreviewed-photo-count", headers: ["Cookie": cookie]) { res in
+            let count = try res.content.decode(CompetitorUnreviewedPhotoCount.self)
+            XCTAssertEqual(count.count, 1)
+        }
+
+        // Removing the restaurant entirely prunes all its photos from the
+        // review store, including the already-reviewed one.
+        let emptyBody = ByteBuffer(string: "[]")
+        try app.test(.PUT, "api/competitor-pricing/restaurants", headers: ["Cookie": cookie, "Content-Type": "application/json"], body: emptyBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+        try app.test(.GET, "api/competitor-pricing/unreviewed-photo-count", headers: ["Cookie": cookie]) { res in
+            let count = try res.content.decode(CompetitorUnreviewedPhotoCount.self)
+            XCTAssertEqual(count.count, 0)
         }
     }
 

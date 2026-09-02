@@ -37,6 +37,7 @@ func configure(_ app: Application) throws {
     FeedbackStore.shared.configure(dataDirectory: dataDirectory)
     StaffRewardsStore.shared.configure(dataDirectory: dataDirectory)
     CompetitorPricingStore.shared.configure(dataDirectory: dataDirectory)
+    CompetitorPhotoReviewStore.shared.configure(dataDirectory: dataDirectory)
     SwagStore.shared.configure(dataDirectory: dataDirectory)
     SwagOrdersStore.shared.configure(dataDirectory: dataDirectory)
     GiftCardOrdersStore.shared.configure(dataDirectory: dataDirectory)
