@@ -1,5 +1,10 @@
 import Crypto
 import Foundation
+#if canImport(FoundationNetworking)
+// URLRequest/URLSession live in a separate module from Foundation on Linux
+// (swift-corelibs-foundation) — the deploy target this actually builds for.
+import FoundationNetworking
+#endif
 import Vapor
 
 protocol TuyaCommanding: Sendable {

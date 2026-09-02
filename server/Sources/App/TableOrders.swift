@@ -223,6 +223,24 @@ final class TableOrdersStore: @unchecked Sendable {
         }.count
     }
 
+    /// Same "past estimated ready time" filter as readyForDeliveryCount(),
+    /// but the actual entries rather than just a count — used by the
+    /// station-light poll to know which prep station/table to flash for.
+    func readyForDelivery() throws -> [TableOrderEntry] {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        let formatter = ISO8601DateFormatter()
+        let now = Date()
+        return entries
+            .filter { entry in
+                guard entry.status == "entered", let readyStr = entry.estimatedReadyAt,
+                      let ready = formatter.date(from: readyStr) else { return false }
+                return ready <= now
+            }
+            .sorted { ($0.estimatedReadyAt ?? "") < ($1.estimatedReadyAt ?? "") }
+    }
+
     /// Real historical average prep time (entered -> delivered) for this
     /// exact item, in minutes — nil until at least 3 completed samples
     /// exist, so one unusually fast/slow order can't skew the estimate.
