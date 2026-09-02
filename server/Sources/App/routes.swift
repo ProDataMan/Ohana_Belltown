@@ -809,6 +809,14 @@ func routes(_ app: Application) throws {
         return entry
     }
 
+    // Lets staff confirm whether the physical station lights are actually
+    // wired up (TUYA_* configured) without exposing the credentials
+    // themselves — no secrets in the response, just booleans/ids/hex colors.
+    app.get("api", "table-orders", "lights") { req async throws -> LightStationsStatus in
+        try requireLogin(req)
+        return await LightNotifier.shared.status()
+    }
+
     // Admin-only — both are analytics.html data, and that page itself is
     // already admin-gated; this keeps the API from being a back door for a
     // non-admin employee who calls it directly.
@@ -928,6 +936,7 @@ func routes(_ app: Application) throws {
         ("competitor-pricing-findings.html", "staff/competitor-pricing-findings.html", true),
         ("swag-admin.html", "staff/swag-admin.html", false),
         ("gift-cards-admin.html", "staff/gift-cards-admin.html", false),
+        ("help.html", "staff/help.html", false),
     ]
     for (route, file, adminOnly) in staffPages {
         app.get(PathComponent(stringLiteral: route)) { req in

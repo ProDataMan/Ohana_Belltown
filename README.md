@@ -26,6 +26,7 @@ now historical background rather than the current plan.
 [Google/Apple/Facebook Sign-In setup](#setting-up-googleapplefacebook-sign-in) ·
 [Local development](#local-development) ·
 [Suggestions for future development](#suggestions-for-future-development) ·
+[Design/UX recommendations](#high-impact-designux-recommendations) ·
 [Other docs](#other-docs-in-this-repo)
 
 ## Live site
@@ -44,8 +45,10 @@ now historical background rather than the current plan.
 - **Persistence:** plain JSON files on an Azure Files–backed volume (no database) —
   `menu.json`, `events.json`, `loyalty.json`, `users.json`, plus an `uploads/` directory for photos.
   Falls back to `Resources/seed-menu.json` on first boot if no persisted data exists yet.
-- **Auth:** Vapor's built-in `Bcrypt` (password hashing) and `SessionsMiddleware` (`.memory` driver —
-  sessions don't survive a restart, so a deploy logs everyone out; acceptable for a small internal team).
+- **Auth:** Vapor's built-in `Bcrypt` (password hashing) and a custom file-backed session driver
+  (`FileSessions`/`FileSessionsStore`, `server/Sources/App/FileSessions.swift`) — one JSON file per
+  session under `<DATA_DIR>/sessions/`, so a deploy or restart no longer logs everyone out (replaces
+  the original in-memory driver). Stale session files (30+ days untouched) are pruned daily.
   Google/Apple/Facebook OAuth on top of that (see [Setting up Google/Apple/Facebook Sign-In](#setting-up-googleapplefacebook-sign-in)),
   using `swift-crypto`'s `P256.Signing` directly for Apple's required client-secret JWT signing.
 - **Hosting:** Azure Container Apps (Consumption plan), resource group `Ohana`, app `ohana-belltown-server`
@@ -77,6 +80,10 @@ now historical background rather than the current plan.
 | `SQUARE_ENVIRONMENT` | **Set to `sandbox`** (2026-08-02) — requests go to `connect.squareupsandbox.com`, fake test cards only. Unset (or set to anything else) to hit production (`connect.squareup.com`) once the token above is swapped too. |
 | `RESEND_API_KEY` | Server-side only — powers real delivery of customer email-verification and password-reset emails via [Resend](https://resend.com)'s REST API (`server/Sources/App/EmailSender.swift`). **Not set yet.** Until it is, emails are only logged server-side (`ConsoleEmailSender`) — see the email caveat below. Get a key at resend.com; the fast path (no domain verification) works immediately with the default `RESEND_FROM_ADDRESS`. |
 | `RESEND_FROM_ADDRESS` | The `From:` address on outgoing email. Defaults to Resend's own `onboarding@resend.dev`, which works without verifying `ohanasushigrill.com`'s DNS. Set to a real `@ohanasushigrill.com` address once that domain is verified with Resend (needs DNS moved to a host that exposes TXT records — see "Suggestions for future development" below). |
+| `TUYA_ACCESS_ID`, `TUYA_ACCESS_SECRET` | Server-side only — Tuya IoT Platform Cloud project credentials, powering the optional Feit/Tuya station-light table-order notifications (see "What's shipped" below). **Not set yet** — entirely dormant/no-op until both are set, same pattern as every other optional integration. |
+| `TUYA_REGION` | Which Tuya data-center region to call (`us` default, or `us-e`/`eu`/`in`/`cn`) — must match wherever the Tuya Smart Life account/devices were actually registered. |
+| `TUYA_DEVICE_ID_SERVER`, `TUYA_DEVICE_ID_KITCHEN`, `TUYA_DEVICE_ID_SUSHI`, `TUYA_DEVICE_ID_BAR` | Tuya device IDs for each physical bulb (server-station, kitchen, sushi bar, service bar). `TUYA_DEVICE_ID` also works as a single fallback for just the server-station bulb if that's all that's wired up initially. Any fixture with no device ID configured is simply skipped. |
+| `TUYA_COLOUR_CODE` | Which Tuya DP (data point) code the bulbs expect for color — `colour_data` (default) or `colour_data_v2`, depending on the specific bulb model. Check the device's DP schema in the Tuya IoT Platform if colors come out wrong. |
 
 `STAFF_PIN` is no longer used — it was retired in favor of real per-user login (see below) and can be removed from the Container App if still set.
 
@@ -103,6 +110,14 @@ now historical background rather than the current plan.
 | `/table-card.html` | Printable QR-code table tents — one per real table/seat (43 total: dining room, bar, sushi bar, deck), each QR unique to its spot |
 | `/scan` | Smart QR landing: redirects to `/happy-hour` during Happy Hour (Mon&ndash;Fri, 3&ndash;6pm Pacific) or `/menu` otherwise, carrying the table id along if the QR had one |
 | `/table-orders-admin.html` | Staff: a visual floor map (flashes a table the moment it needs entry, again once it's awaiting delivery) plus "Needs Entry" and "Awaiting Delivery" list queues for dine-in table orders, and the staff-on-duty count used for prep-time estimates. **Any logged-in employee.** |
+| `/shop` | Public: buy Ohana merch (bandanas, hats, t-shirts) online via Square Checkout — real card payment |
+| `/swag-admin.html` | Staff: manage the Shop product list (name, price, availability, photos), mark paid orders delivered. **Any logged-in employee.** |
+| `/gift-cards` | Public: pay online for a physical Ohana gift card, $5&ndash;$500, via Square Checkout |
+| `/gift-cards-admin.html` | Staff: see paid gift-card orders, activate the physical card, mark fulfilled. **Any logged-in employee.** |
+| `/staff-rewards-admin.html` | Staff: points card for keeping the site up to date — award points, review social-media point requests, edit point values/reward catalog. **Admin only.** |
+| `/competitor-pricing-admin.html` | Staff: find/add nearby competitor restaurants, upload photos of their menus, review the price comparison report. **Admin only.** |
+| `/competitor-pricing-findings.html` | Staff: written summary of what the price comparison data means and what's worth acting on. **Admin only.** |
+| `/help.html` | Staff: setup guides and reference notes (e.g. Tuya Cloud account setup for the table-order station lights), linked from the `.staff-tools-nav` on every admin page. **Any logged-in employee.** |
 | `/signup`, `/account-login` | Customer registration and login (separate from staff accounts). `/account-login` links to `/login` for staff. |
 | `/logged-in` | Shared post-login router — sends staff to `/edit.html` and customers to `/my-account.html`. Where Google Sign-In lands after a successful login. |
 | `/my-account.html` | Customer's own account page — profile, password change |
@@ -138,7 +153,7 @@ now historical background rather than the current plan.
 - `/edit-item.html?id=...` — a focused single-item editor (photos, price, description, tags, featured/sold-out/Happy-Hour toggles, delete) reached by clicking a small "Edit" link that now appears next to every item on the public menu pages (`/menu`, `/sushi`, `/drinks`, `/happy-hour`) whenever a staff member is logged in — invisible to everyone else. The original bulk editor at `/edit.html` (edit many prices, then one Save) still works exactly as before; this is an additional, faster path for touching one item at a time, e.g. from an analytics report link.
 - The "Staff: edit menu →" link on `/menu`, `/sushi`, `/drinks`, and `/happy-hour` is hidden by default and only reveals itself (via `/api/auth/me`) if you're currently logged in as staff — anonymous visitors never see it.
 - Clicking any photo thumbnail in either editor's gallery (`/edit.html` or `/edit-item.html`) opens a preview with resolution, file size, date added, and who added it (`GET /api/uploads/:filename/info`, staff-only) — resolution/size are read live off the file itself, date/uploader come from a new `UploadMetadataStore` that `POST /api/upload` writes to going forward. Since that upload endpoint is also used by the anonymous customer loyalty photo-share flow (`/rewards`), "added by" is best-effort (whoever's logged in at upload time, blank for a guest) rather than a hard requirement — and photos uploaded before this store existed simply show "Unknown (uploaded before tracking was added)" instead of a guess.
-- A "Staff ▾" dropdown appears in the main site header (every public page, injected by `nav.js`) whenever a staff member is logged in — the same links as the `.staff-tools-nav` on every admin page (Menu Editor, Table Orders, Loyalty, Waitlist, Events, Table Cards, Analytics, Staff Rewards, Manage Users, My Account), just also reachable from the customer-facing site without knowing a direct URL.
+- A "Staff ▾" dropdown appears in the main site header (every public page, injected by `nav.js`) whenever a staff member is logged in — the same links as the `.staff-tools-nav` on every admin page (Menu Editor, Table Orders, Loyalty, Waitlist, Events, Table Cards, Analytics, Staff Rewards, Competitor Pricing, Swag, Gift Cards, Manage Users, My Account, Help), just also reachable from the customer-facing site without knowing a direct URL.
 - **Fixed**: the "Menu ▾"/"Staff ▾" nav dropdowns could get stuck open on iPad and not close on a second tap. The CSS also opened the menu on `:hover`, and a tap on a touchscreen leaves a synthetic `:hover` state stuck active — OR'd with that rule, the menu stayed visually open even after the JS toggle removed its `.open` class. Hover-to-open is now scoped to `@media (hover: hover) and (pointer: fine)` (real mouse/trackpad only), and a tap anywhere outside an open dropdown now closes it as a second safety net.
 - Both editors now return to `/menu` once you're done, instead of leaving you stranded on the edit form: saving on `/edit.html` or `/edit-item.html` shows a brief "Saved!" message, then redirects to `/menu` (where the per-item Edit links are right there if something else needs a touch-up). Both also have a **Cancel** button next to Save that returns to `/menu` immediately without saving.
 - Prices are hidden site-wide (`/menu`, `/sushi`, `/drinks`, `/happy-hour`, `/specials`, and the homepage's featured-items widget — plus the page's schema.org structured data, so they don't leak into search results either) until a table's QR code has actually been scanned this session (Yosh's call). A logged-in staff member still sees prices everywhere regardless, so editing/previewing your own changes on `/menu` still works without needing to scan anything.
@@ -161,6 +176,7 @@ now historical background rather than the current plan.
 - The "awaiting delivery" flash (and its spoken alert, below) doesn't start the instant an order is entered — that's before the kitchen could plausibly have it ready. It waits until whichever is greater: the average prep time of the single slowest dish still cooking at that table, or half the combined average prep time of everything cooking there (computed client-side from each order's own `enteredAt`/`estimatedReadyAt`, no extra API call).
 - Spoken order alerts — logged-in staff hear "3 new items added to order at table 84, deck, waiting for 2 to be delivered" whenever a table has items not yet entered by a server (batched into one announcement per table, not one per item — the new-item count is items still `pending`, the waiting count is items already `entered` but not yet `delivered`; the "waiting for..." clause is omitted entirely when that count is 0), and "Order up, table 84, deck" once that table crosses the prep-time threshold above — via the browser's built-in text-to-speech, using the same 15-second poll and table-map lookup as the visual alert. Works site-wide (every page, including every staff admin page, not just `/table-orders-admin.html`) since it's driven from the shared `nav.js`. Best-effort only (some browsers won't play any audio until the page has had a click), so it's a supplement to the visual/tab alerts, not a replacement. A small "🔔 Alerts on"/"🔕 Alerts muted" toggle (top-right, next to the alert badges) lets a staff member mute just the spoken alerts on their own device — the visual badge and floor map still work while muted. Both alerts repeat roughly once a minute for as long as a table has any unaddressed items (still not entered, or still not delivered) rather than announcing once and going silent, so a reminder can't get missed in a busy room — each repeat re-reads the table's current counts, so it stays accurate if more items get added in between. On mobile (≤860px) the alert badges sit just below the header instead of at its very top-right corner, so they don't cover the hamburger menu button that lives in that same corner there.
 - iOS reliability (every browser there — Chrome included — runs on Apple's WebKit engine, not its own): speech only plays at all if `speak()` has fired at least once inside a real tap, so the first tap anywhere on the page after logging in (or unmuting) silently "primes" it by speaking "Voice alerts on" — normal use of the site unlocks it without staff needing to know to do anything special. A [Screen Wake Lock](https://developer.mozilla.org/en-US/docs/Web/API/Screen_Wake_Lock_API) is requested while alerts are on, since iOS suspends a locked/backgrounded tab's timers entirely (stopping the poll, not just the audio) — best-effort, silently no-ops on older browsers. Returning to the tab also clears a well-known iOS bug where the speech queue gets permanently stuck reporting "still speaking" after being backgrounded. None of this can fully replace a real push notification, though — if staff genuinely need an alert while the phone is locked or another app is in front, that needs an installed PWA with the Web Push API, a meaningfully bigger feature than this.
+- Physical station lights (Feit/Tuya smart bulbs, `server/Sources/App/LightNotifier.swift`/`TuyaCloudClient.swift`/`PrepStation.swift`, see `docs/feit-bulb-table-order-lights.md`) — an optional, entirely physical echo of the spoken/visual alerts above, for a kitchen/bar that isn't looking at a screen. A new order pulses the server-station bulb in that area's color (gold/kitchen, teal/sushi, blue/bar) for 30 seconds or until confirmed entered; confirming entry triple-flashes both that station's bulb and the server bulb purple; an order crossing the "should be ready" prep-time threshold triple-flashes pink at the station and holds the server bulb pulsing pink until delivered. Polls the same `readyForDelivery()` data as the visual/spoken alerts every 5 seconds. `GET /api/table-orders/lights` (any logged-in staff) reports whether it's actually enabled and which fixtures/colors are configured, without exposing the Tuya credentials themselves. Entirely optional and a no-op unless `TUYA_*` credentials are set (see env table above) — **not configured yet**.
 - Add-ons & upgrades on individual menu items (e.g. "Add Katsu +$6", "Yosh Size +$25.20") — staff define these per item from `/edit-item.html`, and a guest ordering that item from their table sees them as checkboxes right on the menu, with the selection carried through to the staff order queue. Not priced/charged automatically (this still isn't a payment system) — just makes sure the request actually reaches staff instead of getting lost.
 - Checking an add-on updates that item's displayed price live, e.g. checking "Yosh Size" on a $28 Loco Moco shows "$53.20 ($28.00 + Yosh Size $25.20)" — so a guest sees the real total, and what's driving it, before they order. Unchecking everything reverts to the plain base price. Wraps onto multiple lines on a narrow screen instead of overflowing — checking every add-on on a dish at once (a long breakdown) stays fully on-screen at 390px wide.
 - Required choice groups on composite dishes (`MenuItemChoiceGroup` — e.g. Shogun Bento's "your choice of chicken or beef") — staff define a label + comma-separated options per item on `/edit-item.html`, same "Required Choices" section, right below Add-Ons. Unlike a modifier, this renders as radio buttons (not checkboxes) since exactly one option must be picked and none of them change the price — the "Add to Order" button refuses to add the item (with an inline "Please make a selection" note) until every required choice group on it has a pick. The selection travels to staff the same way a modifier does — as a plain string like "Choice of Protein: Beef" appended to the order's `modifiers` list — so the kitchen queue needed no changes to show it. Reserved for a choice that's genuinely bundled into one dish; two dishes that happen to cost the same (e.g. "Chicken Teriyaki" vs. "Spicy Chicken Teriyaki") are simpler as two separate menu items instead (see `/edit.html`) — added 2026-08-02 after realizing several menu items were listed as "X or Y" in a single name/price, uneditable as a real choice at order time.
@@ -238,7 +254,7 @@ now historical background rather than the current plan.
 - `sitemap.xml` and `robots.txt`
 - Cache-Control revalidation on every response (avoids stale-cache bugs after a deploy)
 - Accessibility pass — fixed real WCAG AA contrast failures (brand pink/gold read ~3:1 as text on light backgrounds; added darker `--pink-text`/`--gold-text` variants used only for text, keeping the brighter originals for backgrounds/borders), a focus state that was fully removed without a visible replacement, and a heading-hierarchy skip on the Contact page. Alt text was already solid site-wide.
-- Automated test suite (`server/Tests/AppTests`, 214 tests) — loyalty punch/redeem math, waitlist and table-order lifecycle behavior (including prep-time estimation and delivery-stats aggregation), analytics aggregation (including OS/browser/device-model user-agent parsing), single-item menu CRUD, staff and customer auth (including deactivation, OAuth linking/photo- and email-backfill for both account types, Facebook as an independent provider alongside Google/Apple, and rewards-card linking), menu backward-compat decoding, the Happy Hour time-window/QR-redirect logic (including table-id passthrough), and route-level permission boundaries. Run with `swift test` from `server/`.
+- Automated test suite (`server/Tests/AppTests`, 246 tests) — loyalty punch/redeem math, waitlist and table-order lifecycle behavior (including prep-time estimation and delivery-stats aggregation), analytics aggregation (including OS/browser/device-model user-agent parsing), single-item menu CRUD, staff and customer auth (including deactivation, OAuth linking/photo- and email-backfill for both account types, Facebook as an independent provider alongside Google/Apple, and rewards-card linking), menu backward-compat decoding, the Happy Hour time-window/QR-redirect logic (including table-id passthrough), competitor-photo review tracking, station-light cue planning, and route-level permission boundaries. Run with `swift test` from `server/` — see [Local development](#local-development) for the GCC-version workaround this sandbox needs to actually build/link locally rather than relying only on CI.
 - **Fixed**: `/analytics.html` itself has always been admin-only at the page level, but 3 of the API endpoints behind it (`delivery-stats`, `occupancy-stats`, `feedback` list/acknowledge) only required *some* staff login underneath — meaning a non-admin employee could still pull that data by calling the API directly, bypassing the page gate. All now require admin. The site-wide "N new feedback" badge every staff member sees (not just admins) is unaffected — that one only ever exposed a bare count, not the feedback content.
 - Self-hosted analytics (`/analytics.html`, admin only) — pageview counts by page and by day, device type (mobile/tablet/desktop), operating system (iPhone/iPad/Android/macOS/Windows/Linux), browser (Safari/Chrome/Firefox/Edge/Samsung Internet/Opera), best-effort Android hardware model (e.g. "Pixel 8" — parsed only when a browser's user-agent happens to include it; iOS never exposes a specific model, so there's no equivalent list for Apple devices), average time on page, and most-viewed menu items (detail-popup opens — a proxy for interest, not a sales figure, since this site has no access to real order data from ChowNow). No cookies, no third-party tracking script, no per-visitor identity anywhere. Bounded to 120 days of aggregated data.
 - `/analytics.html` landing view is a grid of compact summary cards (one per section — peak day, most-viewed page/item, device/OS/browser split, sitewide missing-price/photo counts, etc.), not a long single-column scroll. Clicking a card — or a notification link like `/analytics.html?section=feedback` — expands just that section into a full detail view, so the target always lands exactly where intended (no other section's async-loaded content is above it to shift the page after the click).
@@ -291,6 +307,9 @@ actually shipped as of this README. Not in priority order.
 - Password reset is admin-only for staff (an admin resets it for you) — no self-service "forgot password" email flow for staff (customers have one; see the email caveat below for why it's not fully live yet)
 - Staff accounts can be deactivated/reactivated (see above), but not deleted outright. Customers can self-deactivate their own account (`/my-account.html`), but reactivation isn't self-service (contact the restaurant) — and there's still no staff-facing UI to manage/browse customer accounts.
 - ChowNow menu photo import — investigated, blocked by Cloudflare bot protection on ChowNow's API; not pursued further (see git history for details)
+
+**Needs a follow-up action, not a code change**
+- **Google Sign-In's redirect URI may still point at the old Azure hostname.** When the site's canonical domain moved to `https://www.ohanasushigrill.com` (see `PublicBaseURL.swift`), the app started requesting `https://www.ohanasushigrill.com/auth/google/callback` as the OAuth redirect URI instead of the old Azure one. If that exact URL hasn't been added to **Authorized redirect URIs** in the Google Cloud Console yet (`docs/oauth-setup.md` has the steps), Google sign-in fails with `redirect_uri_mismatch`. Quick to confirm/fix, but can't be verified or done from this codebase — needs a login to the Google Cloud Console.
 
 **Known deliberate tradeoffs (not bugs)**
 - **AI menu-photo extraction is built but not live yet.** Needs `ANTHROPIC_API_KEY` (see the env table above) — a separate credential/billing setup from any claude.ai chat subscription, not yet configured. Until then, the "Extract Items" button on Competitor Pricing simply doesn't appear (checked via `GET /api/competitor-pricing/ai-extraction-status`), same pattern as Apple/Facebook Sign-In staying hidden until their credentials exist.
@@ -428,72 +447,88 @@ caveat above) — after registering at `/signup` or requesting a reset at
 ## Suggestions for future development
 
 Roughly in priority order — not a committed roadmap, just where the next
-session's effort would likely pay off most. Written 2026-08-02.
+session's effort would likely pay off most. Written 2026-08-02, refreshed
+2026-09-02 after the domain went live, Competitor Pricing was redesigned
+around photo upload, and station-light table-order notifications shipped.
 
-1. **Flip Square to production.** Highest leverage item on this list: Shop
-   and Gift Cards are fully built and tested, just sitting behind a sandbox
-   flag. See [Payment Processing](#payment-processing-square) above for the
-   exact two-step swap. Nothing else blocks this.
-2. **Set `RESEND_API_KEY`.** ~~Pick an email provider and wire it in~~ — code
-   is done: `ResendEmailSender` (`server/Sources/App/EmailSender.swift`) is
-   implemented and `EmailSenderFactory.make` already branches on
-   `RESEND_API_KEY`. Self-service password reset and email verification are
-   still dead ends until that key exists (the link just gets logged
-   server-side, never delivered). Two paths, don't let one block the other:
+1. **Confirm Google Sign-In's redirect URI is registered for the real
+   domain.** Two minutes, and currently the single most likely thing to be
+   actively broken for a real user — see "Needs a follow-up action" above.
+   Add `https://www.ohanasushigrill.com/auth/google/callback` in the Google
+   Cloud Console (steps in `docs/oauth-setup.md`) if not already done.
+2. **Flip Square to production.** Still the highest-leverage *money* item:
+   Shop and Gift Cards are fully built and tested, just sitting behind a
+   sandbox flag. See [Payment Processing](#payment-processing-square) above
+   for the exact two-step swap. Nothing else blocks this.
+3. **Set `RESEND_API_KEY`.** Code is done: `ResendEmailSender`
+   (`server/Sources/App/EmailSender.swift`) is implemented and
+   `EmailSenderFactory.make` already branches on `RESEND_API_KEY`.
+   Self-service password reset and email verification are still dead ends
+   until that key exists (the link just gets logged server-side, never
+   delivered). Two paths, don't let one block the other:
    - **Fast path (do this first):** skip domain verification, send from
      Resend's own `onboarding@resend.dev` address (the current default for
      `RESEND_FROM_ADDRESS`). Five minutes, unblocks real delivery today,
      just not `@ohanasushigrill.com`-branded.
-   - **Branded path (needs DNS work first):** verify `ohanasushigrill.com`
-     (or a subdomain) with Resend, then set `RESEND_FROM_ADDRESS` to a real
-     address on it — but the domain's current DNS host (Weebly's manager)
-     only exposes MX records and nameservers, not the TXT records Resend's
-     SPF/DKIM verification needs. Blocked on item 3.
-3. **Move DNS to Cloudflare (free)** — unblocks two things at once: branded
-   email above, and binding `ohanasushigrill.com` as a real custom domain on
-   the Container App (free managed cert included). Plan already scoped: move
-   DNS to Cloudflare, keep the registration wherever it is now (no transfer
-   needed), recreate the existing Google MX records there, then add the
-   custom domain in Azure Container Apps using the TXT+CNAME it provides.
-   Once live, re-point the 43 printed table-card QR codes
-   (`/table-card.html`) from the Azure hostname back to the real domain —
-   they were deliberately left on Azure for testing.
-4. **Get a real Echelon quote** — `docs/payment-processing-plan.md` has the
+   - **Branded path:** verify `ohanasushigrill.com` (or a subdomain) with
+     Resend — now unblocked, since DNS has moved off Weebly and the domain
+     is live (see below) — then set `RESEND_FROM_ADDRESS` to a real address
+     on it.
+4. ~~**Move DNS / bind the real domain**~~ — **done.**
+   `ohanasushigrill.com`/`www.ohanasushigrill.com` are live, bound as
+   custom domains on the Container App with a managed cert, and every
+   hardcoded reference to the old Azure hostname (canonical/og tags,
+   sitemap, `PublicBaseURL.swift`'s fallback, the 43 printed table-card QR
+   codes) has been swept to the real domain. This is what unblocked the
+   branded-email path in item 3 above.
+5. **Get a real Echelon quote** — `docs/payment-processing-plan.md` has the
    full comparison and exactly what to ask for (effective online rate,
-   pricing model, gateway/monthly/PCI fees, contract terms). Nothing to
-   decide until that quote exists; Square's rates are already verified and
-   documented in that file for comparison.
-5. **Quick-win OAuth credentials, if still wanted:** Facebook Login is free
+   pricing model, gateway/monthly/PCI fees, contract terms). Re-checked
+   2026-09-02: still no public pricing from Echelon, so this is still
+   blocked on getting a written quote. Square's rates are already verified
+   and documented in that file for comparison.
+6. **Quick-win OAuth credentials, if still wanted:** Facebook Login is free
    and ~10 minutes (steps in `docs/oauth-setup.md`) — the backend and hidden
    UI are already built and tested, just needs `FACEBOOK_OAUTH_APP_ID`/
    `FACEBOOK_OAUTH_APP_SECRET`. Apple Sign-In needs a paid ($99/yr) Developer
    Program enrollment first, so it's a real cost decision, not just a
    time cost — confirm it's still wanted before spending on it.
-6. **`ANTHROPIC_API_KEY` for AI menu-photo extraction** — cheap (pay-per-use,
+7. **`ANTHROPIC_API_KEY` for AI menu-photo extraction** — cheap (pay-per-use,
    fractions of a cent per photo), fully built, just needs billing set up at
    console.anthropic.com (separate from any claude.ai chat subscription).
-7. **Decide on the Yakisoba pricing inconsistency** found during the
+   Note this is now a *bonus* on Competitor Pricing rather than the primary
+   workflow there — see the redesign described in "What's shipped" above,
+   where a periodic Claude Code session reads unreviewed menu photos
+   directly instead.
+8. **Wire up the Tuya station lights, if the physical bulbs are ready.**
+   Built and merged (`LightNotifier.swift`/`TuyaCloudClient.swift`, see
+   `docs/feit-bulb-table-order-lights.md`), fully dormant until `TUYA_*`
+   credentials are set (see env table above) — needs a Tuya IoT Platform
+   Cloud project plus each bulb's device ID pulled from the Tuya/Smart Life
+   app. Purely physical/optional — nothing else depends on this.
+9. **Decide on the Yakisoba pricing inconsistency** found during the
    description-cleanup pass (2026-08-02): its "With chicken: $27 / YOSH
    $51.30" note doesn't reconcile with simple base+modifier math (base $23 +
    Add Chicken $4 + Yosh Size $20.70 = $47.70, not $51.30) — left as-is
    pending a human call on which number is actually correct, since silently
    "fixing" a real menu price without knowing the intent seemed riskier than
-   flagging it.
-8. **Consider real Square Gift Card API integration** as a later upgrade —
-   today, `/gift-cards` only collects payment; a staff member manually
-   activates a physical card. If volume justifies it, Square's Gift Cards +
-   Gift Card Activities API could auto-create and activate a real, scannable
-   digital gift card server-side once a webhook confirms payment, emailing
-   (or displaying) the resulting GAN to the buyer. Bigger build — this is
-   why it was deliberately skipped for the initial version.
-9. **Uptime monitoring** — steps are ready in `docs/uptime-monitoring.md`,
-   just needs a free UptimeRobot account created (can't be done on your
-   behalf) pointed at the existing `/healthz` endpoint.
-10. ~~**Session persistence**~~ — done: sessions are now file-backed
+   flagging it. Still unresolved.
+10. **Consider real Square Gift Card API integration** as a later upgrade —
+    today, `/gift-cards` only collects payment; a staff member manually
+    activates a physical card. If volume justifies it, Square's Gift Cards +
+    Gift Card Activities API could auto-create and activate a real,
+    scannable digital gift card server-side once a webhook confirms
+    payment, emailing (or displaying) the resulting GAN to the buyer.
+    Bigger build — this is why it was deliberately skipped for the initial
+    version.
+11. **Uptime monitoring** — steps are ready in `docs/uptime-monitoring.md`,
+    just needs a free UptimeRobot account created (can't be done on your
+    behalf) pointed at the existing `/healthz` endpoint.
+12. ~~**Session persistence**~~ — done: sessions are now file-backed
     (`server/Sources/App/FileSessions.swift`), persisted under
     `<DATA_DIR>/sessions/` on the same Azure Files volume every other store
     uses, so a deploy no longer logs everyone out.
-11. **The bigger long-term idea worth naming:** table ordering
+13. **The bigger long-term idea worth naming:** table ordering
     (`/menu` → "Add to Order" → `/table-orders-admin.html`) is currently just
     a "heads up" queue — staff still ring everything up on the real POS, and
     payment happens the traditional way. Now that real Square payment rails
@@ -505,9 +540,69 @@ session's effort would likely pay off most. Written 2026-08-02.
     as the logical next step once the smaller payment surfaces (Shop, Gift
     Cards) have some real usage behind them.
 
+See [High-impact design/UX recommendations](#high-impact-designux-recommendations)
+below for suggestions on the site's usability/visual design rather than its
+feature backlog.
+
+## High-impact design/UX recommendations
+
+Observations from working across the whole site this session, not tied to
+any specific bug report — worth considering, not urgent, no action taken
+yet. Roughly ordered by expected impact for the effort involved.
+
+1. **Add a dark mode, at least for customer-facing pages.** `style.css` hard-codes
+   `color-scheme: light` with no `@media (prefers-color-scheme: dark)` or
+   `[data-theme]` handling anywhere in the site. This matters more than
+   usual for a restaurant: a guest is often pulling up `/menu` at a table in
+   a dimly-lit room at night, on their phone, at full brightness because the
+   page assumes daylight. The brand palette (`--pink`, `--purple`, `--gold`)
+   already has WCAG-AA-safe text variants (`--pink-text`, `--gold-text`)
+   from the earlier accessibility pass — a dark palette could reuse the same
+   verification method. Start with `/menu`, `/sushi`, `/drinks`,
+   `/happy-hour`, `/specials` (what a seated guest actually looks at);
+   staff admin pages are lower priority since they're used in a lit
+   back-of-house environment.
+2. **Bring the rest of the staff admin pages' tables to mobile.** Competitor
+   Pricing's restaurant list was rebuilt this session as a `.shop-grid` card
+   layout instead of a `<table>` that only handled narrow screens via
+   `overflow-x: auto` sideways scroll (see "What's shipped" above) — because
+   staff actually use that page from a phone. The same sideways-scroll
+   pattern is still how every *other* admin table works (`swag-admin.html`,
+   `loyalty-admin.html`, `events-admin.html`, `staff-rewards-admin.html`,
+   etc.), and staff are just as likely to be on a phone there too. Worth
+   auditing which of those get used away from a desk and giving the
+   highest-traffic ones the same card-based treatment.
+3. **Consolidate the growing stack of staff notification badges.** There are
+   now five separate "something needs attention" signals surfacing as
+   individual pills in the same top-right corner via `nav.js`: table orders,
+   customer feedback, and competitor menu photos as visible badges, plus the
+   spoken-alert system layered on top of the first. Fine at this count, but
+   each new one (the next might be staff-reward approval requests, or
+   something else) makes the corner more cluttered and harder to scan at a
+   glance. Worth collapsing into a single "N notifications" dropdown/badge
+   before adding a fourth or fifth, rather than after it starts feeling
+   crowded.
+4. **A unified staff "home" dashboard.** With four different "needs
+   attention" data sources now (table orders, feedback, competitor photos,
+   staff-reward approvals) spread across different admin pages, there's no
+   single place a manager can glance at to see everything waiting on them —
+   they have to know to check each page out of habit, or wait for whichever
+   badge happens to catch their eye. A simple landing page summarizing all
+   of them (reusing the counts each badge already computes) could replace
+   that habit-based checking with one real answer.
+5. **Resolve Square/Echelon and flip on real online checkout.** Already the
+   top item in "Suggestions for future development" above, but worth
+   repeating here as the single biggest *customer-facing* UX gap: Shop and
+   Gift Cards currently show real products/prices but can't actually take a
+   real payment yet, and dine-in table ordering (`/menu` → "Add to Order")
+   is a heads-up queue rather than real checkout. The UX is otherwise fully
+   built for all three — this is a credentials/business decision away from
+   being a materially better experience, not more engineering.
+
 ## Other docs in this repo
 
 - `docs/payment-processing-plan.md` — Square vs. Echelon comparison for web-purchase card processing (Shop/Gift Cards) — Echelon doesn't publish pricing, so this is a research/decision-framework doc pending a real quote, not a completed comparison
+- `docs/feit-bulb-table-order-lights.md` — how the optional Tuya station-light table-order notifications work and how to configure real bulbs (`TUYA_*` env vars)
 - `docs/feature-roadmap.md` — original feature audit and phased plan (predates most of what's now shipped; see the gaps list above for current state)
 - `docs/visual-design-direction.md` — the palette/type direction used for the visual refresh
 - `docs/oauth-setup.md` — step-by-step Google/Apple/Facebook Sign-In credential setup
