@@ -129,7 +129,7 @@ function addItemToCart(button) {
     const errorEl = modifiersContainer.querySelector('.item-modifiers-error');
     if (!modifiers.length) {
       if (errorEl) errorEl.hidden = false;
-      return;
+      return false;
     }
     if (errorEl) errorEl.hidden = true;
   }
@@ -151,7 +151,7 @@ function addItemToCart(button) {
     if (errorEl) errorEl.hidden = true;
     choiceSelections.push(`${groupEl.dataset.groupLabel}: ${checked.value}`);
   });
-  if (missingChoice) return;
+  if (missingChoice) return false;
 
   setPendingCartItem(itemName, { itemId, section: window.MENU_SECTION, modifiers: [...modifiers, ...choiceSelections] });
 
@@ -164,6 +164,7 @@ function addItemToCart(button) {
     c.querySelectorAll('.item-choice-group input').forEach((r) => { r.disabled = true; });
   });
   updateCartBadge();
+  return true;
 }
 
 function removeItemFromCart(button) {
@@ -601,8 +602,11 @@ function ensureItemModal() {
         markOrderDelivered(orderBtn);
       } else if (orderBtn.classList.contains('order-btn-in-cart')) {
         removeItemFromCart(orderBtn);
-      } else {
-        addItemToCart(orderBtn);
+      } else if (addItemToCart(orderBtn)) {
+        // Added successfully (not blocked by a missing required
+        // add-on/choice selection) — close the modal so the guest lands
+        // back on the menu page they were browsing, cart badge updated.
+        closeItemModal();
       }
     }
   });
