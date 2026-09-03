@@ -44,6 +44,21 @@ function getTableId() {
   return sessionStorage.getItem('ohana_table_id');
 }
 
+/// A `?prices=1` on the URL means the front-door "browse the menu while you
+/// wait" QR code — show real prices without a table scan, but deliberately
+/// does NOT unlock ordering/modifiers/choice groups (those still require an
+/// actual table, so staff know where to deliver). Same sessionStorage-persist
+/// pattern as getTableId(), kept as a separate key so it can never be
+/// mistaken for a real table id.
+function getPriceViewFlag() {
+  const fromQuery = new URLSearchParams(window.location.search).get('prices');
+  if (fromQuery === '1') {
+    sessionStorage.setItem('ohana_price_view', '1');
+    return true;
+  }
+  return sessionStorage.getItem('ohana_price_view') === '1';
+}
+
 /// Orders placed this session that haven't been marked received yet, keyed
 /// by item name — lets the "Order" button turn into "Mark Received" and
 /// stay that way across a re-render (e.g. navigating to another menu page).
@@ -447,6 +462,7 @@ function renderMenu(data) {
 
   itemsByIndex = [];
   const tableId = getTableId();
+  const priceView = getPriceViewFlag();
   const activeOrders = tableId ? getActiveOrders() : {};
   const pendingCart = tableId ? getPendingCart() : {};
 
@@ -460,12 +476,14 @@ function renderMenu(data) {
 
           // Prices only show once a table's QR code has been scanned this
           // session (Yosh's call — browsing the public site shouldn't show
-          // prices at all, only ordering from an actual table). Rendered
-          // hidden rather than omitted so logged-in staff can still reveal
-          // it (see revealStaffOnlyElementsIfLoggedIn) to check their edits.
+          // prices at all, only ordering from an actual table) — or via the
+          // front-door "browse while you wait" QR (priceView), which shows
+          // real prices without unlocking ordering at all. Rendered hidden
+          // rather than omitted so logged-in staff can still reveal it (see
+          // revealStaffOnlyElementsIfLoggedIn) to check their edits.
           const priceMarkup =
             item.price != null
-              ? `<div class="price staff-revealable-price" data-base-price="${item.price}" ${tableId ? '' : 'hidden'}>$${Number(item.price).toFixed(2)}</div>`
+              ? `<div class="price staff-revealable-price" data-base-price="${item.price}" ${tableId || priceView ? '' : 'hidden'}>$${Number(item.price).toFixed(2)}</div>`
               : '';
           const featuredImage = (item.images || [])[0];
           const imageMarkup = featuredImage
@@ -670,7 +688,7 @@ async function openItemModal(index) {
   modal.querySelector('.item-modal-desc').textContent = item.description || '';
 
   const priceEl = modal.querySelector('.item-modal-price');
-  const showPrice = item.price != null && (Boolean(getTableId()) || staffLoggedIn);
+  const showPrice = item.price != null && (Boolean(getTableId()) || staffLoggedIn || getPriceViewFlag());
   if (item.price != null) {
     priceEl.dataset.basePrice = item.price;
   } else {

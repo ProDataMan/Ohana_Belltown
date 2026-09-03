@@ -63,6 +63,27 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    // The front-door "browse the menu while you wait" QR — no table, just
+    // asks the menu page to show real prices.
+    func testScanPreservesPricesFlagOnRedirect() throws {
+        try app.test(.GET, "scan?prices=1") { res in
+            XCTAssertEqual(res.status, .seeOther)
+            let location = res.headers.first(name: .location)
+            XCTAssertTrue(location == "/menu?prices=1" || location == "/happy-hour?prices=1", "unexpected redirect target: \(location ?? "nil")")
+        }
+    }
+
+    func testScanCombinesTableAndPricesFlagOnRedirect() throws {
+        try app.test(.GET, "scan?table=5&prices=1") { res in
+            XCTAssertEqual(res.status, .seeOther)
+            let location = res.headers.first(name: .location)
+            XCTAssertTrue(
+                location == "/menu?table=5&prices=1" || location == "/happy-hour?table=5&prices=1",
+                "unexpected redirect target: \(location ?? "nil")"
+            )
+        }
+    }
+
     // analytics.html itself is admin-gated at the page level, but its data
     // came from a mix of requireLogin/requireAdmin endpoints underneath —
     // meaning a logged-in-but-non-admin employee could hit those APIs

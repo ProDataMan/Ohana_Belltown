@@ -123,9 +123,19 @@ func routes(_ app: Application) throws {
     // menu page can show a per-item Order button tied to that table.
     app.get("scan") { req in
         var target = HappyHourSchedule.landingPath()
+        var queryParts: [String] = []
         if let table = req.query[String.self, at: "table"]?.trimmingCharacters(in: .whitespacesAndNewlines), !table.isEmpty,
            let encoded = table.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
-            target += "?table=\(encoded)"
+            queryParts.append("table=\(encoded)")
+        }
+        // The front-door "browse the menu while you wait" QR — real prices,
+        // still no table, so no ordering UI unlocks. See getPriceViewFlag()
+        // in menu-section.js.
+        if req.query[String.self, at: "prices"] == "1" {
+            queryParts.append("prices=1")
+        }
+        if !queryParts.isEmpty {
+            target += "?" + queryParts.joined(separator: "&")
         }
         return req.redirect(to: target, redirectType: .normal)
     }

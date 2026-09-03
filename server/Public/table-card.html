@@ -143,6 +143,13 @@
         member will come confirm it before it's sent to the kitchen, so nothing gets flagged for
         the kitchen until a real person has actually looked at it.
       </p>
+      <p>
+        The two cards at the top aren't tied to a table — <strong>"While You Wait"</strong> is meant
+        for the host stand/front door: it shows the real menu with real prices so a waiting guest can
+        browse, but doesn't unlock ordering (no table to deliver to). <strong>"Shop Ohana Swag"</strong>
+        goes straight to the merch store. Print those once; the table-specific cards below are the
+        ones that need reprinting if the floor plan ever changes.
+      </p>
       <button type="button" onclick="window.print()">Print This Page</button>
     </div>
 
@@ -158,6 +165,25 @@
         return `Table ${entry.id}`;
       }
 
+      // Not tied to any table/seat, so not part of the /api/table-map loop
+      // below — printed once, at the top of the sheet.
+      const specialCardsHtml = `
+        <div class="table-card">
+          <img class="logo" src="/images/logo.png" alt="" />
+          <span class="table-number">While You Wait</span>
+          <h2>Scan for Menu</h2>
+          <img class="qr" src="/images/qr-view-menu.png" alt="QR code linking to the Ohana Belltown menu with prices" />
+          <p>Food &middot; Sushi &middot; Drinks &middot; Happy Hour</p>
+        </div>
+        <div class="table-card">
+          <img class="logo" src="/images/logo.png" alt="" />
+          <span class="table-number">Take Home Some Aloha</span>
+          <h2>Shop Ohana Swag</h2>
+          <img class="qr" src="/images/qr-shop.png" alt="QR code linking to the Ohana Belltown shop" />
+          <p>Bandanas &middot; Hats &middot; T-Shirts</p>
+        </div>
+      `;
+
       async function loadTableCards() {
         const sheet = document.getElementById('card-sheet');
         try {
@@ -167,20 +193,22 @@
           const sectionOrder = ['dining', 'bar', 'sushi', 'deck'];
           entries.sort((a, b) => sectionOrder.indexOf(a.section) - sectionOrder.indexOf(b.section) || a.id.localeCompare(b.id, undefined, { numeric: true }));
 
-          sheet.innerHTML = entries
-            .map((entry) => {
-              const label = labelFor(entry);
-              return `
-                <div class="table-card">
-                  <img class="logo" src="/images/logo.png" alt="" />
-                  <span class="table-number">${label} — ${sectionLabels[entry.section] || entry.section}</span>
-                  <h2>Scan for Menu</h2>
-                  <img class="qr" src="/images/table-qr-${entry.id}.png" alt="QR code for ${label}, linking to the Ohana Belltown menu" />
-                  <p>Food &middot; Sushi &middot; Drinks &middot; Happy Hour</p>
-                </div>
-              `;
-            })
-            .join('');
+          sheet.innerHTML =
+            specialCardsHtml +
+            entries
+              .map((entry) => {
+                const label = labelFor(entry);
+                return `
+                  <div class="table-card">
+                    <img class="logo" src="/images/logo.png" alt="" />
+                    <span class="table-number">${label} — ${sectionLabels[entry.section] || entry.section}</span>
+                    <h2>Scan for Menu</h2>
+                    <img class="qr" src="/images/table-qr-${entry.id}.png" alt="QR code for ${label}, linking to the Ohana Belltown menu" />
+                    <p>Food &middot; Sushi &middot; Drinks &middot; Happy Hour</p>
+                  </div>
+                `;
+              })
+              .join('');
         } catch (error) {
           sheet.textContent = error.message;
         }
