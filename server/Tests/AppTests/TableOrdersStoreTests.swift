@@ -146,6 +146,15 @@ final class TableOrdersStoreTests: XCTestCase {
         XCTAssertEqual(mine.map { $0.itemName }, ["Mine"])
     }
 
+    func testOrdersForDeviceFiltersByDeviceId() throws {
+        try TableOrdersStore.shared.place(tableId: "5", itemName: "Mine", itemId: nil, section: nil, customerId: nil, deviceId: "device-1")
+        try TableOrdersStore.shared.place(tableId: "5", itemName: "Not mine", itemId: nil, section: nil, customerId: nil, deviceId: "device-2")
+        try TableOrdersStore.shared.place(tableId: "5", itemName: "No device id", itemId: nil, section: nil, customerId: nil)
+
+        let mine = try TableOrdersStore.shared.ordersForDevice(deviceId: "device-1")
+        XCTAssertEqual(mine.map { $0.itemName }, ["Mine"])
+    }
+
     func testReadyForDeliveryCountReflectsEstimatedReadyTime() throws {
         let entry = try TableOrdersStore.shared.place(tableId: "5", itemName: "Spam Musubi", itemId: nil, section: "drinks", customerId: nil)
         try TableOrdersStore.shared.markEntered(id: entry.id, staffOnDuty: 10)

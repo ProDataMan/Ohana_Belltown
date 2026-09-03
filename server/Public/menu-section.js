@@ -59,6 +59,23 @@ function getPriceViewFlag() {
   return sessionStorage.getItem('ohana_price_view') === '1';
 }
 
+/// A random id generated once per browser and kept in localStorage — unlike
+/// every other key on this page (sessionStorage, cleared when the tab
+/// closes), this one deliberately persists so a guest who orders without
+/// signing in can still pull up their own past orders later, from the same
+/// browser, on /order-history. Not a real identity: no account, no
+/// PII, nothing that ties it to a person — just enough entropy that nobody
+/// else can guess it and see someone else's orders.
+function getDeviceId() {
+  let id = localStorage.getItem('ohana_device_id');
+  if (id) return id;
+  id = window.crypto && window.crypto.randomUUID
+    ? window.crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
+  localStorage.setItem('ohana_device_id', id);
+  return id;
+}
+
 /// Orders placed this session that haven't been marked received yet, keyed
 /// by item name — lets the "Order" button turn into "Mark Received" and
 /// stay that way across a re-render (e.g. navigating to another menu page).
@@ -214,7 +231,14 @@ async function sendPendingOrder() {
         const response = await fetch('/api/table-orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tableId, itemName, itemId: entry.itemId, section: entry.section, modifiers: entry.modifiers }),
+          body: JSON.stringify({
+            tableId,
+            itemName,
+            itemId: entry.itemId,
+            section: entry.section,
+            modifiers: entry.modifiers,
+            deviceId: getDeviceId(),
+          }),
         });
         if (!response.ok) throw new Error();
         const order = await response.json();
@@ -948,7 +972,10 @@ function renderCartModalBody() {
   const itemNames = Object.keys(cart);
 
   if (!itemNames.length) {
-    body.innerHTML = '<p class="hint">Your order is empty — tap "Add to Order" on anything you\'d like, from any menu page.</p>';
+    body.innerHTML = `
+      <p class="hint">Your order is empty — tap "Add to Order" on anything you'd like, from any menu page.</p>
+      <p class="hint"><a href="/order-history">See your past orders →</a></p>
+    `;
     return;
   }
 
@@ -1018,6 +1045,7 @@ function renderCartModalBody() {
       <p class="status status-ok" style="font-size: 1rem;">
         Staff have been notified that you're ready to order — someone will be by shortly to confirm it.
       </p>
+      <p class="hint"><a href="/order-history">See your order history →</a></p>
       <button type="button" id="cart-modal-done-btn">Got it</button>
     `;
     body.querySelector('#cart-modal-done-btn').addEventListener('click', () => {

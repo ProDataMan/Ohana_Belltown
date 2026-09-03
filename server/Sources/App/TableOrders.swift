@@ -14,6 +14,14 @@ struct TableOrderEntry: Codable, Content {
     /// history" on their account page. Most orders won't have one; ordering
     /// doesn't require being logged in.
     var customerId: String?
+    /// A random UUID the browser generates itself and persists in
+    /// localStorage (see getDeviceId() in menu-section.js) — set on every
+    /// order regardless of login status, so a guest who never signs in can
+    /// still see their own past orders on /order-history.html from the same
+    /// browser. Not a real identity (no account, no PII), just enough to
+    /// look the orders back up; a customer who IS signed in gets both this
+    /// and customerId set on the same entry.
+    var deviceId: String?
     /// "pending" (just placed) -> "entered" (staff checked with the table and
     /// entered it into the order system) -> "delivered". Can also branch to
     /// "cancelled" from "pending" or "entered" — e.g. a server talks to the
@@ -38,13 +46,13 @@ struct TableOrderEntry: Codable, Content {
     var modifiers: [String]
 
     enum CodingKeys: String, CodingKey {
-        case id, tableId, itemName, itemId, section, customerId, status, createdAt, updatedAt
+        case id, tableId, itemName, itemId, section, customerId, deviceId, status, createdAt, updatedAt
         case enteredAt, deliveredAt, cancelledAt, cancelReason, estimatedReadyAt, modifiers
     }
 
     init(
         id: String, tableId: String, itemName: String, itemId: String? = nil, section: String? = nil,
-        customerId: String? = nil, status: String, createdAt: String, updatedAt: String,
+        customerId: String? = nil, deviceId: String? = nil, status: String, createdAt: String, updatedAt: String,
         enteredAt: String? = nil, deliveredAt: String? = nil, cancelledAt: String? = nil,
         cancelReason: String? = nil, estimatedReadyAt: String? = nil,
         modifiers: [String] = []
@@ -55,6 +63,7 @@ struct TableOrderEntry: Codable, Content {
         self.itemId = itemId
         self.section = section
         self.customerId = customerId
+        self.deviceId = deviceId
         self.status = status
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -74,6 +83,7 @@ struct TableOrderEntry: Codable, Content {
         itemId = try container.decodeIfPresent(String.self, forKey: .itemId)
         section = try container.decodeIfPresent(String.self, forKey: .section)
         customerId = try container.decodeIfPresent(String.self, forKey: .customerId)
+        deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId)
         let decodedStatus = try container.decode(String.self, forKey: .status)
         // "acknowledged" was this feature's original status name, before the
         // entered/delivered lifecycle existed — treat it as "entered" so any
@@ -176,14 +186,17 @@ final class TableOrdersStore: @unchecked Sendable {
     }
 
     @discardableResult
-    func place(tableId: String, itemName: String, itemId: String?, section: String?, customerId: String?, modifiers: [String] = []) throws -> TableOrderEntry {
+    func place(
+        tableId: String, itemName: String, itemId: String?, section: String?, customerId: String?,
+        deviceId: String? = nil, modifiers: [String] = []
+    ) throws -> TableOrderEntry {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
         let timestamp = now()
         let entry = TableOrderEntry(
             id: UUID().uuidString, tableId: tableId, itemName: itemName, itemId: itemId, section: section,
-            customerId: customerId, status: "pending", createdAt: timestamp, updatedAt: timestamp,
+            customerId: customerId, deviceId: deviceId, status: "pending", createdAt: timestamp, updatedAt: timestamp,
             modifiers: modifiers
         )
         entries.append(entry)
@@ -403,6 +416,19 @@ final class TableOrdersStore: @unchecked Sendable {
         try loadIfNeeded()
         return entries
             .filter { $0.customerId == customerId }
+            .sorted { $0.createdAt > $1.createdAt }
+    }
+
+    /// Same idea as ordersForCustomer, keyed by the browser-generated device
+    /// id instead of a real account — lets a guest who never signs in still
+    /// see their own past orders (see /order-history.html, getDeviceId() in
+    /// menu-section.js).
+    func ordersForDevice(deviceId: String) throws -> [TableOrderEntry] {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        return entries
+            .filter { $0.deviceId == deviceId }
             .sorted { $0.createdAt > $1.createdAt }
     }
 

@@ -291,6 +291,34 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testDeviceOrderHistoryTracksOnlyMatchingDeviceIdAndRequiresTheParam() throws {
+        try app.test(.GET, "api/table-orders/device-history") { res in
+            XCTAssertEqual(res.status, .badRequest)
+        }
+
+        let mineBody = ByteBuffer(string: #"{"tableId":"5","itemName":"Mine","deviceId":"device-1"}"#)
+        try app.test(.POST, "api/table-orders", headers: ["Content-Type": "application/json"], body: mineBody) { res in
+            XCTAssertEqual(res.status, .ok)
+            let entry = try res.content.decode(TableOrderEntry.self)
+            XCTAssertEqual(entry.deviceId, "device-1")
+        }
+        let otherBody = ByteBuffer(string: #"{"tableId":"5","itemName":"Not mine","deviceId":"device-2"}"#)
+        try app.test(.POST, "api/table-orders", headers: ["Content-Type": "application/json"], body: otherBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+        let anonymousBody = ByteBuffer(string: #"{"tableId":"5","itemName":"No device id"}"#)
+        try app.test(.POST, "api/table-orders", headers: ["Content-Type": "application/json"], body: anonymousBody) { res in
+            let entry = try res.content.decode(TableOrderEntry.self)
+            XCTAssertNil(entry.deviceId)
+        }
+
+        try app.test(.GET, "api/table-orders/device-history?deviceId=device-1") { res in
+            XCTAssertEqual(res.status, .ok)
+            let orders = try res.content.decode([TableOrderEntry].self)
+            XCTAssertEqual(orders.map(\.itemName), ["Mine"])
+        }
+    }
+
     func testFeedbackSubmitIsPublicButListingRequiresLogin() throws {
         let body = ByteBuffer(string: #"{"category":"food","rating":5,"message":"Great sushi!","page":"/menu"}"#)
         try app.test(.POST, "api/feedback", headers: ["Content-Type": "application/json"], body: body) { res in

@@ -23,6 +23,7 @@ struct TableOrderRequest: Content {
     var itemId: String?
     var section: String?
     var modifiers: [String]?
+    var deviceId: String?
 }
 
 struct CancelOrderRequest: Content {
@@ -784,9 +785,11 @@ func routes(_ app: Application) throws {
             throw Abort(.badRequest, reason: "Table ID and item name are required.")
         }
         let customerId = try? currentCustomer(req)?.id
+        let trimmedDeviceId = body.deviceId?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let deviceId = (trimmedDeviceId?.isEmpty ?? true) ? nil : trimmedDeviceId
         let entry = try TableOrdersStore.shared.place(
             tableId: tableId, itemName: itemName, itemId: body.itemId, section: body.section, customerId: customerId,
-            modifiers: body.modifiers ?? []
+            deviceId: deviceId, modifiers: body.modifiers ?? []
         )
         Task { await LightNotifier.shared.notifyPlaced(entry) }
         return entry
@@ -844,6 +847,20 @@ func routes(_ app: Application) throws {
     app.get("api", "table-orders", "lights") { req async throws -> LightStationsStatus in
         try requireLogin(req)
         return await LightNotifier.shared.status()
+    }
+
+    // Public, deliberately — this is the whole point: a guest who never
+    // signs in can still see their own past orders from this browser, via
+    // /order-history.html. The device id is a random UUID the browser
+    // generated itself (getDeviceId() in menu-section.js); knowing the
+    // exact id is the only thing that can look its orders up, same trust
+    // model as any capability-style token/link.
+    app.get("api", "table-orders", "device-history") { req throws -> [TableOrderEntry] in
+        guard let deviceId = req.query[String.self, at: "deviceId"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !deviceId.isEmpty else {
+            throw Abort(.badRequest, reason: "deviceId is required.")
+        }
+        return try TableOrdersStore.shared.ordersForDevice(deviceId: deviceId)
     }
 
     // Admin-only — both are analytics.html data, and that page itself is
@@ -941,6 +958,7 @@ func routes(_ app: Application) throws {
         ("faq", "pages/faq.html"),
         ("shop", "pages/shop.html"),
         ("gift-cards", "pages/gift-cards.html"),
+        ("order-history", "pages/order-history.html"),
     ]
     for (route, file) in cleanPages {
         app.get(PathComponent(stringLiteral: route)) { req in
