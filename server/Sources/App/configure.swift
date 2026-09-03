@@ -48,6 +48,21 @@ func configure(_ app: Application) throws {
         FeedbackDigest.schedule(app)
         Task { await LightNotifier.shared.configureFromEnvironment() }
         LightNotifier.scheduleReadyPoll(app)
+        // A "pending"/"entered" order nobody ever entered or delivered used
+        // to just silently drop off staff's queues once stale, with nothing
+        // ever actually marking it resolved — harmless as a heads-up-only
+        // queue, but a real liability once anything (e.g. charging a
+        // table's card) might key off an order's status. Runs every 30
+        // minutes so staleness becomes a real, visible "cancelled" state.
+        app.eventLoopGroup.next().scheduleRepeatedTask(initialDelay: .minutes(5), delay: .minutes(30)) { _ in
+            let promise = app.eventLoopGroup.next().makePromise(of: Void.self)
+            promise.completeWithTask {
+                guard let cancelled = try? TableOrdersStore.shared.cancelStaleOrders() else { return }
+                for entry in cancelled {
+                    await LightNotifier.shared.notifyCancelled(entry)
+                }
+            }
+        }
     }
 
     try routes(app)

@@ -172,6 +172,33 @@ final class TableOrdersStoreTests: XCTestCase {
         XCTAssertTrue(try TableOrdersStore.shared.readyForDelivery().isEmpty)
     }
 
+    func testCancelStaleOrdersCancelsOldPendingAndEnteredOrders() throws {
+        let farPast = Date().addingTimeInterval(-5 * 60 * 60)  // 5h ago: stale for both pending (4h) and entered (2h)
+        try seedEntries([
+            TableOrderEntry(
+                id: "stale-pending", tableId: "1", itemName: "Never Entered", status: "pending",
+                createdAt: iso(farPast), updatedAt: iso(farPast)
+            ),
+            TableOrderEntry(
+                id: "stale-entered", tableId: "2", itemName: "Never Delivered", status: "entered",
+                createdAt: iso(farPast), updatedAt: iso(farPast), enteredAt: iso(farPast),
+                estimatedReadyAt: iso(farPast.addingTimeInterval(600))
+            ),
+            TableOrderEntry(
+                id: "fresh-pending", tableId: "3", itemName: "Just Placed", status: "pending",
+                createdAt: iso(Date()), updatedAt: iso(Date())
+            ),
+        ])
+
+        let cancelled = try TableOrdersStore.shared.cancelStaleOrders()
+        XCTAssertEqual(Set(cancelled.map(\.id)), ["stale-pending", "stale-entered"])
+        XCTAssertTrue(cancelled.allSatisfy { $0.status == "cancelled" && $0.cancelledAt != nil && $0.cancelReason != nil })
+
+        // Not cancelled again on a second sweep, and the fresh one is untouched.
+        XCTAssertTrue(try TableOrdersStore.shared.cancelStaleOrders().isEmpty)
+        XCTAssertEqual(try TableOrdersStore.shared.needsEntry().map(\.id), ["fresh-pending"])
+    }
+
     func testDeliveryStatsComputesAveragesFromCompletedOrders() throws {
         let entry = try TableOrdersStore.shared.place(tableId: "5", itemName: "Spam Musubi", itemId: nil, section: "menu", customerId: nil)
         try TableOrdersStore.shared.markEntered(id: entry.id, staffOnDuty: 3)

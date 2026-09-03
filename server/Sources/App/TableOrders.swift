@@ -348,6 +348,54 @@ final class TableOrdersStore: @unchecked Sendable {
         return entries[idx]
     }
 
+    /// Previously, a "pending"/"entered" order that nobody ever entered or
+    /// delivered just silently dropped off needsEntry()/awaitingDelivery()
+    /// once stale — its status stayed "pending"/"entered" forever, with
+    /// nothing anywhere actually marking it resolved. Harmless while table
+    /// orders are only ever a heads-up for staff, but a real liability once
+    /// anything (e.g. charging a table's card) might key off an order's
+    /// status — an indefinitely "still open" order is exactly the kind of
+    /// thing that could get double-charged or charged for nothing. Run
+    /// periodically (see configure.swift) so staleness is a real, visible,
+    /// auditable "cancelled" state instead of a silent disappearance.
+    @discardableResult
+    func cancelStaleOrders() throws -> [TableOrderEntry] {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        let formatter = ISO8601DateFormatter()
+        let now = Date()
+        let pendingCutoff = now.addingTimeInterval(-Self.pendingStaleAfterSeconds)
+        let enteredCutoff = now.addingTimeInterval(-Self.awaitingDeliveryStaleAfterSeconds)
+        var cancelled: [TableOrderEntry] = []
+
+        for idx in entries.indices {
+            let entry = entries[idx]
+            let reason: String
+            switch entry.status {
+            case "pending":
+                guard let created = formatter.date(from: entry.createdAt), created <= pendingCutoff else { continue }
+                reason = "Auto-cancelled: never entered within \(Int(Self.pendingStaleAfterSeconds / 3600))h of being placed."
+            case "entered":
+                guard let enteredAt = entry.enteredAt, let entered = formatter.date(from: enteredAt), entered <= enteredCutoff else { continue }
+                reason = "Auto-cancelled: never delivered within \(Int(Self.awaitingDeliveryStaleAfterSeconds / 3600))h of being entered."
+            default:
+                continue
+            }
+            let timestamp = now
+            entries[idx].status = "cancelled"
+            entries[idx].cancelledAt = ISO8601DateFormatter().string(from: timestamp)
+            entries[idx].cancelReason = reason
+            entries[idx].updatedAt = entries[idx].cancelledAt!
+            cancelled.append(entries[idx])
+        }
+
+        if !cancelled.isEmpty {
+            try persist()
+        }
+        return cancelled
+    }
+
     /// A signed-in customer's own past table orders, newest first.
     func ordersForCustomer(customerId: String) throws -> [TableOrderEntry] {
         lock.lock()
