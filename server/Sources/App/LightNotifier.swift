@@ -67,6 +67,15 @@ actor LightNotifier {
         Task { await resumeServerHoldIfNeeded(excludingReadyPulse: true) }
     }
 
+    /// Same cleanup as delivered — the entry stops counting toward
+    /// needsEntry/awaitingDelivery either way, so the server-station light
+    /// needs the same "what's actually still pending" recompute.
+    func notifyCancelled(_ entry: TableOrderEntry) {
+        guard isEnabled else { return }
+        announcedReadyIds.remove(entry.id)
+        Task { await resumeServerHoldIfNeeded(excludingReadyPulse: true) }
+    }
+
     private func resumeServerHoldIfNeeded(excludingReadyPulse: Bool) async {
         let ready: [TableOrderEntry]
         let pending: [TableOrderEntry]

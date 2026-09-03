@@ -55,6 +55,43 @@ final class TableOrdersStoreTests: XCTestCase {
         XCTAssertTrue(try TableOrdersStore.shared.awaitingDelivery().isEmpty)
     }
 
+    func testCancellingAPendingOrderRemovesItFromNeedsEntry() throws {
+        let entry = try TableOrdersStore.shared.place(tableId: "5", itemName: "Spam Musubi", itemId: nil, section: "menu", customerId: nil)
+        let cancelled = try TableOrdersStore.shared.cancel(id: entry.id, reason: "Guest changed their mind")
+        XCTAssertEqual(cancelled.status, "cancelled")
+        XCTAssertNotNil(cancelled.cancelledAt)
+        XCTAssertEqual(cancelled.cancelReason, "Guest changed their mind")
+
+        XCTAssertTrue(try TableOrdersStore.shared.needsEntry().isEmpty)
+    }
+
+    func testCancellingAnEnteredOrderRemovesItFromAwaitingDelivery() throws {
+        let entry = try TableOrdersStore.shared.place(tableId: "5", itemName: "Spam Musubi", itemId: nil, section: "menu", customerId: nil)
+        try TableOrdersStore.shared.markEntered(id: entry.id, staffOnDuty: 3)
+        let cancelled = try TableOrdersStore.shared.cancel(id: entry.id, reason: nil)
+        XCTAssertEqual(cancelled.status, "cancelled")
+        XCTAssertNil(cancelled.cancelReason, "a blank/nil reason should stay nil, not an empty string")
+
+        XCTAssertTrue(try TableOrdersStore.shared.awaitingDelivery().isEmpty)
+    }
+
+    func testCancellingADeliveredOrderThrows() throws {
+        let entry = try TableOrdersStore.shared.place(tableId: "5", itemName: "Spam Musubi", itemId: nil, section: "menu", customerId: nil)
+        try TableOrdersStore.shared.markEntered(id: entry.id, staffOnDuty: 3)
+        try TableOrdersStore.shared.markDelivered(id: entry.id)
+        XCTAssertThrowsError(try TableOrdersStore.shared.cancel(id: entry.id, reason: nil)) { error in
+            guard let orderError = error as? TableOrderError else { return XCTFail("wrong error type") }
+            XCTAssertEqual(orderError, .cannotCancelDelivered)
+        }
+    }
+
+    func testCancellingUnknownEntryThrows() throws {
+        XCTAssertThrowsError(try TableOrdersStore.shared.cancel(id: "does-not-exist", reason: nil)) { error in
+            guard let orderError = error as? TableOrderError else { return XCTFail("wrong error type") }
+            XCTAssertEqual(orderError, .entryNotFound)
+        }
+    }
+
     func testEnteringUnknownEntryThrows() throws {
         XCTAssertThrowsError(try TableOrdersStore.shared.markEntered(id: "does-not-exist", staffOnDuty: 3)) { error in
             guard let orderError = error as? TableOrderError else { return XCTFail("wrong error type") }

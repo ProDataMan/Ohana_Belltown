@@ -15,12 +15,19 @@ struct TableOrderEntry: Codable, Content {
     /// doesn't require being logged in.
     var customerId: String?
     /// "pending" (just placed) -> "entered" (staff checked with the table and
-    /// entered it into the order system) -> "delivered".
+    /// entered it into the order system) -> "delivered". Can also branch to
+    /// "cancelled" from "pending" or "entered" — e.g. a server talks to the
+    /// table and they no longer want an item — but never from "delivered"
+    /// (already served; that's a different, unhandled scenario, not a cancel).
     var status: String
     var createdAt: String
     var updatedAt: String
     var enteredAt: String?
     var deliveredAt: String?
+    /// Set when marked "cancelled" — who/why, for the same reason enteredAt/
+    /// deliveredAt are kept: a simple audit trail, not shown to the guest.
+    var cancelledAt: String?
+    var cancelReason: String?
     /// Set when marked "entered" — a heuristic estimate of when the dish
     /// should be ready, used to proactively notify staff. See PrepTimeEstimator.
     var estimatedReadyAt: String?
@@ -32,13 +39,14 @@ struct TableOrderEntry: Codable, Content {
 
     enum CodingKeys: String, CodingKey {
         case id, tableId, itemName, itemId, section, customerId, status, createdAt, updatedAt
-        case enteredAt, deliveredAt, estimatedReadyAt, modifiers
+        case enteredAt, deliveredAt, cancelledAt, cancelReason, estimatedReadyAt, modifiers
     }
 
     init(
         id: String, tableId: String, itemName: String, itemId: String? = nil, section: String? = nil,
         customerId: String? = nil, status: String, createdAt: String, updatedAt: String,
-        enteredAt: String? = nil, deliveredAt: String? = nil, estimatedReadyAt: String? = nil,
+        enteredAt: String? = nil, deliveredAt: String? = nil, cancelledAt: String? = nil,
+        cancelReason: String? = nil, estimatedReadyAt: String? = nil,
         modifiers: [String] = []
     ) {
         self.id = id
@@ -52,6 +60,8 @@ struct TableOrderEntry: Codable, Content {
         self.updatedAt = updatedAt
         self.enteredAt = enteredAt
         self.deliveredAt = deliveredAt
+        self.cancelledAt = cancelledAt
+        self.cancelReason = cancelReason
         self.estimatedReadyAt = estimatedReadyAt
         self.modifiers = modifiers
     }
@@ -73,6 +83,8 @@ struct TableOrderEntry: Codable, Content {
         updatedAt = try container.decode(String.self, forKey: .updatedAt)
         enteredAt = try container.decodeIfPresent(String.self, forKey: .enteredAt)
         deliveredAt = try container.decodeIfPresent(String.self, forKey: .deliveredAt)
+        cancelledAt = try container.decodeIfPresent(String.self, forKey: .cancelledAt)
+        cancelReason = try container.decodeIfPresent(String.self, forKey: .cancelReason)
         estimatedReadyAt = try container.decodeIfPresent(String.self, forKey: .estimatedReadyAt)
         modifiers = try container.decodeIfPresent([String].self, forKey: .modifiers) ?? []
     }
@@ -114,18 +126,21 @@ struct TableOccupancyStatsSummary: Content {
 
 enum TableOrderError: Error, Equatable {
     case entryNotFound
+    case cannotCancelDelivered
 }
 
 extension TableOrderError: AbortError {
     var status: HTTPResponseStatus {
         switch self {
         case .entryNotFound: return .notFound
+        case .cannotCancelDelivered: return .conflict
         }
     }
 
     var reason: String {
         switch self {
         case .entryNotFound: return "Order not found."
+        case .cannotCancelDelivered: return "This item was already delivered and can't be cancelled."
         }
     }
 }
@@ -294,6 +309,32 @@ final class TableOrdersStore: @unchecked Sendable {
         let timestamp = now()
         entries[idx].status = "delivered"
         entries[idx].deliveredAt = timestamp
+        entries[idx].updatedAt = timestamp
+        try persist()
+        return entries[idx]
+    }
+
+    /// A server talked to the table and they no longer want this item —
+    /// either before it was entered (changed their mind before the kitchen
+    /// even saw it) or after (kitchen hasn't started/can 86 it). Refuses on
+    /// an already-delivered item, since that's a different situation (it
+    /// already reached the table) than this is meant to handle.
+    @discardableResult
+    func cancel(id: String, reason: String?) throws -> TableOrderEntry {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard let idx = entries.firstIndex(where: { $0.id == id }) else {
+            throw TableOrderError.entryNotFound
+        }
+        guard entries[idx].status != "delivered" else {
+            throw TableOrderError.cannotCancelDelivered
+        }
+        let timestamp = now()
+        entries[idx].status = "cancelled"
+        entries[idx].cancelledAt = timestamp
+        let trimmedReason = reason?.trimmingCharacters(in: .whitespacesAndNewlines)
+        entries[idx].cancelReason = (trimmedReason?.isEmpty ?? true) ? nil : trimmedReason
         entries[idx].updatedAt = timestamp
         try persist()
         return entries[idx]

@@ -188,6 +188,57 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testTableOrderCancelRequiresLoginAndRemovesFromNeedsEntry() throws {
+        let orderBody = ByteBuffer(string: #"{"tableId":"5","itemName":"Spam Musubi","section":"menu"}"#)
+        var orderId: String?
+        try app.test(.POST, "api/table-orders", headers: ["Content-Type": "application/json"], body: orderBody) { res in
+            let entry = try res.content.decode(TableOrderEntry.self)
+            orderId = entry.id
+        }
+        guard let id = orderId else { return XCTFail("expected an order id") }
+
+        // Unlike deliver, cancel is staff-only — a guest shouldn't be able
+        // to cancel their own order out from under themselves.
+        try app.test(.POST, "api/table-orders/\(id)/cancel") { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+
+        let bootstrapBody = ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"], body: bootstrapBody) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        let cancelBody = ByteBuffer(string: #"{"reason":"Guest changed their mind"}"#)
+        try app.test(.POST, "api/table-orders/\(id)/cancel", headers: ["Cookie": cookie, "Content-Type": "application/json"], body: cancelBody) { res in
+            XCTAssertEqual(res.status, .ok)
+            let cancelled = try res.content.decode(TableOrderEntry.self)
+            XCTAssertEqual(cancelled.status, "cancelled")
+            XCTAssertEqual(cancelled.cancelReason, "Guest changed their mind")
+        }
+
+        try app.test(.GET, "api/table-orders/dashboard", headers: ["Cookie": cookie]) { res in
+            let dashboard = try res.content.decode(TableOrdersDashboard.self)
+            XCTAssertTrue(dashboard.needsEntry.isEmpty, "a cancelled order shouldn't still show up as needing entry")
+        }
+
+        // Already-delivered orders refuse to cancel (409), not silently succeed.
+        let orderBody2 = ByteBuffer(string: #"{"tableId":"6","itemName":"Poke Bowl","section":"menu"}"#)
+        var secondId: String?
+        try app.test(.POST, "api/table-orders", headers: ["Content-Type": "application/json"], body: orderBody2) { res in
+            secondId = try res.content.decode(TableOrderEntry.self).id
+        }
+        guard let id2 = secondId else { return XCTFail("expected a second order id") }
+        try app.test(.POST, "api/table-orders/\(id2)/enter", headers: ["Cookie": cookie]) { _ in }
+        try app.test(.POST, "api/table-orders/\(id2)/deliver") { _ in }
+        try app.test(.POST, "api/table-orders/\(id2)/cancel", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .conflict)
+        }
+    }
+
     func testStaffingCanBeReadAndUpdated() throws {
         let bootstrapBody = ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)
         var sessionCookie: String?

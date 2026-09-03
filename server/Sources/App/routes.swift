@@ -25,6 +25,10 @@ struct TableOrderRequest: Content {
     var modifiers: [String]?
 }
 
+struct CancelOrderRequest: Content {
+    var reason: String?
+}
+
 struct TableOrdersDashboard: Content {
     var needsEntry: [TableOrderEntry]
     var awaitingDelivery: [TableOrderEntry]
@@ -806,6 +810,21 @@ func routes(_ app: Application) throws {
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
         let entry = try TableOrdersStore.shared.markDelivered(id: id)
         Task { await LightNotifier.shared.notifyDelivered(entry) }
+        return entry
+    }
+
+    // Staff-only — a server talked to the table and they no longer want
+    // this item, whether it's still waiting to be entered or already
+    // cooking. Refuses (409) once it's been delivered; that's a different
+    // situation than this handles. Not public like deliver is, since a
+    // guest shouldn't be able to cancel their own order out from under
+    // themselves via the same button that marks it received.
+    app.post("api", "table-orders", ":id", "cancel") { req throws -> TableOrderEntry in
+        try requireLogin(req)
+        guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
+        let body = try? req.content.decode(CancelOrderRequest.self)
+        let entry = try TableOrdersStore.shared.cancel(id: id, reason: body?.reason)
+        Task { await LightNotifier.shared.notifyCancelled(entry) }
         return entry
     }
 

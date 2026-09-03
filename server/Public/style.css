@@ -567,6 +567,12 @@ button.secondary:hover {
   filter: none;
 }
 
+/* Table-orders admin: Cancel sits next to Confirm Entered/Delivered in the
+   same cell — a little breathing room so they don't sit flush together. */
+.data-table .cancel-btn {
+  margin-left: 0.4rem;
+}
+
 .status {
   min-height: 1.2em;
   font-size: 0.9rem;

@@ -23,6 +23,33 @@ function itemDisplayName(order) {
   return `${base} <span class="hint">+ ${order.modifiers.map(escapeHtmlTableOrders).join(', ')}</span>`;
 }
 
+// Shared by both queues below — a server talked to the table and they no
+// longer want this item, whether it's still waiting to be entered or
+// already cooking. Asks for an optional reason (kitchen out of it, guest
+// changed their mind, etc.) for the record, but a blank answer still cancels.
+function wireCancelButtons(container) {
+  container.querySelectorAll('.cancel-btn').forEach((btn) => {
+    btn.addEventListener('click', async (event) => {
+      const row = event.target.closest('tr');
+      const id = row.dataset.id;
+      const itemName = row.dataset.itemName;
+      if (!confirm(`Cancel "${itemName}"? This can't be undone.`)) return;
+      const reason = prompt('Reason (optional):') || null;
+      const response = await staffFetch(`/api/table-orders/${id}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        alert(body.reason || `Failed to cancel (${response.status}).`);
+        return;
+      }
+      await loadTableOrders();
+    });
+  });
+}
+
 function renderNeedsEntry(orders) {
   if (!orders.length) {
     needsEntryEl.innerHTML = '<p class="hint">Nothing needs entering right now.</p>';
@@ -36,11 +63,14 @@ function renderNeedsEntry(orders) {
           ${orders
             .map(
               (o) => `
-            <tr data-id="${o.id}">
+            <tr data-id="${o.id}" data-item-name="${escapeHtmlTableOrders(o.itemName)}">
               <td><span class="pill pill-approved">Table ${escapeHtmlTableOrders(o.tableId)}</span></td>
               <td>${itemDisplayName(o)}</td>
               <td>${minutesAgoTableOrder(o.createdAt)}</td>
-              <td><button type="button" class="secondary enter-btn">Confirm Entered</button></td>
+              <td>
+                <button type="button" class="secondary enter-btn">Confirm Entered</button>
+                <button type="button" class="secondary cancel-btn">Cancel</button>
+              </td>
             </tr>
           `
             )
@@ -56,6 +86,7 @@ function renderNeedsEntry(orders) {
       await loadTableOrders();
     });
   });
+  wireCancelButtons(needsEntryEl);
 }
 
 function renderAwaitingDelivery(orders) {
@@ -73,12 +104,15 @@ function renderAwaitingDelivery(orders) {
             .map((o) => {
               const isReady = o.estimatedReadyAt && new Date(o.estimatedReadyAt).getTime() <= now;
               return `
-              <tr data-id="${o.id}">
+              <tr data-id="${o.id}" data-item-name="${escapeHtmlTableOrders(o.itemName)}">
                 <td><span class="pill pill-approved">Table ${escapeHtmlTableOrders(o.tableId)}</span></td>
                 <td>${escapeHtmlTableOrders(o.itemName)}</td>
                 <td>${minutesAgoTableOrder(o.enteredAt || o.createdAt)}</td>
                 <td>${isReady ? '<span class="pill pill-warning">Ready now</span>' : '<span class="pill">Cooking</span>'}</td>
-                <td><button type="button" class="secondary deliver-btn">Confirm Delivered</button></td>
+                <td>
+                  <button type="button" class="secondary deliver-btn">Confirm Delivered</button>
+                  <button type="button" class="secondary cancel-btn">Cancel</button>
+                </td>
               </tr>
             `;
             })
@@ -94,6 +128,7 @@ function renderAwaitingDelivery(orders) {
       await loadTableOrders();
     });
   });
+  wireCancelButtons(awaitingDeliveryEl);
 }
 
 async function loadTableOrders() {

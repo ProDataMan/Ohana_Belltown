@@ -221,6 +221,7 @@ document.getElementById('deactivate-btn').addEventListener('click', async () => 
 function orderStatusLabel(order) {
   if (order.status === 'delivered') return 'Delivered';
   if (order.status === 'entered') return 'Being prepared';
+  if (order.status === 'cancelled') return 'Cancelled';
   return 'Sent to staff';
 }
 
@@ -246,7 +247,7 @@ async function loadOrderHistory() {
               <tr>
                 <td>${escapeHtmlMyAccount(o.itemName)}</td>
                 <td>${escapeHtmlMyAccount(o.tableId)}</td>
-                <td><span class="pill ${o.status === 'delivered' ? 'pill-approved' : ''}">${orderStatusLabel(o)}</span></td>
+                <td><span class="pill ${o.status === 'delivered' ? 'pill-approved' : o.status === 'cancelled' ? 'pill-denied' : ''}">${orderStatusLabel(o)}</span></td>
                 <td>${new Date(o.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</td>
               </tr>
             `
