@@ -153,6 +153,25 @@ final class TableOrdersStoreTests: XCTestCase {
         XCTAssertEqual(try TableOrdersStore.shared.readyForDeliveryCount(), 0)
     }
 
+    // Regression test: an "entered" order older than the awaiting-delivery
+    // staleness window (2h) drops off the visible list, but was still
+    // counting toward readyForDeliveryCount()/readyForDelivery() forever —
+    // a badge/spoken alert/station light claiming something's ready with
+    // no way to actually see or clear it anywhere in the UI.
+    func testStaleEnteredOrderStopsCountingAsReady() throws {
+        let farPast = Date().addingTimeInterval(-3 * 60 * 60)  // 3h ago, past the 2h stale cutoff
+        try seedEntries([
+            TableOrderEntry(
+                id: "stale-1", tableId: "9", itemName: "Old Ticket", status: "entered",
+                createdAt: iso(farPast), updatedAt: iso(farPast),
+                enteredAt: iso(farPast), estimatedReadyAt: iso(farPast.addingTimeInterval(600))
+            ),
+        ])
+        XCTAssertTrue(try TableOrdersStore.shared.awaitingDelivery().isEmpty, "sanity check: already known to drop off the visible list")
+        XCTAssertEqual(try TableOrdersStore.shared.readyForDeliveryCount(), 0)
+        XCTAssertTrue(try TableOrdersStore.shared.readyForDelivery().isEmpty)
+    }
+
     func testDeliveryStatsComputesAveragesFromCompletedOrders() throws {
         let entry = try TableOrdersStore.shared.place(tableId: "5", itemName: "Spam Musubi", itemId: nil, section: "menu", customerId: nil)
         try TableOrdersStore.shared.markEntered(id: entry.id, staffOnDuty: 3)

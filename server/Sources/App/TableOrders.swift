@@ -229,13 +229,7 @@ final class TableOrdersStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
-        let formatter = ISO8601DateFormatter()
-        let now = Date()
-        return entries.filter { entry in
-            guard entry.status == "entered", let readyStr = entry.estimatedReadyAt,
-                  let ready = formatter.date(from: readyStr) else { return false }
-            return ready <= now
-        }.count
+        return readyForDeliveryLocked().count
     }
 
     /// Same "past estimated ready time" filter as readyForDeliveryCount(),
@@ -245,13 +239,27 @@ final class TableOrdersStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
+        return readyForDeliveryLocked()
+    }
+
+    /// Shared by both of the above — must apply the exact same staleness
+    /// cutoff as awaitingDelivery() (same status, same clock), or an order
+    /// that's dropped off the visible "Awaiting Delivery" list keeps
+    /// counting toward "N ready" forever: the badge/spoken alert/station
+    /// lights would report something as ready that no queue anywhere
+    /// actually shows staff, with no way to clear it short of editing data
+    /// directly. Caller must already hold `lock`.
+    private func readyForDeliveryLocked() -> [TableOrderEntry] {
         let formatter = ISO8601DateFormatter()
         let now = Date()
+        let cutoff = now.addingTimeInterval(-Self.awaitingDeliveryStaleAfterSeconds)
         return entries
             .filter { entry in
                 guard entry.status == "entered", let readyStr = entry.estimatedReadyAt,
                       let ready = formatter.date(from: readyStr) else { return false }
-                return ready <= now
+                guard ready <= now else { return false }
+                guard let entered = entry.enteredAt, let enteredDate = formatter.date(from: entered) else { return true }
+                return enteredDate > cutoff
             }
             .sorted { ($0.estimatedReadyAt ?? "") < ($1.estimatedReadyAt ?? "") }
     }
