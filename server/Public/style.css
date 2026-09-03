@@ -1928,14 +1928,34 @@ select {
   box-shadow: 0 10px 30px rgba(36, 20, 45, 0.06);
 }
 
-.shop-card-photo {
+/* Wraps 1+ .shop-card-photo images, cross-fading through all of them when
+   there's more than one (e.g. a t-shirt's front and back) — same absolute-
+   stack + opacity-transition technique as .item-modal-gallery/-gallery-img
+   in menu-section.js, just sized for a card tile instead of the item modal. */
+.shop-card-photo-stack {
+  position: relative;
   width: 100%;
   aspect-ratio: 1;
+  overflow: hidden;
+}
+
+.shop-card-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  display: block;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+.shop-card-photo.active {
+  opacity: 1;
 }
 
 .shop-card-photo-placeholder {
+  width: 100%;
+  aspect-ratio: 1;
   display: flex;
   align-items: center;
   justify-content: center;

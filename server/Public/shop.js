@@ -85,8 +85,21 @@ function renderShopBanner() {
   }
 }
 
+// Cross-fades through every photo a product has (e.g. a t-shirt's front and
+// back) rather than only ever showing images[0] — one shared interval walks
+// every multi-photo card each tick, using each stack's current `.active`
+// image to know where it is, so cards with different photo counts rotate
+// independently without needing separate per-card state. Rebuilt on every
+// renderGrid() call (cart quantity changes re-render the whole grid), so the
+// old interval must always be cleared first or they'd pile up indefinitely.
+let shopGalleryRotationInterval = null;
+
 function renderGrid() {
   const grid = document.getElementById('shop-grid');
+  if (shopGalleryRotationInterval) {
+    clearInterval(shopGalleryRotationInterval);
+    shopGalleryRotationInterval = null;
+  }
   if (!products.length) {
     grid.innerHTML = '<p class="hint">Nothing in the shop yet — check back soon.</p>';
     return;
@@ -97,10 +110,17 @@ function renderGrid() {
   grid.innerHTML = products
     .map((product) => {
       const soldOut = product.available === false;
-      const photo = (product.images || [])[0];
-      const photoMarkup = photo
-        ? `<img class="shop-card-photo" src="${escapeHtml(photo)}" alt="${escapeHtml(product.name)}" loading="lazy" />`
-        : '<div class="shop-card-photo shop-card-photo-placeholder">No photo yet</div>';
+      const images = product.images || [];
+      const photoMarkup = images.length
+        ? `<div class="shop-card-photo-stack">
+            ${images
+              .map(
+                (src, i) =>
+                  `<img class="shop-card-photo${i === 0 ? ' active' : ''}" src="${escapeHtml(src)}" alt="${escapeHtml(product.name)}" loading="lazy" />`
+              )
+              .join('')}
+          </div>`
+        : '<div class="shop-card-photo-placeholder">No photo yet</div>';
       const qty = cart[product.id] || 0;
 
       return `
@@ -132,6 +152,22 @@ function renderGrid() {
     minus.addEventListener('click', () => changeQuantity(productId, -1));
     plus.addEventListener('click', () => changeQuantity(productId, 1));
   });
+
+  const rotatableStacks = Array.from(grid.querySelectorAll('.shop-card-photo-stack')).filter(
+    (stack) => stack.querySelectorAll('img').length > 1
+  );
+  if (rotatableStacks.length) {
+    shopGalleryRotationInterval = setInterval(() => {
+      rotatableStacks.forEach((stack) => {
+        const imgs = stack.querySelectorAll('img');
+        const activeIndex = Array.from(imgs).findIndex((img) => img.classList.contains('active'));
+        if (activeIndex === -1) return;
+        const nextIndex = (activeIndex + 1) % imgs.length;
+        imgs[activeIndex].classList.remove('active');
+        imgs[nextIndex].classList.add('active');
+      });
+    }, 4000);
+  }
 }
 
 function changeQuantity(productId, delta) {
