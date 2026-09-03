@@ -409,9 +409,9 @@ function renderModifiersInnerMarkup(item, orderLocked) {
 // the page (e.g. both the inline card and the detail modal at once).
 function renderChoiceGroupsMarkup(item, tableId, soldOut, orderLocked, namePrefix) {
   const groups = item.choiceGroups || [];
-  if (!tableId || soldOut || !groups.length) return '';
+  if (soldOut || !groups.length) return '';
   return `
-    <div class="item-choice-groups">
+    <div class="item-choice-groups staff-revealable-extras" ${tableId ? '' : 'hidden'}>
       ${groups
         .map(
           (g) => `
@@ -498,9 +498,14 @@ function renderMenu(data) {
               ? `<button type="button" class="${orderBtnClass}" data-item-name="${escapeHtml(item.name)}" data-item-id="${escapeHtml(item.id || '')}"${activeOrderId ? ` data-order-id="${escapeHtml(activeOrderId)}"` : ''}>${orderBtnLabel}</button>`
               : '';
           const modifiers = item.modifiers || [];
+          // Rendered whenever the item has any, not just once a table's QR
+          // is scanned — a logged-in staff member previewing the menu
+          // should see what add-ons exist here, same as they already see
+          // prices (staff-revealable-extras, revealed by
+          // revealStaffOnlyElementsIfLoggedIn once login is confirmed).
           const modifiersMarkup =
-            tableId && !soldOut && modifiers.length
-              ? `<div class="item-modifiers" data-requires-selection="${item.requiresModifierSelection ? 'true' : 'false'}">
+            !soldOut && modifiers.length
+              ? `<div class="item-modifiers staff-revealable-extras" data-requires-selection="${item.requiresModifierSelection ? 'true' : 'false'}" ${tableId ? '' : 'hidden'}>
                   ${renderModifiersInnerMarkup(item, orderLocked)}
                 </div>`
               : '';
@@ -682,9 +687,14 @@ async function openItemModal(index) {
   const inCart = !activeOrderId && Boolean(pendingCart[item.name]);
   const orderLocked = Boolean(activeOrderId) || inCart;
 
+  // Shown whenever the item has any add-ons/choice groups, same as prices
+  // above — either a scanned table, or a logged-in staff member previewing
+  // the menu. Ordering itself (the button below) still requires a table.
+  const canSeeExtras = Boolean(tableId) || staffLoggedIn;
+
   const modifiersEl = modal.querySelector('.item-modal-modifiers');
   const modifiers = item.modifiers || [];
-  if (tableId && !soldOut && modifiers.length) {
+  if (canSeeExtras && !soldOut && modifiers.length) {
     modifiersEl.hidden = false;
     modifiersEl.dataset.requiresSelection = item.requiresModifierSelection ? 'true' : 'false';
     modifiersEl.innerHTML = renderModifiersInnerMarkup(item, orderLocked);
@@ -694,7 +704,7 @@ async function openItemModal(index) {
     delete modifiersEl.dataset.requiresSelection;
   }
 
-  modal.querySelector('.item-modal-choice-groups').innerHTML = renderChoiceGroupsMarkup(item, tableId, soldOut, orderLocked, 'modal');
+  modal.querySelector('.item-modal-choice-groups').innerHTML = renderChoiceGroupsMarkup(item, canSeeExtras, soldOut, orderLocked, 'modal');
 
   const orderBtnEl = modal.querySelector('.item-modal-order-btn');
   if (tableId && !soldOut) {
@@ -1002,13 +1012,15 @@ function openCartModal() {
 async function revealStaffOnlyElementsIfLoggedIn() {
   const links = document.querySelectorAll('.staff-edit-link');
   const prices = document.querySelectorAll('.staff-revealable-price');
-  if (!links.length && !prices.length) return;
+  const extras = document.querySelectorAll('.staff-revealable-extras');
+  if (!links.length && !prices.length && !extras.length) return;
   try {
     const response = await fetch('/api/auth/me');
     if (response.ok) {
       staffLoggedIn = true;
       links.forEach((link) => { link.hidden = false; });
       prices.forEach((price) => { price.hidden = false; });
+      extras.forEach((el) => { el.hidden = false; });
     }
   } catch {
     // stay hidden

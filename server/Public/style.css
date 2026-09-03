@@ -1816,6 +1816,17 @@ select {
   background: #f9f5f7;
 }
 
+/* Needed since the rule above sets its own `display` — an author style
+   always beats the browser's default [hidden] rule unless re-declared
+   explicitly (same bug class as the label[hidden] fix elsewhere in this
+   file). Without this, staff-revealable-extras' `hidden` attribute would
+   be silently ignored and the block would show even before staff login
+   is confirmed. */
+.item-modifiers[hidden],
+.item-choice-groups[hidden] {
+  display: none;
+}
+
 .item-modifier-checkbox {
   display: flex;
   align-items: center;
