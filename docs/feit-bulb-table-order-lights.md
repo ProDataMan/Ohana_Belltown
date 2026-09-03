@@ -31,6 +31,7 @@ Kitchen / sushi / bar bulbs never flash for needs-entry.
 | Confirm Entered | **3 flashes** purple at that station and server |
 | `estimatedReadyAt` reached | Station **3 flashes** pink; server pulses pink **until Confirm Delivered** |
 | Confirm Delivered (or guest Mark Received) | Server pink stops (unless another ticket is still up) |
+| Order cancelled (staff, or the 30-min auto-cancel sweep for stale tickets) | Same recompute as delivered — server light stops or moves to whatever's still actually pending |
 
 Cart bursts from the same station within 2s share one server pulse.
 

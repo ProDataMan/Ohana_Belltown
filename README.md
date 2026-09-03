@@ -538,7 +538,11 @@ around photo upload, and station-light table-order notifications shipped.
     charge the table's card for the full order Square already knows about,
     rather than just notifying staff. Not scoped or estimated, just flagged
     as the logical next step once the smaller payment surfaces (Shop, Gift
-    Cards) have some real usage behind them.
+    Cards) have some real usage behind them. Worth noting: the cancel/
+    auto-cancel-stale-orders work above was partly done with this in mind —
+    an order's `status` needs to be a trustworthy, always-resolved signal
+    (never silently "still open" forever) before anything should ever key a
+    real charge off of it.
 
 See [High-impact design/UX recommendations](#high-impact-designux-recommendations)
 below for suggestions on the site's usability/visual design rather than its
