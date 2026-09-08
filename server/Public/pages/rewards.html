@@ -67,7 +67,7 @@
       <div class="panel">
         <h2>How It Works</h2>
         <ul>
-          <li>Give staff your phone number the first time you order sushi &mdash; that's your card.</li>
+          <li>Log in (or create a free account) and add your phone number &mdash; that's your card.</li>
           <li>Earn <strong>1 punch</strong> every time you order sushi.</li>
           <li>Earn <strong>1/10 of a punch</strong> for sharing a photo of your dish or tagging us on social &mdash; submit it below and our staff will review it. Ten approved shares add up to a full punch. Only your first <strong>2 shares per visit</strong> count, so no need to post 20 photos of one meal.</li>
           <li>Collect <strong>10 punches</strong> and your next roll is on us.</li>
@@ -77,13 +77,31 @@
 
     <section class="content-section">
       <div class="panel">
-        <h2>Check My Card</h2>
-        <div class="cta-row">
-          <input type="tel" id="check-phone-input" placeholder="Your phone number" />
-          <button id="check-btn" type="button">Check my card</button>
+        <h2>My Punch Card</h2>
+
+        <div id="loyalty-logged-out">
+          <p class="hint">Log in (or create a free account) to see your punch card and start earning.</p>
+          <div class="cta-row">
+            <a class="cta-button" href="/account-login?next=/rewards">Log In</a>
+            <a class="cta-button secondary" href="/signup?next=/rewards">Create Account</a>
+          </div>
         </div>
-        <p id="check-status" class="status"></p>
-        <div id="check-result"></div>
+
+        <div id="loyalty-link-phone" hidden>
+          <p class="hint">Add your phone number to start your punch card.</p>
+          <form id="loyalty-phone-form">
+            <div class="cta-row">
+              <input type="tel" id="loyalty-phone-input" placeholder="Your phone number" />
+              <button type="submit">Save</button>
+            </div>
+            <p id="loyalty-phone-status" class="status"></p>
+          </form>
+        </div>
+
+        <div id="loyalty-card-display" hidden>
+          <div id="loyalty-card-summary"></div>
+          <button id="change-phone-btn" type="button" class="secondary" style="margin-top: 0.75rem;">Change phone number</button>
+        </div>
       </div>
     </section>
 

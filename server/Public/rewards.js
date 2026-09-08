@@ -4,38 +4,93 @@ function setRewardsStatus(el, message, isError) {
   el.classList.toggle('status-ok', !isError && Boolean(message));
 }
 
-const checkPhoneInput = document.getElementById('check-phone-input');
-const checkStatus = document.getElementById('check-status');
-const checkResult = document.getElementById('check-result');
+// --- Punch card: login-gated. A guest sees a log in / create account
+// prompt; once logged in, they link a phone number (their card's key);
+// once linked, their card status shows automatically. ---
+const loyaltyLoggedOutEl = document.getElementById('loyalty-logged-out');
+const loyaltyLinkPhoneEl = document.getElementById('loyalty-link-phone');
+const loyaltyCardDisplayEl = document.getElementById('loyalty-card-display');
+const loyaltyPhoneForm = document.getElementById('loyalty-phone-form');
+const loyaltyPhoneInput = document.getElementById('loyalty-phone-input');
+const loyaltyPhoneStatus = document.getElementById('loyalty-phone-status');
+const loyaltyCardSummary = document.getElementById('loyalty-card-summary');
+const changePhoneBtn = document.getElementById('change-phone-btn');
 
-document.getElementById('check-btn').addEventListener('click', async () => {
-  const phone = checkPhoneInput.value.trim();
-  if (!phone) return setRewardsStatus(checkStatus, 'Enter your phone number first.', true);
-  setRewardsStatus(checkStatus, 'Checking...', false);
-  checkResult.innerHTML = '';
+function showLoyaltySection(section) {
+  loyaltyLoggedOutEl.hidden = section !== 'logged-out';
+  loyaltyLinkPhoneEl.hidden = section !== 'link-phone';
+  loyaltyCardDisplayEl.hidden = section !== 'card';
+}
+
+// Once we know the guest's linked phone, prefill it into the referral/bonus
+// forms below so a logged-in guest doesn't have to type it a second time —
+// those forms still work standalone for anyone not logged in.
+function prefillPhoneFields(phone) {
+  const referralPhoneInput = document.getElementById('referral-phone-input');
+  const bonusPhoneInput = document.getElementById('bonus-phone-input');
+  if (referralPhoneInput && !referralPhoneInput.value) referralPhoneInput.value = phone;
+  if (bonusPhoneInput && !bonusPhoneInput.value) bonusPhoneInput.value = phone;
+}
+
+async function loadPunchCard() {
+  const meResponse = await fetch('/api/customer/me');
+  if (meResponse.status === 401) {
+    showLoyaltySection('logged-out');
+    return;
+  }
+  if (!meResponse.ok) return;
+
+  const loyaltyResponse = await fetch('/api/customer/loyalty');
+  if (!loyaltyResponse.ok) return;
+  const loyalty = await loyaltyResponse.json();
+
+  if (!loyalty.linkedPhone) {
+    showLoyaltySection('link-phone');
+    return;
+  }
+
+  prefillPhoneFields(loyalty.linkedPhone);
+  if (loyalty.status) {
+    loyaltyCardSummary.innerHTML = `
+      <div class="loyalty-card-summary">
+        <span class="pill ${loyalty.status.rewardReady ? 'pill-approved' : ''}">${loyalty.status.punches} / ${loyalty.status.punchesNeeded} punches</span>
+        ${loyalty.status.bonusPoints > 0 ? `<span class="pill">+${loyalty.status.bonusPoints}/10 toward your next punch from shares</span>` : ''}
+        ${loyalty.status.rewardReady ? '<span class="pill pill-approved">Free roll ready — show this to your server!</span>' : ''}
+      </div>
+    `;
+  } else {
+    loyaltyCardSummary.innerHTML = `<p class="hint">Card linked to ${loyalty.linkedPhone} &mdash; no punches yet. Order sushi to start earning!</p>`;
+  }
+  showLoyaltySection('card');
+}
+
+loyaltyPhoneForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const phone = loyaltyPhoneInput.value.trim();
+  if (!phone) return setRewardsStatus(loyaltyPhoneStatus, 'Enter your phone number first.', true);
+  setRewardsStatus(loyaltyPhoneStatus, 'Saving...', false);
   try {
-    const response = await fetch('/api/loyalty/lookup', {
+    const response = await fetch('/api/customer/loyalty-phone', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phone }),
     });
-    if (response.status === 404) {
-      return setRewardsStatus(checkStatus, "No card yet — ask staff to start one on your next sushi order.", false);
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.reason || `Failed (${response.status}).`);
     }
-    if (!response.ok) throw new Error('Something went wrong. Please try again.');
-    const card = await response.json();
-    setRewardsStatus(checkStatus, '', false);
-    checkResult.innerHTML = `
-      <div class="loyalty-card-summary">
-        <span class="pill ${card.rewardReady ? 'pill-approved' : ''}">${card.punches} / ${card.punchesNeeded} punches</span>
-        ${card.bonusPoints > 0 ? `<span class="pill">+${card.bonusPoints}/10 toward your next punch from shares</span>` : ''}
-        ${card.rewardReady ? '<span class="pill pill-approved">Free roll ready — show this to your server!</span>' : ''}
-      </div>
-    `;
+    setRewardsStatus(loyaltyPhoneStatus, '', false);
+    await loadPunchCard();
   } catch (error) {
-    setRewardsStatus(checkStatus, error.message, true);
+    setRewardsStatus(loyaltyPhoneStatus, error.message, true);
   }
 });
+
+changePhoneBtn.addEventListener('click', () => {
+  showLoyaltySection('link-phone');
+});
+
+loadPunchCard();
 
 document.getElementById('referral-form').addEventListener('submit', async (event) => {
   event.preventDefault();

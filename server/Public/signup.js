@@ -22,7 +22,8 @@ document.getElementById('signup-form').addEventListener('submit', async (event) 
       const body = await response.json().catch(() => ({}));
       throw new Error(body.reason || `Failed (${response.status}).`);
     }
-    window.location.href = '/my-account.html';
+    const params = new URLSearchParams(window.location.search);
+    window.location.href = params.get('next') || '/my-account.html';
   } catch (error) {
     setSignupStatus(statusEl, error.message, true);
   }
