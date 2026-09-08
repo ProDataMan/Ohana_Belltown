@@ -639,8 +639,9 @@ button.secondary:hover {
   border-color: #1877f2;
 }
 
-/* Facebook Login isn't configured yet — hidden for now, same reasoning
-   as .oauth-btn-apple[hidden] above. */
+/* Facebook Login is configured and live (2026-09-08) — no element actually
+   carries [hidden] anymore, but this stays as the same override-safety-net
+   as .oauth-btn-apple[hidden] above, in case it's ever re-hidden. */
 .oauth-btn-facebook[hidden] {
   display: none;
 }

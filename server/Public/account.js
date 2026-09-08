@@ -53,7 +53,7 @@ async function loadProfile() {
           : ''}
         ${user.facebookLinked
           ? '<span class="pill pill-approved">Facebook linked</span>'
-          : '<a class="oauth-btn oauth-btn-facebook" href="/auth/facebook/staff?mode=link" hidden>Link Facebook Account</a>'}
+          : '<a class="oauth-btn oauth-btn-facebook" href="/auth/facebook/staff?mode=link">Link Facebook Account</a>'}
       `;
     }
   } catch (error) {

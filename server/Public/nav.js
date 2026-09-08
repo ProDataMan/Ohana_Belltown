@@ -1,3 +1,19 @@
+// favicon.ico at the site root already covers most browsers with zero markup
+// (the default path they request automatically) — these explicit tags add a
+// crisper PNG for browsers that prefer one, plus the iOS home-screen icon.
+// Injected here (loaded on every page) instead of duplicating <link> tags
+// across 20+ HTML files.
+[
+  { rel: 'icon', type: 'image/png', href: '/images/favicon-32.png' },
+  { rel: 'apple-touch-icon', href: '/images/apple-touch-icon.png' },
+].forEach(({ rel, type, href }) => {
+  const link = document.createElement('link');
+  link.rel = rel;
+  if (type) link.type = type;
+  link.href = href;
+  document.head.appendChild(link);
+});
+
 document.getElementById('nav-toggle')?.addEventListener('click', () => {
   document.getElementById('site-nav')?.classList.toggle('open');
 });

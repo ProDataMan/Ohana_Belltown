@@ -4,15 +4,13 @@ All three providers are fully built underneath, but clicking a button
 returns a `503 Service Unavailable` until real credentials are set on the
 Container App. This doc walks through getting those credentials for each.
 
-The "Continue with Google" button appears on `/signup`, `/account-login`,
-`/login`, and `/account.html`. Apple's and Facebook's buttons are currently
-**hidden** site-wide (via a `hidden` attribute in each page's HTML, or a
-`hidden` attribute on the JS-generated link button on `/account.html`) since
-neither is configured yet — once you have real credentials for one, remove
-the `hidden` attribute from its `.oauth-btn-apple` / `.oauth-btn-facebook`
-elements in `customer/signup.html`, `customer/account-login.html`,
-`staff/login.html`, and (for the staff account-linking button) `account.js`
-to bring it back.
+The "Continue with Google" and "Continue with Facebook" buttons appear on
+`/signup`, `/account-login`, `/login`, and `/account.html` — both are
+configured and live. Apple's button is still **hidden** site-wide (via a
+`hidden` attribute in each page's HTML) since it isn't configured yet — once
+you have real credentials, remove the `hidden` attribute from its
+`.oauth-btn-apple` elements in `customer/signup.html`,
+`customer/account-login.html`, and `staff/login.html` to bring it back.
 
 Customers can use any provider to sign in self-serve. Staff can only *link*
 an existing username/password account to Google/Apple/Facebook from
@@ -78,15 +76,24 @@ These become:
 
 ## Facebook (free, ~10 minutes)
 
+**Already configured.** Real credentials set on the Container App since
+2026-09-08. The app is currently in **Development Mode** — only accounts
+added as testers/admins under **App Roles** in the Facebook developer
+dashboard can actually complete sign-in; everyone else gets an error from
+Facebook itself. Switch the app to **Live** (Basic Settings requires a
+privacy policy URL — `https://www.ohanasushigrill.com/privacy` already works
+for this) once real customers should be able to use it.
+
+Steps followed, for reference (or if credentials ever need regenerating):
+
 1. Go to [developers.facebook.com/apps](https://developers.facebook.com/apps/) and create a new app (choose the "Consumer" or "None" use case — no business verification is needed for basic Facebook Login).
 2. From the app dashboard, add the **Facebook Login** product.
 3. Under **Facebook Login → Settings**, add this to **Valid OAuth Redirect URIs** — both customer and staff sign-in share it, dispatched internally by the app, same as Google:
    - `https://www.ohanasushigrill.com/auth/facebook/callback`
    - Optional, for testing locally: also add `http://localhost:8080/auth/facebook/callback`
 4. Under **App Settings → Basic**, copy the **App ID** and **App Secret**.
-5. While the app is in **Development Mode**, only accounts added as testers/admins under **App Roles** can sign in. Switch the app to **Live** (Basic Settings requires a privacy policy URL — `/privacy` already works for this) once you want anyone to be able to use it.
 
-These become:
+These became:
 - `FACEBOOK_OAUTH_APP_ID`
 - `FACEBOOK_OAUTH_APP_SECRET`
 
