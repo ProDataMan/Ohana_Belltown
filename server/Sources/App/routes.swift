@@ -779,17 +779,30 @@ func routes(_ app: Application) throws {
     // table and entered it into the order system) -> delivered.
     app.post("api", "table-orders") { req throws -> TableOrderEntry in
         let body = try req.content.decode(TableOrderRequest.self)
-        let tableId = body.tableId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedTableId = body.tableId.trimmingCharacters(in: .whitespacesAndNewlines)
         let itemName = body.itemName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !tableId.isEmpty, !itemName.isEmpty else {
+        let customer = try? currentCustomer(req)
+        // A blank tableId means "no QR scan" — only a signed-in customer can
+        // place a table-less pickup order this way; a guest with no table
+        // has no way for staff to find/identify their order.
+        let tableId: String
+        if trimmedTableId.isEmpty {
+            guard customer != nil else {
+                throw Abort(.badRequest, reason: "Table ID and item name are required.")
+            }
+            tableId = "pickup"
+        } else {
+            tableId = trimmedTableId
+        }
+        guard !itemName.isEmpty else {
             throw Abort(.badRequest, reason: "Table ID and item name are required.")
         }
-        let customerId = try? currentCustomer(req)?.id
         let trimmedDeviceId = body.deviceId?.trimmingCharacters(in: .whitespacesAndNewlines)
         let deviceId = (trimmedDeviceId?.isEmpty ?? true) ? nil : trimmedDeviceId
         let entry = try TableOrdersStore.shared.place(
-            tableId: tableId, itemName: itemName, itemId: body.itemId, section: body.section, customerId: customerId,
-            deviceId: deviceId, modifiers: body.modifiers ?? []
+            tableId: tableId, itemName: itemName, itemId: body.itemId, section: body.section, customerId: customer?.id,
+            deviceId: deviceId, customerName: customer?.preferredName, customerPhotoURL: customer?.photoURL,
+            modifiers: body.modifiers ?? []
         )
         Task { await LightNotifier.shared.notifyPlaced(entry) }
         return entry

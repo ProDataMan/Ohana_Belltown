@@ -222,7 +222,10 @@ async function sendPendingOrder() {
   const tableId = getTableId();
   const cart = getPendingCart();
   const itemNames = Object.keys(cart);
-  if (!tableId || !itemNames.length) return;
+  // A signed-in customer can send an order with no table at all — the
+  // server treats that as a pickup order once it confirms who's logged in
+  // (POST /api/table-orders rejects an empty tableId from anyone else).
+  if ((!tableId && !customerLoggedIn) || !itemNames.length) return;
 
   const results = await Promise.all(
     itemNames.map(async (itemName) => {
@@ -232,7 +235,7 @@ async function sendPendingOrder() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            tableId,
+            tableId: tableId || '',
             itemName,
             itemId: entry.itemId,
             section: entry.section,
@@ -487,8 +490,12 @@ function renderMenu(data) {
   itemsByIndex = [];
   const tableId = getTableId();
   const priceView = getPriceViewFlag();
-  const activeOrders = tableId ? getActiveOrders() : {};
-  const pendingCart = tableId ? getPendingCart() : {};
+  // A signed-in customer can order without a table at all (pickup) — see
+  // sendPendingOrder(). Everywhere below that gates ordering/price/extras
+  // on tableId also allows this.
+  const canOrder = Boolean(tableId) || customerLoggedIn;
+  const activeOrders = canOrder ? getActiveOrders() : {};
+  const pendingCart = canOrder ? getPendingCart() : {};
 
   menuContainer.innerHTML = categories
     .map((category) => {
@@ -507,7 +514,7 @@ function renderMenu(data) {
           // revealStaffOnlyElementsIfLoggedIn) to check their edits.
           const priceMarkup =
             item.price != null
-              ? `<div class="price staff-revealable-price" data-base-price="${item.price}" ${tableId || priceView ? '' : 'hidden'}>$${Number(item.price).toFixed(2)}</div>`
+              ? `<div class="price staff-revealable-price" data-base-price="${item.price}" ${canOrder || priceView ? '' : 'hidden'}>$${Number(item.price).toFixed(2)}</div>`
               : '';
           const featuredImage = (item.images || [])[0];
           const imageMarkup = featuredImage
@@ -537,7 +544,7 @@ function renderMenu(data) {
             orderBtnLabel = 'Added — Tap to Remove';
           }
           const orderButton =
-            tableId && !soldOut
+            canOrder && !soldOut
               ? `<button type="button" class="${orderBtnClass}" data-item-name="${escapeHtml(item.name)}" data-item-id="${escapeHtml(item.id || '')}"${activeOrderId ? ` data-order-id="${escapeHtml(activeOrderId)}"` : ''}>${orderBtnLabel}</button>`
               : '';
           const modifiers = item.modifiers || [];
@@ -548,11 +555,11 @@ function renderMenu(data) {
           // revealStaffOnlyElementsIfLoggedIn once login is confirmed).
           const modifiersMarkup =
             !soldOut && modifiers.length
-              ? `<div class="item-modifiers staff-revealable-extras" data-requires-selection="${item.requiresModifierSelection ? 'true' : 'false'}" ${tableId ? '' : 'hidden'}>
+              ? `<div class="item-modifiers staff-revealable-extras" data-requires-selection="${item.requiresModifierSelection ? 'true' : 'false'}" ${canOrder ? '' : 'hidden'}>
                   ${renderModifiersInnerMarkup(item, orderLocked)}
                 </div>`
               : '';
-          const choiceGroupsMarkup = renderChoiceGroupsMarkup(item, tableId, soldOut, orderLocked, `item-${index}`);
+          const choiceGroupsMarkup = renderChoiceGroupsMarkup(item, canOrder, soldOut, orderLocked, `item-${index}`);
           return `
             <article class="item${soldOut ? ' item-sold-out' : ''}" data-search="${escapeHtml(searchText)}" data-index="${index}" data-tags="${escapeHtml(tags.join(','))}">
               ${imageMarkup}
@@ -583,7 +590,7 @@ function renderMenu(data) {
     .join('');
 
   renderControls(categories);
-  renderOrderingHint(tableId);
+  renderOrderingHint(canOrder);
   injectMenuSchema(categories, tableId);
   updateCartBadge();
 }
@@ -591,10 +598,10 @@ function renderMenu(data) {
 // A one-time orientation for guests actively at a table (tableId set) —
 // separate from renderControls, which skips itself entirely on a
 // single-category/no-tags menu page and shouldn't gate this too.
-function renderOrderingHint(tableId) {
+function renderOrderingHint(canOrder) {
   const existing = document.getElementById('ordering-hint');
   if (existing) existing.remove();
-  if (!tableId) return;
+  if (!canOrder) return;
 
   const hint = document.createElement('p');
   hint.id = 'ordering-hint';
@@ -712,7 +719,7 @@ async function openItemModal(index) {
   modal.querySelector('.item-modal-desc').textContent = item.description || '';
 
   const priceEl = modal.querySelector('.item-modal-price');
-  const showPrice = item.price != null && (Boolean(getTableId()) || staffLoggedIn || getPriceViewFlag());
+  const showPrice = item.price != null && (Boolean(getTableId()) || staffLoggedIn || getPriceViewFlag() || customerLoggedIn);
   if (item.price != null) {
     priceEl.dataset.basePrice = item.price;
   } else {
@@ -733,10 +740,12 @@ async function openItemModal(index) {
   const inCart = !activeOrderId && Boolean(pendingCart[item.name]);
   const orderLocked = Boolean(activeOrderId) || inCart;
 
-  // Shown whenever the item has any add-ons/choice groups, same as prices
-  // above — either a scanned table, or a logged-in staff member previewing
-  // the menu. Ordering itself (the button below) still requires a table.
-  const canSeeExtras = Boolean(tableId) || staffLoggedIn;
+  // A signed-in customer can order without a table (pickup) — see
+  // sendPendingOrder(). Shown whenever the item has any add-ons/choice
+  // groups, same as prices above — a scanned table, a logged-in customer,
+  // or a logged-in staff member previewing the menu.
+  const canOrder = Boolean(tableId) || customerLoggedIn;
+  const canSeeExtras = canOrder || staffLoggedIn;
 
   const modifiersEl = modal.querySelector('.item-modal-modifiers');
   const modifiers = item.modifiers || [];
@@ -753,7 +762,7 @@ async function openItemModal(index) {
   modal.querySelector('.item-modal-choice-groups').innerHTML = renderChoiceGroupsMarkup(item, canSeeExtras, soldOut, orderLocked, 'modal');
 
   const orderBtnEl = modal.querySelector('.item-modal-order-btn');
-  if (tableId && !soldOut) {
+  if (canOrder && !soldOut) {
     orderBtnEl.hidden = false;
     orderBtnEl.className = 'order-btn item-modal-order-btn';
     if (activeOrderId) {
@@ -997,7 +1006,11 @@ function renderCartModalBody() {
         })
         .join('')}
     </div>
-    <p class="hint">A staff member will come confirm your order — it hasn't been sent to the kitchen yet.</p>
+    <p class="hint">${
+      getTableId()
+        ? "A staff member will come confirm your order — it hasn't been sent to the kitchen yet."
+        : "This is a pickup order at the counter, not a table — a staff member will confirm it before it's sent to the kitchen."
+    }</p>
     <button type="button" id="send-order-btn">Send Order</button>
     <p id="cart-status" class="status"></p>
   `;
@@ -1043,7 +1056,11 @@ function renderCartModalBody() {
 
     body.innerHTML = `
       <p class="status status-ok" style="font-size: 1rem;">
-        Staff have been notified that you're ready to order — someone will be by shortly to confirm it.
+        ${
+          getTableId()
+            ? "Staff have been notified that you're ready to order — someone will be by shortly to confirm it."
+            : "Staff have been notified — head to the counter and we'll get your pickup order started."
+        }
       </p>
       <p class="hint"><a href="/order-history">See your order history →</a></p>
       <button type="button" id="cart-modal-done-btn">Got it</button>
@@ -1077,9 +1094,28 @@ async function revealStaffOnlyElementsIfLoggedIn() {
   }
 }
 
+// A signed-in customer can order without ever scanning a table (pickup at
+// the counter — see sendPendingOrder()) — checked in parallel with the menu
+// fetch itself, rather than after the fact like staffLoggedIn, since
+// (unlike the price reveal) the order button/modifiers/choice groups aren't
+// rendered into the DOM at all when there's no table, so there's nothing to
+// later un-hide. Resolving this before the first renderMenu() call means
+// the ordering UI is right the first time, at the cost of the initial
+// render waiting on whichever of the two requests is slower (negligible —
+// both are fast, same-origin calls).
+let customerLoggedIn = false;
+async function checkCustomerLoggedIn() {
+  try {
+    const response = await fetch('/api/customer/me');
+    customerLoggedIn = response.ok;
+  } catch {
+    customerLoggedIn = false;
+  }
+}
+
 async function loadMenu() {
   try {
-    const response = await fetch('/api/menu');
+    const [response] = await Promise.all([fetch('/api/menu'), checkCustomerLoggedIn()]);
     if (!response.ok) {
       throw new Error('Unable to load the menu data.');
     }

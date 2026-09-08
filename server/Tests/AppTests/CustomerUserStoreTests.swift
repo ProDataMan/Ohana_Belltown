@@ -235,6 +235,17 @@ final class CustomerUserStoreTests: XCTestCase {
         XCTAssertNil(cleared.birthday)
     }
 
+    func testNicknameCanBeSetAndCleared() throws {
+        let (customer, _) = try CustomerUserStore.shared.register(email: "guest@example.com", displayName: "Guest", password: "guestpass1")
+        XCTAssertNil(customer.nickname)
+
+        let set = try CustomerUserStore.shared.updateNickname(id: customer.id, nickname: "Ronnie")
+        XCTAssertEqual(set.nickname, "Ronnie")
+
+        let cleared = try CustomerUserStore.shared.updateNickname(id: customer.id, nickname: "  ")
+        XCTAssertNil(cleared.nickname, "blank/whitespace-only nickname should clear it, not store whitespace")
+    }
+
     func testUpcomingBirthdaysFindsCustomerWithinWindow() throws {
         let (customer, _) = try CustomerUserStore.shared.register(email: "guest@example.com", displayName: "Guest", password: "guestpass1")
         try CustomerUserStore.shared.updateBirthday(id: customer.id, birthday: monthDay(daysFromToday: 3))

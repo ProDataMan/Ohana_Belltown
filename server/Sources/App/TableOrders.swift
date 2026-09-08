@@ -22,6 +22,14 @@ struct TableOrderEntry: Codable, Content {
     /// look the orders back up; a customer who IS signed in gets both this
     /// and customerId set on the same entry.
     var deviceId: String?
+    /// Snapshot of the ordering customer's preferredName (nickname if set,
+    /// else display name) and photoURL at the moment they placed the order —
+    /// captured here rather than looked up live so a later profile edit
+    /// doesn't retroactively rewrite order history. Set whenever customerId
+    /// is set; primarily used to identify "pickup" (table-less) orders,
+    /// which have no table pill to show staff instead.
+    var customerName: String?
+    var customerPhotoURL: String?
     /// "pending" (just placed) -> "entered" (staff checked with the table and
     /// entered it into the order system) -> "delivered". Can also branch to
     /// "cancelled" from "pending" or "entered" — e.g. a server talks to the
@@ -46,13 +54,15 @@ struct TableOrderEntry: Codable, Content {
     var modifiers: [String]
 
     enum CodingKeys: String, CodingKey {
-        case id, tableId, itemName, itemId, section, customerId, deviceId, status, createdAt, updatedAt
+        case id, tableId, itemName, itemId, section, customerId, deviceId, customerName, customerPhotoURL
+        case status, createdAt, updatedAt
         case enteredAt, deliveredAt, cancelledAt, cancelReason, estimatedReadyAt, modifiers
     }
 
     init(
         id: String, tableId: String, itemName: String, itemId: String? = nil, section: String? = nil,
-        customerId: String? = nil, deviceId: String? = nil, status: String, createdAt: String, updatedAt: String,
+        customerId: String? = nil, deviceId: String? = nil, customerName: String? = nil,
+        customerPhotoURL: String? = nil, status: String, createdAt: String, updatedAt: String,
         enteredAt: String? = nil, deliveredAt: String? = nil, cancelledAt: String? = nil,
         cancelReason: String? = nil, estimatedReadyAt: String? = nil,
         modifiers: [String] = []
@@ -64,6 +74,8 @@ struct TableOrderEntry: Codable, Content {
         self.section = section
         self.customerId = customerId
         self.deviceId = deviceId
+        self.customerName = customerName
+        self.customerPhotoURL = customerPhotoURL
         self.status = status
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -84,6 +96,8 @@ struct TableOrderEntry: Codable, Content {
         section = try container.decodeIfPresent(String.self, forKey: .section)
         customerId = try container.decodeIfPresent(String.self, forKey: .customerId)
         deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId)
+        customerName = try container.decodeIfPresent(String.self, forKey: .customerName)
+        customerPhotoURL = try container.decodeIfPresent(String.self, forKey: .customerPhotoURL)
         let decodedStatus = try container.decode(String.self, forKey: .status)
         // "acknowledged" was this feature's original status name, before the
         // entered/delivered lifecycle existed — treat it as "entered" so any
@@ -188,7 +202,8 @@ final class TableOrdersStore: @unchecked Sendable {
     @discardableResult
     func place(
         tableId: String, itemName: String, itemId: String?, section: String?, customerId: String?,
-        deviceId: String? = nil, modifiers: [String] = []
+        deviceId: String? = nil, customerName: String? = nil, customerPhotoURL: String? = nil,
+        modifiers: [String] = []
     ) throws -> TableOrderEntry {
         lock.lock()
         defer { lock.unlock() }
@@ -196,7 +211,8 @@ final class TableOrdersStore: @unchecked Sendable {
         let timestamp = now()
         let entry = TableOrderEntry(
             id: UUID().uuidString, tableId: tableId, itemName: itemName, itemId: itemId, section: section,
-            customerId: customerId, deviceId: deviceId, status: "pending", createdAt: timestamp, updatedAt: timestamp,
+            customerId: customerId, deviceId: deviceId, customerName: customerName, customerPhotoURL: customerPhotoURL,
+            status: "pending", createdAt: timestamp, updatedAt: timestamp,
             modifiers: modifiers
         )
         entries.append(entry)
@@ -499,7 +515,9 @@ final class TableOrdersStore: @unchecked Sendable {
         let formatter = ISO8601DateFormatter()
         let cutoff = Calendar(identifier: .gregorian).date(byAdding: .day, value: -days, to: Date()) ?? .distantPast
 
-        let byTable = Dictionary(grouping: entries, by: { $0.tableId })
+        // "pickup" entries aren't a real dine-in seating — a counter pickup
+        // has no table to turn over, so it would only skew occupancy estimates.
+        let byTable = Dictionary(grouping: entries.filter { $0.tableId != "pickup" }, by: { $0.tableId })
         var sessions: [[TableOrderEntry]] = []
         for (_, orders) in byTable {
             let sorted = orders.sorted { $0.createdAt < $1.createdAt }

@@ -29,6 +29,10 @@ struct CustomerBirthdayRequest: Content {
     var birthday: String?
 }
 
+struct CustomerNicknameRequest: Content {
+    var nickname: String?
+}
+
 struct CustomerLoyaltyPhoneRequest: Content {
     var phone: String?
 }
@@ -159,6 +163,12 @@ func registerCustomerAuthRoutes(_ app: Application) throws {
         let customer = try requireCustomerLogin(req)
         let body = try req.content.decode(CustomerBirthdayRequest.self)
         return try CustomerUserStore.shared.updateBirthday(id: customer.id, birthday: body.birthday)
+    }
+
+    app.post("api", "customer", "nickname") { req throws -> CustomerUserPublic in
+        let customer = try requireCustomerLogin(req)
+        let body = try req.content.decode(CustomerNicknameRequest.self)
+        return try CustomerUserStore.shared.updateNickname(id: customer.id, nickname: body.nickname)
     }
 
     // Links this account to a phone-based punch card, so a signed-in

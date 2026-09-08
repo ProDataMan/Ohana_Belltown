@@ -400,6 +400,32 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testLoggedInCustomerCanPlaceATablelessPickupOrder() throws {
+        let registerBody = ByteBuffer(string: #"{"email":"pickup@example.com","displayName":"Guest","password":"guestpass1"}"#)
+        var sessionCookie: String?
+        try app.test(.POST, "api/customer/register", headers: ["Content-Type": "application/json"], body: registerBody) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from register") }
+
+        let nicknameBody = ByteBuffer(string: #"{"nickname":"Ronnie"}"#)
+        try app.test(.POST, "api/customer/nickname", headers: ["Content-Type": "application/json", "Cookie": cookie], body: nicknameBody) { res in
+            XCTAssertEqual(res.status, .ok)
+            let customer = try res.content.decode(CustomerUserPublic.self)
+            XCTAssertEqual(customer.nickname, "Ronnie")
+        }
+
+        let orderBody = ByteBuffer(string: #"{"tableId":"","itemName":"Spam Musubi"}"#)
+        try app.test(.POST, "api/table-orders", headers: ["Content-Type": "application/json", "Cookie": cookie], body: orderBody) { res in
+            XCTAssertEqual(res.status, .ok)
+            let entry = try res.content.decode(TableOrderEntry.self)
+            XCTAssertEqual(entry.tableId, "pickup")
+            XCTAssertEqual(entry.customerName, "Ronnie")
+        }
+    }
+
     func testCustomerOrderHistoryReflectsOrdersPlacedWhileSignedIn() throws {
         let registerBody = ByteBuffer(string: #"{"email":"guest@example.com","displayName":"Guest","password":"guestpass1"}"#)
         var sessionCookie: String?

@@ -16,6 +16,13 @@ struct CustomerUser: Codable {
     /// Profile photo URL, extracted from Google on signup/link. Apple never
     /// supplies one, and there's no manual-upload path — only ever set from OAuth.
     var photoURL: String?
+    /// What staff actually call this person at the restaurant — may differ
+    /// from displayName (a legal/formal name, or whatever a provider handed
+    /// over). Self-service, editable any time from /my-account.html. Shown
+    /// to staff on a table-less pickup order (see TableOrderEntry.customerName)
+    /// so there's some way to identify who it's for without a table to
+    /// deliver to.
+    var nickname: String?
     /// Phone number linking this account to a punch card in LoyaltyStore
     /// (which is phone-keyed and otherwise has no concept of a customer login).
     var loyaltyPhone: String?
@@ -26,14 +33,14 @@ struct CustomerUser: Codable {
     var updatedAt: String
 
     enum CodingKeys: String, CodingKey {
-        case id, email, displayName, passwordHash, googleId, appleId, facebookId, verified, active, birthday, photoURL, loyaltyPhone
+        case id, email, displayName, passwordHash, googleId, appleId, facebookId, verified, active, birthday, photoURL, nickname, loyaltyPhone
         case verificationToken, resetToken, resetTokenExpiresAt, createdAt, updatedAt
     }
 
     init(
         id: String, email: String, displayName: String, passwordHash: String?,
         googleId: String?, appleId: String?, facebookId: String? = nil, verified: Bool, active: Bool = true,
-        birthday: String? = nil, photoURL: String? = nil, loyaltyPhone: String? = nil,
+        birthday: String? = nil, photoURL: String? = nil, nickname: String? = nil, loyaltyPhone: String? = nil,
         verificationToken: String?, resetToken: String?, resetTokenExpiresAt: String?,
         createdAt: String, updatedAt: String
     ) {
@@ -48,6 +55,7 @@ struct CustomerUser: Codable {
         self.active = active
         self.birthday = birthday
         self.photoURL = photoURL
+        self.nickname = nickname
         self.loyaltyPhone = loyaltyPhone
         self.verificationToken = verificationToken
         self.resetToken = resetToken
@@ -69,12 +77,21 @@ struct CustomerUser: Codable {
         active = try container.decodeIfPresent(Bool.self, forKey: .active) ?? true
         birthday = try container.decodeIfPresent(String.self, forKey: .birthday)
         photoURL = try container.decodeIfPresent(String.self, forKey: .photoURL)
+        nickname = try container.decodeIfPresent(String.self, forKey: .nickname)
         loyaltyPhone = try container.decodeIfPresent(String.self, forKey: .loyaltyPhone)
         verificationToken = try container.decodeIfPresent(String.self, forKey: .verificationToken)
         resetToken = try container.decodeIfPresent(String.self, forKey: .resetToken)
         resetTokenExpiresAt = try container.decodeIfPresent(String.self, forKey: .resetTokenExpiresAt)
         createdAt = try container.decode(String.self, forKey: .createdAt)
         updatedAt = try container.decode(String.self, forKey: .updatedAt)
+    }
+
+    /// What to show staff/display when identifying this customer — the
+    /// nickname if they've set one, otherwise their display name. Never
+    /// blank.
+    var preferredName: String {
+        let trimmed = nickname?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (trimmed?.isEmpty ?? true) ? displayName : trimmed!
     }
 }
 
@@ -89,6 +106,7 @@ struct CustomerUserPublic: Content {
     var facebookLinked: Bool
     var birthday: String?
     var photoURL: String?
+    var nickname: String?
     var loyaltyPhone: String?
 
     init(_ user: CustomerUser) {
@@ -102,6 +120,7 @@ struct CustomerUserPublic: Content {
         facebookLinked = user.facebookId != nil
         birthday = user.birthday
         photoURL = user.photoURL
+        nickname = user.nickname
         loyaltyPhone = user.loyaltyPhone
     }
 }
@@ -394,6 +413,23 @@ final class CustomerUserStore: @unchecked Sendable {
         } else {
             users[idx].birthday = nil
         }
+        users[idx].updatedAt = nowString()
+        try persist()
+        return CustomerUserPublic(users[idx])
+    }
+
+    /// The informal name staff call this customer by at the restaurant, used
+    /// to identify pickup orders that have no table. Pass nil/empty to clear.
+    @discardableResult
+    func updateNickname(id: String, nickname: String?) throws -> CustomerUserPublic {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard let idx = users.firstIndex(where: { $0.id == id }) else {
+            throw CustomerUserError.notFound
+        }
+        let trimmed = nickname?.trimmingCharacters(in: .whitespacesAndNewlines)
+        users[idx].nickname = (trimmed?.isEmpty ?? true) ? nil : trimmed
         users[idx].updatedAt = nowString()
         try persist()
         return CustomerUserPublic(users[idx])

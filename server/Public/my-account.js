@@ -40,11 +40,16 @@ async function loadProfile() {
       ${customer.photoURL ? `<img class="profile-avatar" src="${escapeHtmlMyAccount(customer.photoURL)}" alt="" />` : ''}
       <p><strong>${escapeHtmlMyAccount(customer.displayName)}</strong></p>
       <p>${escapeHtmlMyAccount(customer.email)}${customer.verified ? '' : ' (unverified)'}</p>
+      ${customer.nickname ? `<p>Nickname: ${escapeHtmlMyAccount(customer.nickname)}</p>` : ''}
       ${customer.birthday ? `<p>Birthday: ${escapeHtmlMyAccount(formatMonthDayMyAccount(customer.birthday))}</p>` : ''}
       ${customer.loyaltyPhone ? `<p>Phone (Rewards): ${escapeHtmlMyAccount(customer.loyaltyPhone)}</p>` : ''}
       ${signInMethods.length ? `<p class="hint">Signs in with: ${escapeHtmlMyAccount(signInMethods.join(', '))}</p>` : ''}
       ${!customer.verified ? '<p class="hint">Check your email to verify your account (a verification link was sent when you signed up).</p>' : ''}
     `;
+    const nicknameInput = document.getElementById('nickname-input');
+    if (nicknameInput && customer.nickname) {
+      nicknameInput.value = customer.nickname;
+    }
     const birthdayInput = document.getElementById('birthday-input');
     if (birthdayInput && customer.birthday) {
       // The year is never stored or sent anywhere — 2000 is just a
@@ -154,6 +159,46 @@ document.getElementById('change-password-form').addEventListener('submit', async
     }
     setMyAccountStatus(statusEl, 'Password changed!', false);
     event.target.reset();
+  } catch (error) {
+    setMyAccountStatus(statusEl, error.message, true);
+  }
+});
+
+document.getElementById('nickname-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const statusEl = document.getElementById('nickname-status');
+  const nickname = document.getElementById('nickname-input').value.trim();
+  if (!nickname) return setMyAccountStatus(statusEl, 'Enter a nickname first, or use Clear.', true);
+
+  setMyAccountStatus(statusEl, 'Saving...', false);
+  try {
+    const response = await fetch('/api/customer/nickname', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nickname }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.reason || `Failed (${response.status}).`);
+    }
+    setMyAccountStatus(statusEl, 'Saved!', false);
+  } catch (error) {
+    setMyAccountStatus(statusEl, error.message, true);
+  }
+});
+
+document.getElementById('clear-nickname-btn').addEventListener('click', async () => {
+  const statusEl = document.getElementById('nickname-status');
+  setMyAccountStatus(statusEl, 'Clearing...', false);
+  try {
+    const response = await fetch('/api/customer/nickname', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nickname: null }),
+    });
+    if (!response.ok) throw new Error(`Failed (${response.status}).`);
+    document.getElementById('nickname-input').value = '';
+    setMyAccountStatus(statusEl, 'Cleared.', false);
   } catch (error) {
     setMyAccountStatus(statusEl, error.message, true);
   }

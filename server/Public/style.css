@@ -2458,6 +2458,19 @@ fieldset legend {
   color: var(--gold-text);
 }
 
+.pickup-order-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pickup-order-photo {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 .loyalty-card-summary {
   display: flex;
   flex-wrap: wrap;

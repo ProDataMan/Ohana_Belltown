@@ -24,6 +24,16 @@ final class TableOrdersStoreTests: XCTestCase {
         XCTAssertEqual(needsEntry[0].itemName, "Spam Musubi")
     }
 
+    func testPlaceStoresCustomerNameAndPhotoForPickupOrders() throws {
+        let entry = try TableOrdersStore.shared.place(
+            tableId: "pickup", itemName: "Spam Musubi", itemId: nil, section: "menu", customerId: "cust-1",
+            customerName: "Ronnie", customerPhotoURL: "https://example.com/photo.jpg"
+        )
+        XCTAssertEqual(entry.tableId, "pickup")
+        XCTAssertEqual(entry.customerName, "Ronnie")
+        XCTAssertEqual(entry.customerPhotoURL, "https://example.com/photo.jpg")
+    }
+
     func testNeedsEntryQueueIsOldestFirst() throws {
         try TableOrdersStore.shared.place(tableId: "1", itemName: "First", itemId: nil, section: nil, customerId: nil)
         try TableOrdersStore.shared.place(tableId: "2", itemName: "Second", itemId: nil, section: nil, customerId: nil)
@@ -319,6 +329,21 @@ final class TableOrdersStoreTests: XCTestCase {
 
         let stats = try TableOrdersStore.shared.tableOccupancyStats(days: 30)
         XCTAssertEqual(stats.sessions, 0, "a session isn't over until every order in it has actually been delivered")
+        XCTAssertTrue(stats.isBaselineOnly)
+    }
+
+    func testOccupancyStatsExcludesPickupOrders() throws {
+        let created = Date().addingTimeInterval(-3600)
+        let delivered = created.addingTimeInterval(14 * 60)
+        try seedEntries([
+            TableOrderEntry(
+                id: "a", tableId: "pickup", itemName: "Loco Moco", section: "menu", status: "delivered",
+                createdAt: iso(created), updatedAt: iso(delivered), enteredAt: iso(created), deliveredAt: iso(delivered)
+            )
+        ])
+
+        let stats = try TableOrdersStore.shared.tableOccupancyStats(days: 30)
+        XCTAssertEqual(stats.sessions, 0, "a counter pickup isn't a table seating and shouldn't skew turnover estimates")
         XCTAssertTrue(stats.isBaselineOnly)
     }
 }

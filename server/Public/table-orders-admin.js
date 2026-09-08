@@ -17,6 +17,19 @@ function minutesAgoTableOrder(timestamp) {
 const needsEntryEl = document.getElementById('needs-entry-list');
 const awaitingDeliveryEl = document.getElementById('awaiting-delivery-list');
 
+// "pickup" orders have no table — show who to call for instead, using the
+// name/photo snapshotted at order time (see customerName/customerPhotoURL).
+function tableCellMarkup(order) {
+  if (order.tableId !== 'pickup') {
+    return `<span class="pill pill-approved">Table ${escapeHtmlTableOrders(order.tableId)}</span>`;
+  }
+  const photo = order.customerPhotoURL
+    ? `<img src="${escapeHtmlTableOrders(order.customerPhotoURL)}" alt="" class="pickup-order-photo">`
+    : '';
+  const name = escapeHtmlTableOrders(order.customerName || 'Pickup');
+  return `<span class="pill pill-warning pickup-order-pill">${photo}Pickup: ${name}</span>`;
+}
+
 function itemDisplayName(order) {
   const base = escapeHtmlTableOrders(order.itemName);
   if (!order.modifiers || !order.modifiers.length) return base;
@@ -64,7 +77,7 @@ function renderNeedsEntry(orders) {
             .map(
               (o) => `
             <tr data-id="${o.id}" data-item-name="${escapeHtmlTableOrders(o.itemName)}">
-              <td><span class="pill pill-approved">Table ${escapeHtmlTableOrders(o.tableId)}</span></td>
+              <td>${tableCellMarkup(o)}</td>
               <td>${itemDisplayName(o)}</td>
               <td>${minutesAgoTableOrder(o.createdAt)}</td>
               <td>
@@ -105,7 +118,7 @@ function renderAwaitingDelivery(orders) {
               const isReady = o.estimatedReadyAt && new Date(o.estimatedReadyAt).getTime() <= now;
               return `
               <tr data-id="${o.id}" data-item-name="${escapeHtmlTableOrders(o.itemName)}">
-                <td><span class="pill pill-approved">Table ${escapeHtmlTableOrders(o.tableId)}</span></td>
+                <td>${tableCellMarkup(o)}</td>
                 <td>${escapeHtmlTableOrders(o.itemName)}</td>
                 <td>${minutesAgoTableOrder(o.enteredAt || o.createdAt)}</td>
                 <td>${isReady ? '<span class="pill pill-warning">Ready now</span>' : '<span class="pill">Cooking</span>'}</td>
