@@ -978,6 +978,7 @@ func routes(_ app: Application) throws {
         ("drinks", "pages/drinks.html"),
         ("happy-hour", "pages/happy-hour.html"),
         ("local", "pages/local.html"),
+        ("entertainment", "pages/entertainment.html"),
         ("about", "pages/about.html"),
         ("catering", "pages/catering.html"),
         ("contact", "pages/contact.html"),

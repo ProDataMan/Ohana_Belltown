@@ -91,7 +91,7 @@ now historical background rather than the current plan.
 
 | Path | What it is |
 |---|---|
-| `/`, `/about`, `/local`, `/contact`, `/catering`, `/gallery` | Marketing pages |
+| `/`, `/about`, `/local`, `/entertainment`, `/contact`, `/catering`, `/gallery` | Marketing pages |
 | `/faq` | Common questions — reservations, hours, parking, dietary/allergen info, private events, gift cards |
 | `/privacy`, `/terms` | Privacy Policy and Terms of Service — linked from every public page's footer and the signup form |
 | `/menu`, `/sushi`, `/drinks`, `/happy-hour` | Menu sections (216 items total) — search box + allergen/dietary filter chips |
@@ -137,6 +137,7 @@ now historical background rather than the current plan.
 - Catering page now also covers Private Events &mdash; booking Ohana's own space for a large party, distinct from off-site catering
 - Legacy `.html` URL redirects preserved for SEO
 - HTTPS + persistent storage (Azure Files-backed menu data and photos)
+- `/entertainment` (2026-09-08) — a static weekly nightlife schedule page (`server/Public/pages/entertainment.html`, registered as a clean route in `routes.swift`'s `cleanPages` list): karaoke Monday/Tuesday, Island Night (free live island music) Wednesday at 9pm, DJ nights Thursday–Saturday, karaoke again Sunday. Deliberately static/low-maintenance rather than admin-editable — the specific DJ/performer each week already gets posted to Ohana's Facebook/Instagram, so the page links out to both (prominent CTA buttons, not just the footer icons) for the current week's lineup and event photos rather than trying to duplicate that content here. Linked from the main nav (all 21 public/customer pages) and a new homepage callout section, same pattern as Rewards/Gift Cards/Catering.
 
 </details>
 
