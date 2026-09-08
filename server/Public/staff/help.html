@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Help — Ohana Belltown</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="stylesheet" href="../style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <p class="eyebrow">Ohana Belltown — Staff</p>
+        <h1>Help &amp; Documentation</h1>
+        <p>
+          What every staff tool on this site does, how to use it, and what's still on the
+          way. Ask a manager if something here is out of date.
+        </p>
+        <p class="admin-link"><a href="/menu">&larr; Back to menu</a></p>
+        <div class="staff-tools-nav">
+          <a href="/edit.html">Menu Editor</a>
+          <a href="/loyalty-admin.html">Loyalty</a>
+          <a href="/waitlist-admin.html">Waitlist</a>
+          <a href="/table-orders-admin.html">Table Orders</a>
+          <a href="/events-admin.html">Events</a>
+          <a href="/table-card.html">Table Cards</a>
+          <a href="/account.html">My Account</a>
+          <a href="/manage-users.html">Manage Users</a>
+          <a href="/analytics.html">Analytics</a>
+          <a href="/staff-rewards-admin.html">Staff Rewards</a>
+          <a href="/competitor-pricing-admin.html">Competitor Pricing</a>
+          <a href="/swag-admin.html">Swag</a>
+          <a href="/gift-cards-admin.html">Gift Cards</a>
+          <a href="/help.html" class="active">Help</a>
+        </div>
+      </header>
+
+      <section class="panel">
+        <h2>Jump to a section</h2>
+        <div class="section-tabs">
+          <a href="#ordering">Table Ordering</a>
+          <a href="#menu">Menu Editor</a>
+          <a href="#loyalty">Loyalty &amp; Rewards Card</a>
+          <a href="#staff-rewards">Staff Rewards</a>
+          <a href="#waitlist">Waitlist</a>
+          <a href="#events">Events &amp; Specials</a>
+          <a href="#table-cards">Table Cards &amp; QR Codes</a>
+          <a href="#competitor-pricing">Competitor Pricing</a>
+          <a href="#shop-giftcards">Shop &amp; Gift Cards</a>
+          <a href="#analytics">Analytics</a>
+          <a href="#customer-accounts">Customer Accounts</a>
+          <a href="#staff-accounts">Staff Accounts</a>
+          <a href="#feedback">Feedback</a>
+          <a href="#alerts">Notifications &amp; Alerts</a>
+          <a href="#lights">Station Lights</a>
+          <a href="#coming-soon">Coming Soon</a>
+        </div>
+      </section>
+
+      <section class="panel" id="ordering">
+        <h2>Table Ordering &amp; the Floor Map</h2>
+        <p>
+          Once a guest scans a table's QR code, every menu page shows an
+          <strong>Add to Order</strong> button. Tapping it doesn't touch the kitchen yet —
+          it just builds a pending order the guest reviews and sends themselves. It is
+          <strong>not a payment system</strong>: nothing gets charged, the check still gets
+          rung up the normal way when it's brought to the table.
+        </p>
+        <h3>The lifecycle</h3>
+        <ol>
+          <li><strong>Pending</strong> — guest sent it, nobody's confirmed it yet. Shows on the "Needs Entry" queue.</li>
+          <li><strong>Entered</strong> — a server checked with the table and rang it in for real. Click <strong>Confirm Entered</strong> on <a href="/table-orders-admin.html">/table-orders-admin.html</a>. Moves to "Awaiting Delivery," and an estimated ready time appears.</li>
+          <li><strong>Delivered</strong> — click <strong>Confirm Delivered</strong> once it's dropped at the table (a guest can also self-confirm this from their phone).</li>
+          <li><strong>Cancelled</strong> — click <strong>Cancel</strong> next to either button if a guest changes their mind or the kitchen is out of something. You'll be asked for an optional reason. Can't cancel something already delivered.</li>
+        </ol>
+        <p class="hint">
+          An order nobody ever touches doesn't sit forever — anything left unentered for 4
+          hours, or entered-but-undelivered for 2 hours, auto-cancels itself with a system
+          reason so nothing is silently stuck open.
+        </p>
+        <h3>Pickup orders (no table)</h3>
+        <p>
+          A signed-in customer can now place an order without ever scanning a table —
+          useful for a counter pickup. Since there's no table to point staff to, these
+          show on the admin page as a <strong>"Pickup: &lt;name&gt;"</strong> pill with the
+          customer's photo instead of a table number. The name shown is whatever nickname
+          the customer set on their account (see Customer Accounts below), or their account
+          name if they never set one.
+        </p>
+        <h3>The floor map</h3>
+        <p>
+          The live floor map on <a href="/table-orders-admin.html">/table-orders-admin.html</a>
+          mirrors the real dining room/bar/sushi bar/deck layout. A table flashes
+          <strong>gold</strong> the instant an order needs entering, turns solid
+          <strong>purple</strong> ("Processing") once entered, then flashes <strong>pink</strong>
+          once it's plausibly ready to deliver. Set the staff-on-duty count at the top of the
+          page — it's used to adjust prep-time estimates when the room is busier than the
+          crew can keep up with.
+        </p>
+      </section>
+
+      <section class="panel" id="menu">
+        <h2>Menu Editor</h2>
+        <p>
+          Two ways to edit the menu, both live the moment you save — no publish step:
+        </p>
+        <ul>
+          <li><strong><a href="/edit.html">/edit.html</a></strong> — the full menu, all 24 categories on one page with a jump-nav at the top. Best for touching several items or scanning a whole category.</li>
+          <li><strong>/edit-item.html?id=...</strong> — a focused single-item editor, reached by clicking the small "Edit" link that appears next to every item on the public menu when you're logged in. Faster for a one-off fix.</li>
+        </ul>
+        <h3>What you can set per item</h3>
+        <ul>
+          <li>Price, description, tags (allergen/dietary), photos (upload your own or pick from our Google Business photos)</li>
+          <li><strong>Featured</strong> — shows on the homepage's daily specials</li>
+          <li><strong>Sold Out</strong> — grays it out with a badge instead of deleting it; easy to flip back on</li>
+          <li><strong>Happy Hour</strong> — includes it in the Happy Hour section</li>
+          <li><strong>Add-Ons</strong> — optional upcharges (e.g. "Add Katsu +$6") that show as checkboxes to the guest, with the price updating live as they check them</li>
+          <li><strong>Required Choices</strong> — for a dish that's genuinely "pick one" (e.g. chicken or beef) with no price difference — shows as radio buttons and blocks ordering until a choice is made</li>
+          <li><strong>Require at least one add-on</strong> — for an item that's all optional checkboxes with no real base price (e.g. Extra Sauces), so a guest can't add it with nothing selected</li>
+        </ul>
+        <p class="hint">
+          The <strong>Additions Catalog</strong> remembers every add-on you've ever typed in
+          site-wide, so adding "Add Bacon" to a second item is a dropdown pick, not
+          retyping the name and price. The <strong>"Scan for common add-ons"</strong> button
+          on /edit.html does a one-time sweep of descriptions that already mention an
+          upcharge and turns them into real add-ons automatically — safe to click more than
+          once, it only adds what's missing.
+        </p>
+      </section>
+
+      <section class="panel" id="loyalty">
+        <h2>Loyalty &amp; Rewards Card</h2>
+        <p>
+          <a href="/loyalty-admin.html">/loyalty-admin.html</a> — look up a guest's digital
+          sushi punch card by phone number, add a punch, or redeem a reward (10 punches =
+          free roll).
+        </p>
+        <ul>
+          <li>Photo/social shares submitted from <a href="/rewards">/rewards</a> show up here to approve or deny — an approved photo is worth 1/10 of a punch and gets published straight into that dish's own photo gallery.</li>
+          <li>Capped at the first 2 approved shares per phone number per day, so posting many photos of one meal doesn't multiply the reward.</li>
+          <li><strong>Birthday Club</strong> — this page also shows anyone with a birthday in the next 7 days, so a server can proactively treat a regular. There's no automatic discount (no POS connection) — it's a heads-up, not a coupon.</li>
+        </ul>
+      </section>
+
+      <section class="panel" id="staff-rewards">
+        <h2>Staff Rewards</h2>
+        <p>
+          A points card for keeping the site itself up to date, redeemable against a real
+          catalog (a free roll, Shop swag). Points come in automatically or by self-report:
+        </p>
+        <ul>
+          <li>Editing a menu item auto-awards points for whatever actually changed (price update = 10, adding a photo = 25, first-ever photo on an item = 50 bonus)</li>
+          <li>Adding an event = 35 points</li>
+          <li>Log your own "other" activity from <a href="/account.html">/account.html</a> for instant credit (20 points)</li>
+          <li>A social media post needs a link and goes to a queue on <a href="/staff-rewards-admin.html">/staff-rewards-admin.html</a> for admin approval (30 points once approved)</li>
+        </ul>
+        <p class="hint">
+          Everything except admin-approved requests shares one cap of 100 points/staff/day,
+          so nobody can farm points by repeatedly toggling the same field. Admins can edit
+          point values and the redemption catalog directly on
+          <a href="/staff-rewards-admin.html">/staff-rewards-admin.html</a> — no code change
+          needed to adjust either.
+        </p>
+      </section>
+
+      <section class="panel" id="waitlist">
+        <h2>Waitlist</h2>
+        <p>
+          <a href="/waitlist-admin.html">/waitlist-admin.html</a> shows the live walk-in
+          queue from <a href="/waitlist">/waitlist</a>. This is a waitlist, not a
+          reservation — it just lets someone put their name in before they arrive.
+        </p>
+        <ul>
+          <li><strong>"Text they're ready"</strong> opens your own phone's messaging app with the guest's number and a ready-made message pre-filled — nothing is sent automatically, you still hit send yourself.</li>
+          <li>Entries older than 4 hours drop off the queue on their own.</li>
+        </ul>
+      </section>
+
+      <section class="panel" id="events">
+        <h2>Events &amp; Specials</h2>
+        <p>
+          <a href="/events-admin.html">/events-admin.html</a> (admin only) edits what shows
+          on the public events/specials calendar at <a href="/local">/local</a>. Adding a
+          new event also auto-awards Staff Rewards points.
+        </p>
+      </section>
+
+      <section class="panel" id="table-cards">
+        <h2>Table Cards &amp; QR Codes</h2>
+        <p>
+          <a href="/table-card.html">/table-card.html</a> has printable QR-code cards for
+          every real table/seat (43 total, dining room/bar/sushi bar/deck) — each one is
+          unique to its spot so ordering knows which table it came from.
+        </p>
+        <ul>
+          <li>Scanning one sends the guest to <strong>/happy-hour</strong> automatically during Happy Hour (Mon&ndash;Fri, 3&ndash;6pm) or straight to <strong>/menu</strong> otherwise, carrying the table id along.</li>
+          <li><strong>"While You Wait"</strong> — a separate card for the front door/host stand. Shows real prices without a table id, but deliberately does <em>not</em> unlock ordering — there'd be nowhere to deliver an order placed there.</li>
+          <li><strong>"Shop Ohana Swag"</strong> — a plain QR straight to <a href="/shop">/shop</a>, not tied to any table.</li>
+        </ul>
+      </section>
+
+      <section class="panel" id="competitor-pricing">
+        <h2>Competitor Pricing</h2>
+        <p>
+          <a href="/competitor-pricing-admin.html">/competitor-pricing-admin.html</a> (admin
+          only) compares our prices against nearby restaurants for the same/similar dish.
+        </p>
+        <ol>
+          <li>Find a nearby restaurant with the built-in search (real distance from our own address, no typing an address by hand).</li>
+          <li>Snap/upload photos of their menu right on their card.</li>
+          <li>That's it for you — pricing gets filled in later by periodically pointing a Claude Code session at whatever photos are still marked unreviewed (a small pink dot on the thumbnail). You can also dismiss a photo's unreviewed flag yourself with the ✓ button if you've already handled it another way.</li>
+        </ol>
+        <p class="hint">
+          A written summary of what the data actually means — real gaps vs. single-restaurant
+          noise, and suggested actions — lives at
+          <a href="/competitor-pricing-findings.html">/competitor-pricing-findings.html</a>.
+        </p>
+      </section>
+
+      <section class="panel" id="shop-giftcards">
+        <h2>Shop &amp; Gift Cards</h2>
+        <ul>
+          <li><strong><a href="/swag-admin.html">/swag-admin.html</a></strong> — manage what's for sale on <a href="/shop">/shop</a> (bandanas, hats, t-shirts): name, price, availability, photos. Mark a paid order delivered once you've handed it over.</li>
+          <li><strong><a href="/gift-cards-admin.html">/gift-cards-admin.html</a></strong> — see paid gift-card orders from <a href="/gift-cards">/gift-cards</a>. This doesn't issue a digital card automatically — once an order shows "Paid," activate a physical card by hand for that amount and get it to the buyer (mail, pickup, or bring it to their table if they're dining in).</li>
+        </ul>
+        <p class="hint">
+          Both take real card payment via Square Checkout — see "Coming Soon" below for the
+          current sandbox-vs-production status.
+        </p>
+      </section>
+
+      <section class="panel" id="analytics">
+        <h2>Analytics</h2>
+        <p>
+          <a href="/analytics.html">/analytics.html</a> (admin only) — a grid of summary
+          cards; click one (or a notification link) to expand just that section. Covers:
+        </p>
+        <ul>
+          <li>Pageviews by page/day, device/OS/browser split — no cookies, no per-visitor tracking</li>
+          <li>Table-order wait/prep/delivery time KPIs, and an estimated table-turnover time</li>
+          <li>Customer feedback report (with average rating)</li>
+          <li>"Menu Items Missing a Price/Photo" — each row links straight to that item's editor</li>
+          <li>Competitor Menu Pricing summary</li>
+        </ul>
+      </section>
+
+      <section class="panel" id="customer-accounts">
+        <h2>Customer Accounts</h2>
+        <p>
+          Separate from staff logins — a customer signs up at <a href="/signup">/signup</a>
+          or via "Continue with Google," and manages everything from
+          <a href="/my-account.html">/my-account.html</a>.
+        </p>
+        <ul>
+          <li><strong>Nickname</strong> — what a customer wants to actually be called at Ohana, which may differ from their account name (a Google account for "Ronald Smith" who everyone calls "Ronnie," say). This is what shows up on a pickup order's "Pickup: &lt;name&gt;" pill — see Table Ordering above.</li>
+          <li><strong>Profile photo</strong> — captured automatically from Google sign-in, shown alongside pickup orders too.</li>
+          <li><strong>Birthday Club</strong> — see the Loyalty section above for the staff-facing view.</li>
+          <li><strong>Rewards Card linking</strong> — a customer can link their phone number to see their punch-card status without looking it up separately on /rewards.</li>
+          <li><strong>Order history</strong> — every customer (signed in or not) can see their own past table orders. Signed-in history lives on their account page; a guest who never signs in still gets one at <a href="/order-history">/order-history</a>, tied to their browser rather than an identity.</li>
+        </ul>
+      </section>
+
+      <section class="panel" id="staff-accounts">
+        <h2>Staff Accounts</h2>
+        <p>
+          Named username/password logins (not a shared PIN), two roles: <strong>admin</strong>
+          and <strong>employee</strong>.
+        </p>
+        <ul>
+          <li><a href="/manage-users.html">/manage-users.html</a> (admin only) — create accounts, change roles, force-reset a forgotten password, deactivate/reactivate. Deactivation logs someone out immediately, even mid-session.</li>
+          <li><a href="/account.html">/account.html</a> — your own profile: display name, optional email/phone/birthday, log Staff Rewards activity, link Google sign-in.</li>
+          <li>Log in with either your username or your email, same password.</li>
+          <li>A new or reset account must change its password on next login.</li>
+        </ul>
+      </section>
+
+      <section class="panel" id="feedback">
+        <h2>Feedback Widget</h2>
+        <p>
+          A small "Feedback" tab appears on every public page (no login needed) for guests
+          to rate/comment on the website, food, or service. Any logged-in staff member sees
+          a floating "N new feedback" badge site-wide; the full report (with average rating)
+          lives on <a href="/analytics.html">/analytics.html</a>.
+        </p>
+      </section>
+
+      <section class="panel" id="alerts">
+        <h2>Notifications &amp; Spoken Alerts</h2>
+        <p>
+          Logged-in staff get several "something needs attention" signals, all shown
+          site-wide via the header (not just on the relevant admin page):
+        </p>
+        <ul>
+          <li>A "N table orders (X new, Y ready)" badge — links to whichever table has waited longest.</li>
+          <li>A "N new feedback" badge.</li>
+          <li>A "N unreviewed menu photos" badge (admin only, Competitor Pricing).</li>
+          <li><strong>Spoken alerts</strong> — your device reads out new/waiting table orders aloud (e.g. "3 new items added to order at table 84, deck"). A "🔔 Alerts on / 🔕 Alerts muted" toggle next to the badges lets you mute just the voice on your own device — the visual badges keep working either way.</li>
+        </ul>
+        <p class="hint">
+          On iPhone/iPad, the first tap anywhere on the page after logging in "primes" audio
+          — normal use unlocks it, nothing special to do. If a phone is locked or another app
+          is in front, none of this can ring through; that would need a real installed app
+          with push notifications (see "Coming Soon" below).
+        </p>
+      </section>
+
+      <section class="panel" id="lights">
+        <h2>Table-order station lights (Tuya / Feit bulbs)</h2>
+        <p>
+          The server station and each prep station (kitchen, sushi, bar) have a smart bulb
+          that flashes when a table sends an order, when it's confirmed, and when it's ready.
+          The bulbs are Feit color bulbs, but they're paired through Tuya's cloud, not the
+          Feit app.
+        </p>
+
+        <h3>1. Create the Tuya Cloud developer account</h3>
+        <ol>
+          <li>Go to <strong>iot.tuya.com</strong> and sign up for a free Tuya IoT developer account (a work email is fine — this is separate from the Smart Life app account used to add bulbs).</li>
+          <li>In the Tuya IoT Platform console, create a new <strong>Cloud Project</strong>. Pick the data center region closest to us (<code>US</code>) and note it — it must match the <code>TUYA_REGION</code> value below.</li>
+          <li>Once the project exists, open it and copy the <strong>Access ID/Client ID</strong> and <strong>Access Secret/Client Secret</strong> from the project overview page. These become <code>TUYA_ACCESS_ID</code> and <code>TUYA_ACCESS_SECRET</code>.</li>
+          <li>Under the project's <strong>Devices</strong> tab, link your Tuya account (see step 2) so the bulbs show up here too.</li>
+        </ol>
+
+        <h3>2. Add the physical bulbs</h3>
+        <ol>
+          <li>Install the <strong>Smart Life</strong> app (not the Feit app) and create/sign in to a Tuya account.</li>
+          <li>Add each bulb in Smart Life as normal (Add Device → Lighting → follow the pairing steps), and name them clearly, e.g. "Server Station", "Kitchen Station", "Sushi Station", "Bar Station".</li>
+          <li>Back in the Tuya IoT Platform console, under your Cloud Project → <strong>Devices</strong> → <strong>Link Tuya App Account</strong>, scan the QR code with the Smart Life app to link that account. The bulbs should then appear in the project's device list.</li>
+          <li>Click into each device and copy its <strong>Device ID</strong>.</li>
+        </ol>
+
+        <h3>3. Set the server secrets</h3>
+        <p>These go on the Azure Container App (<code>ohana-belltown-server</code>), not in the repo:</p>
+        <ul>
+          <li><code>TUYA_ACCESS_ID</code></li>
+          <li><code>TUYA_ACCESS_SECRET</code></li>
+          <li><code>TUYA_REGION</code> (e.g. <code>us</code>)</li>
+          <li><code>TUYA_DEVICE_ID_SERVER</code></li>
+          <li><code>TUYA_DEVICE_ID_KITCHEN</code></li>
+          <li><code>TUYA_DEVICE_ID_SUSHI</code></li>
+          <li><code>TUYA_DEVICE_ID_BAR</code></li>
+          <li><code>TUYA_COLOUR_CODE</code> — start with <code>colour_data</code>; switch to <code>colour_data_v2</code> if color commands fail for a bulb.</li>
+        </ul>
+        <p class="hint">
+          Guest ordering keeps working even if Tuya is down or unconfigured — the lights are a
+          notification layer only. To confirm they're wired up, check
+          <code>GET /api/table-orders/lights</code> while logged in.
+        </p>
+      </section>
+
+      <section class="panel" id="coming-soon">
+        <h2>Coming Soon / Not Live Yet</h2>
+        <p>
+          Everything below is built (or partly built) but isn't doing anything for a real
+          guest yet — usually because it's waiting on a credential, an account, or a
+          business decision rather than more code. Placeholders so it's clear what to expect
+          and what not to promise a guest yet.
+        </p>
+
+        <h3><span class="pill pill-warning">Not live</span> Real online payment (Square)</h3>
+        <p>
+          Shop and Gift Cards checkout is fully built and tested, but still pointed at
+          Square's <strong>sandbox</strong> — only fake test cards work right now, no real
+          money has moved. Flipping to production is a two-setting swap on the Container App
+          (production access token + turning off sandbox mode), no code change needed.
+        </p>
+
+        <h3><span class="pill pill-warning">Not live</span> Real email delivery</h3>
+        <p>
+          Customer email verification and password-reset links are built but only logged to
+          the server console right now, never actually emailed — needs a Resend API key.
+          Once that's set, both start working immediately with no other changes.
+        </p>
+
+        <h3><span class="pill pill-warning">Not live</span> Apple &amp; Facebook Sign-In</h3>
+        <p>
+          Both buttons exist in the code and are fully wired up, just hidden until their
+          credentials are set up. Facebook is free and quick; Apple needs a paid Apple
+          Developer Program enrollment first.
+        </p>
+
+        <h3><span class="pill pill-warning">Not live</span> AI menu-photo price extraction</h3>
+        <p>
+          On Competitor Pricing, a button to auto-read prices off an uploaded menu photo
+          exists but stays hidden until an Anthropic API key is configured. Until then, the
+          Claude-Code-session workflow described under Competitor Pricing above is how
+          pricing actually gets filled in.
+        </p>
+
+        <h3><span class="pill pill-warning">Idea, not built</span> Real dine-in checkout</h3>
+        <p>
+          Table ordering today is a "heads up" queue for staff — the actual check still gets
+          rung up and paid the traditional way. A future version could charge the table's
+          card for the order directly, the same way Shop/Gift Cards already take real
+          payment, once there's real usage behind those to build on.
+        </p>
+
+        <h3><span class="pill pill-warning">Idea, not built</span> One unified notification dashboard</h3>
+        <p>
+          Table orders, feedback, and competitor photos each have their own badge in the
+          header today. A single "N notifications" landing page pulling all of them together
+          is a planned cleanup once a few more badges get added.
+        </p>
+
+        <h3><span class="pill pill-warning">Idea, not built</span> Dark mode</h3>
+        <p>
+          Every page is light-mode only right now. Worth having for a guest checking the
+          menu at a dim table at night — not started yet.
+        </p>
+
+        <h3><span class="pill pill-warning">Idea, not built</span> Real push notifications</h3>
+        <p>
+          Spoken/visual alerts only work while a staff member's phone is unlocked and the
+          tab is open. A locked-phone alert would need an installed app with real push
+          notifications — a bigger project than the current browser-based alerts.
+        </p>
+
+        <h3><span class="pill pill-warning">Not started</span> Online reservations</h3>
+        <p>
+          Deliberately not built — OpenTable/Resy/Tock were evaluated and didn't clear the
+          cost bar against Ohana's walk-in-friendly style. The free call/text-to-reserve
+          buttons on the homepage and Contact page are the current answer; revisit if we
+          start regularly turning away walk-ins.
+        </p>
+
+        <h3><span class="pill pill-warning">Not started</span> Uptime monitoring</h3>
+        <p>
+          Setup steps are ready, just needs a free UptimeRobot account created and pointed
+          at the site's health-check endpoint.
+        </p>
+
+        <p class="hint">
+          More placeholders will show up here as new ideas come up — if you're wondering
+          "does the site do X yet," check here first before asking around.
+        </p>
+      </section>
+
+      <section class="panel">
+        <h2>Other guides</h2>
+        <p>More staff documentation will be added here as it comes up. If you had to ask
+        someone how to do something and it's not written down, that's a good sign it belongs
+        on this page — let a manager know.</p>
+      </section>
+    </main>
+
+    <script src="/nav.js"></script>
+    <script src="../staff-auth.js"></script>
+  </body>
+</html>

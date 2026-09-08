@@ -90,6 +90,7 @@ function insertStaffNavDropdown() {
       <a href="/gift-cards-admin.html">Gift Cards</a>
       <a href="/manage-users.html">Manage Users</a>
       <a href="/account.html">My Account</a>
+      <a href="/help.html">Help</a>
     </div>
   `;
   dropdown.querySelector('.nav-dropdown-toggle').addEventListener('click', () => {
