@@ -501,6 +501,55 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testLoyaltyReferralHappyPathAndErrorCases() throws {
+        let selfReferralBody = ByteBuffer(string: #"{"phone":"2065550100","referrerPhone":"2065550100"}"#)
+        try app.test(.POST, "api/loyalty/referral", headers: ["Content-Type": "application/json"], body: selfReferralBody) { res in
+            XCTAssertEqual(res.status, .badRequest)
+        }
+
+        let referralBody = ByteBuffer(string: #"{"phone":"2065550100","referrerPhone":"2065559999"}"#)
+        try app.test(.POST, "api/loyalty/referral", headers: ["Content-Type": "application/json"], body: referralBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+
+        // Already has a card now (created by the referral above) — can't
+        // backfill a referrer a second time.
+        try app.test(.POST, "api/loyalty/referral", headers: ["Content-Type": "application/json"], body: referralBody) { res in
+            XCTAssertEqual(res.status, .badRequest)
+        }
+    }
+
+    func testDeliveredSushiOrderAutomaticallyPunchesTheSignedInCustomersLinkedCard() throws {
+        let registerBody = ByteBuffer(string: #"{"email":"sushifan@example.com","displayName":"Sushi Fan","password":"guestpass1"}"#)
+        var sessionCookie: String?
+        try app.test(.POST, "api/customer/register", headers: ["Content-Type": "application/json"], body: registerBody) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from register") }
+
+        let phoneBody = ByteBuffer(string: #"{"phone":"2065550200"}"#)
+        try app.test(.POST, "api/customer/loyalty-phone", headers: ["Content-Type": "application/json", "Cookie": cookie], body: phoneBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+
+        let orderBody = ByteBuffer(string: #"{"tableId":"5","itemName":"Volcano Roll","section":"sushi"}"#)
+        var orderId: String?
+        try app.test(.POST, "api/table-orders", headers: ["Content-Type": "application/json", "Cookie": cookie], body: orderBody) { res in
+            XCTAssertEqual(res.status, .ok)
+            orderId = try res.content.decode(TableOrderEntry.self).id
+        }
+        guard let id = orderId else { return XCTFail("expected an order id") }
+
+        try app.test(.POST, "api/table-orders/\(id)/deliver") { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+
+        let status = try LoyaltyStore.shared.lookup(phone: "2065550200")
+        XCTAssertEqual(status.punches, 1, "delivering a sushi order for a signed-in customer with a linked rewards phone should auto-punch their card")
+    }
+
     func testPlaceReviewsReturnsEmptyWithoutAPIConfigured() throws {
         try app.test(.GET, "api/place-reviews") { res in
             XCTAssertEqual(res.status, .ok)

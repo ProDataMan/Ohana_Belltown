@@ -167,4 +167,54 @@ final class LoyaltyStoreTests: XCTestCase {
         let location = try MenuStore.shared.findItem(id: itemId)
         XCTAssertFalse(location.item.images.contains("/uploads/dish2.jpg"), "denying shouldn't publish anything to the menu item")
     }
+
+    func testSetReferrerRejectsSelfReferral() throws {
+        XCTAssertThrowsError(try LoyaltyStore.shared.setReferrer(phone: "2065551234", referrerPhone: "2065551234")) { error in
+            guard let loyaltyError = error as? LoyaltyError else { return XCTFail("wrong error type") }
+            XCTAssertEqual(loyaltyError, .cannotReferSelf)
+        }
+    }
+
+    func testSetReferrerRejectsAnAlreadyExistingCard() throws {
+        try LoyaltyStore.shared.addPunch(phone: "2065551234")
+        XCTAssertThrowsError(try LoyaltyStore.shared.setReferrer(phone: "2065551234", referrerPhone: "2065559999")) { error in
+            guard let loyaltyError = error as? LoyaltyError else { return XCTFail("wrong error type") }
+            XCTAssertEqual(loyaltyError, .referralOnlyForNewCards)
+        }
+    }
+
+    func testReferredCustomersFirstPunchPaysTheReferrerExactlyOnce() throws {
+        try LoyaltyStore.shared.setReferrer(phone: "2065551234", referrerPhone: "2065559999")
+
+        let firstPunch = try LoyaltyStore.shared.addPunch(phone: "2065551234")
+        XCTAssertEqual(firstPunch.punches, 1)
+        let referrerAfterFirst = try LoyaltyStore.shared.lookup(phone: "2065559999")
+        XCTAssertEqual(referrerAfterFirst.punches, 1, "the referrer should get a bonus punch on the referred customer's first punch")
+
+        try LoyaltyStore.shared.addPunch(phone: "2065551234")
+        let referrerAfterSecond = try LoyaltyStore.shared.lookup(phone: "2065559999")
+        XCTAssertEqual(referrerAfterSecond.punches, 1, "the referral bonus should only ever pay out once")
+    }
+
+    func testAutomaticSushiPunchCapsAtOncePerDay() throws {
+        let firstCall = try LoyaltyStore.shared.addAutomaticSushiPunchIfNeeded(phone: "2065551234")
+        XCTAssertTrue(firstCall)
+        let secondCall = try LoyaltyStore.shared.addAutomaticSushiPunchIfNeeded(phone: "2065551234")
+        XCTAssertFalse(secondCall, "a second automatic punch the same day should be a no-op")
+
+        let status = try LoyaltyStore.shared.lookup(phone: "2065551234")
+        XCTAssertEqual(status.punches, 1)
+    }
+
+    func testBirthdayBonusPaysOncePerYear() throws {
+        let firstAward = try LoyaltyStore.shared.awardBirthdayBonusIfNeeded(phone: "2065551234", year: 2026)
+        XCTAssertTrue(firstAward)
+        let secondAwardSameYear = try LoyaltyStore.shared.awardBirthdayBonusIfNeeded(phone: "2065551234", year: 2026)
+        XCTAssertFalse(secondAwardSameYear, "shouldn't pay out twice in the same year")
+        let awardNextYear = try LoyaltyStore.shared.awardBirthdayBonusIfNeeded(phone: "2065551234", year: 2027)
+        XCTAssertTrue(awardNextYear, "should pay out again the following year")
+
+        let status = try LoyaltyStore.shared.lookup(phone: "2065551234")
+        XCTAssertEqual(status.punches, 2)
+    }
 }

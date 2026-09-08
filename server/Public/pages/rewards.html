@@ -88,6 +88,23 @@
 
     <section class="content-section">
       <div class="panel">
+        <h2>Refer a Friend</h2>
+        <p class="hint">First time here? Enter your phone number and the phone number of the friend who told you about us — once you earn your first punch, you'll both get a bonus punch.</p>
+        <form id="referral-form">
+          <label>Your phone number
+            <input type="tel" id="referral-phone-input" placeholder="Your phone number" required />
+          </label>
+          <label>Referred by (their phone number)
+            <input type="tel" id="referral-referrer-input" placeholder="Your friend's phone number" required />
+          </label>
+          <button type="submit">Submit</button>
+          <p id="referral-status" class="status"></p>
+        </form>
+      </div>
+    </section>
+
+    <section class="content-section">
+      <div class="panel">
         <h2>Submit a Bonus Punch</h2>
         <p class="hint">Share a photo of your dish, or tag @ohanabelltown on Instagram or Facebook, then tell us about it here. Our staff reviews every submission — each approved share is worth 1/10 of a punch (10 add up to a full punch), and only your first 2 per visit count toward it.</p>
         <form id="bonus-form">

@@ -48,6 +48,13 @@ func configure(_ app: Application) throws {
         FeedbackDigest.schedule(app)
         Task { await LightNotifier.shared.configureFromEnvironment() }
         LightNotifier.scheduleReadyPoll(app)
+        // Pays a bonus punch to any customer whose birthday is today and who
+        // has a linked rewards phone — idempotent per year, so running daily
+        // (rather than trying to fire exactly at midnight) is fine.
+        app.eventLoopGroup.next().scheduleRepeatedTask(initialDelay: .minutes(10), delay: .hours(24)) { _ in
+            let promise = app.eventLoopGroup.next().makePromise(of: Void.self)
+            promise.completeWithTask { await LoyaltyBirthdayBonus.runSweep(app) }
+        }
         // A "pending"/"entered" order nobody ever entered or delivered used
         // to just silently drop off staff's queues once stale, with nothing
         // ever actually marking it resolved — harmless as a heads-up-only

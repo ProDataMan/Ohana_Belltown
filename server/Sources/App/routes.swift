@@ -4,6 +4,11 @@ struct PhoneRequest: Content {
     var phone: String
 }
 
+struct LoyaltyReferralRequest: Content {
+    var phone: String
+    var referrerPhone: String
+}
+
 struct BonusClaimRequest: Content {
     var phone: String
     var type: String
@@ -698,6 +703,11 @@ func routes(_ app: Application) throws {
         return try LoyaltyStore.shared.lookup(phone: body.phone)
     }
 
+    app.post("api", "loyalty", "referral") { req throws -> LoyaltyStatus in
+        let body = try req.content.decode(LoyaltyReferralRequest.self)
+        return try LoyaltyStore.shared.setReferrer(phone: body.phone, referrerPhone: body.referrerPhone)
+    }
+
     app.post("api", "loyalty", "bonus-request") { req throws -> BonusRequest in
         let body = try req.content.decode(BonusClaimRequest.self)
         guard ["photo", "social"].contains(body.type) else {
@@ -836,6 +846,15 @@ func routes(_ app: Application) throws {
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
         let entry = try TableOrdersStore.shared.markDelivered(id: id)
         Task { await LightNotifier.shared.notifyDelivered(entry) }
+        // Best-effort automatic sushi punch — never blocks delivery itself.
+        // entry.section is the menu section (window.MENU_SECTION), not the
+        // table's physical floor-map section, so this only fires for real
+        // /sushi-page items regardless of which table ordered them.
+        if entry.section == "sushi", let customerId = entry.customerId,
+           let customer = try? CustomerUserStore.shared.find(id: customerId),
+           let phone = customer.loyaltyPhone {
+            try? LoyaltyStore.shared.addAutomaticSushiPunchIfNeeded(phone: phone)
+        }
         return entry
     }
 

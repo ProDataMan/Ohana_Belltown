@@ -9,18 +9,40 @@ struct LoyaltyCustomer: Codable, Content {
     var totalRedeemed: Int
     var createdAt: String
     var updatedAt: String
+    /// The phone number of whoever referred this customer — set once, only
+    /// when this card is first created (see LoyaltyStore.setReferrer), never
+    /// changed after. Nil for a card that was never referred.
+    var referredByPhone: String?
+    /// Flips true the moment the referral bonus actually pays out (at this
+    /// customer's first real punch, not at signup) so it can never fire twice.
+    var referralBonusPaid: Bool
+    /// "yyyy-MM-dd" (Pacific) of the last automatic sushi-order punch, so the
+    /// automation caps at one per day independently of manual staff punches.
+    var lastAutoPunchDay: String?
+    /// Calendar year the birthday bonus last paid out, so the daily sweep can
+    /// run every day without double-paying within the same year.
+    var lastBirthdayBonusYear: Int?
 
     enum CodingKeys: String, CodingKey {
         case phone, punches, bonusPoints, totalRedeemed, createdAt, updatedAt
+        case referredByPhone, referralBonusPaid, lastAutoPunchDay, lastBirthdayBonusYear
     }
 
-    init(phone: String, punches: Int, bonusPoints: Int = 0, totalRedeemed: Int, createdAt: String, updatedAt: String) {
+    init(
+        phone: String, punches: Int, bonusPoints: Int = 0, totalRedeemed: Int, createdAt: String, updatedAt: String,
+        referredByPhone: String? = nil, referralBonusPaid: Bool = false,
+        lastAutoPunchDay: String? = nil, lastBirthdayBonusYear: Int? = nil
+    ) {
         self.phone = phone
         self.punches = punches
         self.bonusPoints = bonusPoints
         self.totalRedeemed = totalRedeemed
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.referredByPhone = referredByPhone
+        self.referralBonusPaid = referralBonusPaid
+        self.lastAutoPunchDay = lastAutoPunchDay
+        self.lastBirthdayBonusYear = lastBirthdayBonusYear
     }
 
     init(from decoder: Decoder) throws {
@@ -31,6 +53,10 @@ struct LoyaltyCustomer: Codable, Content {
         totalRedeemed = try container.decode(Int.self, forKey: .totalRedeemed)
         createdAt = try container.decode(String.self, forKey: .createdAt)
         updatedAt = try container.decode(String.self, forKey: .updatedAt)
+        referredByPhone = try container.decodeIfPresent(String.self, forKey: .referredByPhone)
+        referralBonusPaid = try container.decodeIfPresent(Bool.self, forKey: .referralBonusPaid) ?? false
+        lastAutoPunchDay = try container.decodeIfPresent(String.self, forKey: .lastAutoPunchDay)
+        lastBirthdayBonusYear = try container.decodeIfPresent(Int.self, forKey: .lastBirthdayBonusYear)
     }
 }
 
@@ -106,17 +132,19 @@ struct LoyaltyStatus: Content {
     var totalRedeemed: Int
 }
 
-enum LoyaltyError: Error {
+enum LoyaltyError: Error, Equatable {
     case customerNotFound
     case bonusRequestNotFound
     case noRewardAvailable
+    case cannotReferSelf
+    case referralOnlyForNewCards
 }
 
 extension LoyaltyError: AbortError {
     var status: HTTPResponseStatus {
         switch self {
         case .customerNotFound, .bonusRequestNotFound: return .notFound
-        case .noRewardAvailable: return .badRequest
+        case .noRewardAvailable, .cannotReferSelf, .referralOnlyForNewCards: return .badRequest
         }
     }
 
@@ -125,6 +153,8 @@ extension LoyaltyError: AbortError {
         case .customerNotFound: return "No punch card found for that phone number yet."
         case .bonusRequestNotFound: return "Bonus request not found."
         case .noRewardAvailable: return "This card doesn't have enough punches for a reward yet."
+        case .cannotReferSelf: return "You can't refer yourself — enter a friend's phone number instead."
+        case .referralOnlyForNewCards: return "Looks like you already have a punch card — referral bonuses are only for brand-new cards."
         }
     }
 }
@@ -201,8 +231,10 @@ final class LoyaltyStore: @unchecked Sendable {
         let phone = Self.normalizePhone(rawPhone)
         let timestamp = now()
         if let idx = data.customers.firstIndex(where: { $0.phone == phone }) {
+            let wasFirstPunch = data.customers[idx].punches == 0
             data.customers[idx].punches += count
             data.customers[idx].updatedAt = timestamp
+            if wasFirstPunch { awardReferralBonusIfNeeded(customerIdx: idx) }
             try persist()
             return statusFor(data.customers[idx])
         } else {
@@ -211,6 +243,89 @@ final class LoyaltyStore: @unchecked Sendable {
             try persist()
             return statusFor(customer)
         }
+    }
+
+    /// Automated version of addPunch for a real delivered sushi order (see
+    /// the table-orders deliver route) — capped at one per calendar day
+    /// (Pacific) via lastAutoPunchDay, independently of manual staff punches,
+    /// so a customer ordering several rolls in one visit doesn't fill their
+    /// card in a single sitting. Returns whether a punch was actually added.
+    @discardableResult
+    func addAutomaticSushiPunchIfNeeded(phone rawPhone: String) throws -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        let phone = Self.normalizePhone(rawPhone)
+        let timestamp = now()
+        let today = Self.dayKey(fromISO8601: timestamp)
+        let idx = findOrCreateCustomerIndex(phone: phone)
+        guard data.customers[idx].lastAutoPunchDay != today else { return false }
+        let wasFirstPunch = data.customers[idx].punches == 0
+        data.customers[idx].punches += 1
+        data.customers[idx].lastAutoPunchDay = today
+        data.customers[idx].updatedAt = timestamp
+        if wasFirstPunch { awardReferralBonusIfNeeded(customerIdx: idx) }
+        try persist()
+        return true
+    }
+
+    /// Called from the daily birthday sweep. Idempotent per calendar year via
+    /// lastBirthdayBonusYear, so a daily-repeating scheduled task can call
+    /// this safely without a separate "already ran today" gate. Returns
+    /// whether a punch was actually added.
+    @discardableResult
+    func awardBirthdayBonusIfNeeded(phone rawPhone: String, year: Int) throws -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        let phone = Self.normalizePhone(rawPhone)
+        let idx = findOrCreateCustomerIndex(phone: phone)
+        guard data.customers[idx].lastBirthdayBonusYear != year else { return false }
+        data.customers[idx].punches += 1
+        data.customers[idx].lastBirthdayBonusYear = year
+        data.customers[idx].updatedAt = now()
+        try persist()
+        return true
+    }
+
+    /// Guest-facing — links a brand-new phone number to whoever referred
+    /// them, so the referrer can be paid a bonus punch once the referred
+    /// customer actually earns their first real punch (see
+    /// awardReferralBonusIfNeeded). Only for a phone that has never punched
+    /// before, so an existing customer can't retroactively claim a referral.
+    @discardableResult
+    func setReferrer(phone rawPhone: String, referrerPhone rawReferrerPhone: String) throws -> LoyaltyStatus {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        let phone = Self.normalizePhone(rawPhone)
+        let referrerPhone = Self.normalizePhone(rawReferrerPhone)
+        guard !referrerPhone.isEmpty, phone != referrerPhone else {
+            throw LoyaltyError.cannotReferSelf
+        }
+        guard !data.customers.contains(where: { $0.phone == phone }) else {
+            throw LoyaltyError.referralOnlyForNewCards
+        }
+        let timestamp = now()
+        let customer = LoyaltyCustomer(
+            phone: phone, punches: 0, totalRedeemed: 0, createdAt: timestamp, updatedAt: timestamp,
+            referredByPhone: referrerPhone
+        )
+        data.customers.append(customer)
+        try persist()
+        return statusFor(customer)
+    }
+
+    /// Pays out the referral bonus at the referred customer's first real
+    /// punch (not at signup), so a referral can't be farmed without an
+    /// actual visit. Assumes the lock is already held.
+    private func awardReferralBonusIfNeeded(customerIdx: Int) {
+        guard let referrerPhone = data.customers[customerIdx].referredByPhone,
+              !data.customers[customerIdx].referralBonusPaid else { return }
+        data.customers[customerIdx].referralBonusPaid = true
+        let referrerIdx = findOrCreateCustomerIndex(phone: referrerPhone)
+        data.customers[referrerIdx].punches += 1
+        data.customers[referrerIdx].updatedAt = now()
     }
 
     @discardableResult

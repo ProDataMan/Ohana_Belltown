@@ -37,6 +37,31 @@ document.getElementById('check-btn').addEventListener('click', async () => {
   }
 });
 
+document.getElementById('referral-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const statusEl = document.getElementById('referral-status');
+  const phone = document.getElementById('referral-phone-input').value.trim();
+  const referrerPhone = document.getElementById('referral-referrer-input').value.trim();
+  if (!phone || !referrerPhone) return setRewardsStatus(statusEl, 'Enter both phone numbers first.', true);
+
+  setRewardsStatus(statusEl, 'Submitting...', false);
+  try {
+    const response = await fetch('/api/loyalty/referral', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, referrerPhone }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.reason || `Submission failed (${response.status}).`);
+    }
+    setRewardsStatus(statusEl, "Got it! You'll both get a bonus punch once you earn your first one.", false);
+    event.target.reset();
+  } catch (error) {
+    setRewardsStatus(statusEl, error.message, true);
+  }
+});
+
 const typeRadios = document.querySelectorAll('input[name="bonus-type"]');
 const photoLabel = document.getElementById('bonus-photo-label');
 const socialLabel = document.getElementById('bonus-social-label');

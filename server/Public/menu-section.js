@@ -608,6 +608,9 @@ function renderOrderingHint(canOrder) {
   hint.className = 'hint ordering-hint';
   hint.innerHTML =
     'Tap <strong>Add to Order</strong> on anything you\'d like, from any menu page — then tap <strong>Review &amp; Send</strong> (bottom-left) once you\'re done picking.';
+  if (window.MENU_SECTION === 'sushi') {
+    hint.innerHTML += ' <a href="/rewards">Every sushi order earns a punch toward a free roll — join our Rewards program.</a>';
+  }
   menuContainer.before(hint);
 }
 
