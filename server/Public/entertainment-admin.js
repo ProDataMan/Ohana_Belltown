@@ -1,4 +1,4 @@
-function escapeHtmlIslandNights(value) {
+function escapeHtmlEntertainment(value) {
   return String(value)
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
@@ -7,11 +7,26 @@ function escapeHtmlIslandNights(value) {
     .replaceAll("'", '&#39;');
 }
 
-function setIslandNightsStatus(el, message, isError) {
+function setEntertainmentStatus(el, message, isError) {
   el.textContent = message;
   el.classList.toggle('status-error', Boolean(isError));
   el.classList.toggle('status-ok', !isError && Boolean(message));
 }
+
+// Which of the 7 nightly pages a date's booking will show up on — matches
+// the current weekly schedule (see /entertainment). Purely a display label
+// here; the server derives the same thing from the date itself, not from
+// anything this admin page sends.
+const NIGHT_TYPES = {
+  sunday: 'Karaoke',
+  monday: 'No entertainment scheduled',
+  tuesday: 'No entertainment scheduled',
+  wednesday: 'Island Nights',
+  thursday: 'DJ Night',
+  friday: 'DJ Night',
+  saturday: 'DJ Night',
+};
+const WEEKDAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
 const listEl = document.getElementById('performers-list');
 const statusEl = document.getElementById('status');
@@ -28,15 +43,15 @@ function formatPerformerDate(dateStr) {
 }
 
 async function loadPerformers() {
-  setIslandNightsStatus(statusEl, 'Loading...', false);
+  setEntertainmentStatus(statusEl, 'Loading...', false);
   try {
-    const response = await fetch('/api/island-nights');
+    const response = await fetch('/api/entertainment');
     if (!response.ok) throw new Error(`Failed to load (${response.status}).`);
     performers = await response.json();
-    setIslandNightsStatus(statusEl, '', false);
+    setEntertainmentStatus(statusEl, '', false);
     renderPerformers();
   } catch (error) {
-    setIslandNightsStatus(statusEl, error.message, true);
+    setEntertainmentStatus(statusEl, error.message, true);
   }
 }
 
@@ -49,22 +64,22 @@ function renderPerformers() {
   listEl.innerHTML = performers
     .map(
       (p, index) => `
-    <div class="panel" data-index="${index}" data-id="${escapeHtmlIslandNights(p.id)}" style="margin-bottom: 1rem;">
+    <div class="panel" data-index="${index}" data-id="${escapeHtmlEntertainment(p.id)}" style="margin-bottom: 1rem;">
       <div class="cta-row" style="justify-content: space-between; align-items: flex-end;">
         <label>Date
-          <input type="date" class="performer-date-input" value="${escapeHtmlIslandNights(p.date)}" />
+          <input type="date" class="performer-date-input" value="${escapeHtmlEntertainment(p.date)}" />
         </label>
         <label>Start time
-          <input type="time" class="performer-time-input" value="${escapeHtmlIslandNights(p.startTime || '21:00')}" />
+          <input type="time" class="performer-time-input" value="${escapeHtmlEntertainment(p.startTime || '21:00')}" />
         </label>
-        <span class="hint performer-date-label">${p.date ? escapeHtmlIslandNights(formatPerformerDate(p.date)) : ''}</span>
+        <span class="hint performer-date-label">${p.date ? escapeHtmlEntertainment(formatPerformerDate(p.date)) : ''}</span>
         <button type="button" class="secondary performer-remove-btn">Remove</button>
       </div>
       <label>Performer name
-        <input type="text" class="performer-name-input" value="${escapeHtmlIslandNights(p.performerName)}" placeholder="e.g. The Coconut Wireless" />
+        <input type="text" class="performer-name-input" value="${escapeHtmlEntertainment(p.performerName)}" placeholder="e.g. The Coconut Wireless" />
       </label>
       <label>Bio / note (optional)
-        <textarea class="performer-bio-input" rows="2">${escapeHtmlIslandNights(p.bio || '')}</textarea>
+        <textarea class="performer-bio-input" rows="2">${escapeHtmlEntertainment(p.bio || '')}</textarea>
       </label>
 
       <p class="hint" style="margin-bottom: 0.4rem;">Photos</p>
@@ -74,8 +89,8 @@ function renderPerformers() {
             (url, photoIndex) => `
           <div class="menu-photo-item">
             <div class="item-thumb-wrap">
-              <a href="${escapeHtmlIslandNights(url)}" target="_blank" rel="noopener">
-                <img class="item-thumb" src="${escapeHtmlIslandNights(url)}" alt="${escapeHtmlIslandNights(p.performerName)}" />
+              <a href="${escapeHtmlEntertainment(url)}" target="_blank" rel="noopener">
+                <img class="item-thumb" src="${escapeHtmlEntertainment(url)}" alt="${escapeHtmlEntertainment(p.performerName)}" />
               </a>
               <button type="button" class="thumb-remove-btn performer-photo-remove-btn" data-photo-index="${photoIndex}" aria-label="Remove this photo">&times;</button>
             </div>
@@ -93,7 +108,7 @@ function renderPerformers() {
       <p class="hint" style="margin: 0.8rem 0 0.4rem;">Video (with sound)</p>
       ${p.videoURL
         ? `<div class="item-thumb-wrap" style="max-width: 320px;">
-             <video src="${escapeHtmlIslandNights(p.videoURL)}" controls style="max-width: 100%; border-radius: 8px;"></video>
+             <video src="${escapeHtmlEntertainment(p.videoURL)}" controls style="max-width: 100%; border-radius: 8px;"></video>
              <button type="button" class="thumb-remove-btn performer-video-remove-btn" aria-label="Remove this video">&times;</button>
            </div>`
         : '<p class="hint">No video yet.</p>'}
@@ -123,7 +138,7 @@ function wirePerformerCard() {
       if (!confirm('Remove this performer?')) return;
       if (id) {
         try {
-          const response = await staffFetch(`/api/island-nights/${id}`, { method: 'DELETE' });
+          const response = await staffFetch(`/api/entertainment/${id}`, { method: 'DELETE' });
           if (!response.ok) throw new Error(`Failed (${response.status}).`);
         } catch (error) {
           alert(error.message);
@@ -170,10 +185,15 @@ function wirePerformerCard() {
   listEl.querySelectorAll('.performer-date-input').forEach((input) => {
     input.addEventListener('input', () => {
       const label = input.closest('.cta-row').querySelector('.performer-date-label');
-      const isWednesday = input.value && new Date(input.value + 'T00:00:00').getDay() === 3;
-      label.textContent = input.value ? formatPerformerDate(input.value) : '';
-      label.classList.toggle('status-error', Boolean(input.value) && !isWednesday);
-      if (input.value && !isWednesday) label.textContent += ' — not a Wednesday!';
+      if (!input.value) {
+        label.textContent = '';
+        label.classList.remove('status-error');
+        return;
+      }
+      const weekday = WEEKDAY_NAMES[new Date(input.value + 'T00:00:00').getDay()];
+      const nightType = NIGHT_TYPES[weekday];
+      label.textContent = `${formatPerformerDate(input.value)} — ${nightType}`;
+      label.classList.toggle('status-error', nightType === NIGHT_TYPES.monday);
     });
   });
 }
@@ -184,7 +204,7 @@ async function uploadPerformerPhoto(event) {
   const card = event.target.closest('[data-id]');
   const index = Number(card.dataset.index);
   const statusEl = card.querySelector('.performer-photo-status');
-  setIslandNightsStatus(statusEl, 'Uploading...', false);
+  setEntertainmentStatus(statusEl, 'Uploading...', false);
 
   const formData = new FormData();
   formData.append('image', file);
@@ -196,10 +216,10 @@ async function uploadPerformerPhoto(event) {
     }
     const result = await response.json();
     performers[index].photos = [...(performers[index].photos || []), result.url];
-    setIslandNightsStatus(statusEl, '', false);
+    setEntertainmentStatus(statusEl, '', false);
     renderPerformers();
   } catch (error) {
-    setIslandNightsStatus(statusEl, error.message, true);
+    setEntertainmentStatus(statusEl, error.message, true);
   }
 }
 
@@ -209,7 +229,7 @@ async function uploadPerformerVideo(event) {
   const card = event.target.closest('[data-id]');
   const index = Number(card.dataset.index);
   const statusEl = card.querySelector('.performer-video-status');
-  setIslandNightsStatus(statusEl, `Uploading (${(file.size / 1024 / 1024).toFixed(1)}MB, this can take a bit)...`, false);
+  setEntertainmentStatus(statusEl, `Uploading (${(file.size / 1024 / 1024).toFixed(1)}MB, this can take a bit)...`, false);
 
   const formData = new FormData();
   formData.append('video', file);
@@ -221,10 +241,10 @@ async function uploadPerformerVideo(event) {
     }
     const result = await response.json();
     performers[index].videoURL = result.url;
-    setIslandNightsStatus(statusEl, '', false);
+    setEntertainmentStatus(statusEl, '', false);
     renderPerformers();
   } catch (error) {
-    setIslandNightsStatus(statusEl, error.message, true);
+    setEntertainmentStatus(statusEl, error.message, true);
   }
 }
 
@@ -238,7 +258,7 @@ async function savePerformer(card) {
   const statusEl = card.querySelector('.performer-save-status');
 
   if (!date || !performerName) {
-    return setIslandNightsStatus(statusEl, 'Date and performer name are required.', true);
+    return setEntertainmentStatus(statusEl, 'Date and performer name are required.', true);
   }
 
   const body = {
@@ -250,10 +270,10 @@ async function savePerformer(card) {
     videoURL: performers[index].videoURL || null,
   };
 
-  setIslandNightsStatus(statusEl, 'Saving...', false);
+  setEntertainmentStatus(statusEl, 'Saving...', false);
   try {
     const isNew = !id;
-    const response = await staffFetch(isNew ? '/api/island-nights' : `/api/island-nights/${id}`, {
+    const response = await staffFetch(isNew ? '/api/entertainment' : `/api/entertainment/${id}`, {
       method: isNew ? 'POST' : 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -263,10 +283,10 @@ async function savePerformer(card) {
       throw new Error(responseBody.reason || `Save failed (${response.status}).`);
     }
     performers[index] = await response.json();
-    setIslandNightsStatus(statusEl, 'Saved!', false);
+    setEntertainmentStatus(statusEl, 'Saved!', false);
     renderPerformers();
   } catch (error) {
-    setIslandNightsStatus(statusEl, error.message, true);
+    setEntertainmentStatus(statusEl, error.message, true);
   }
 }
 

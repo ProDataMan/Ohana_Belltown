@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Island Nights — Ohana Belltown</title>
+    <title>Entertainment — Ohana Belltown</title>
     <meta name="robots" content="noindex, nofollow" />
     <link rel="stylesheet" href="../style.css" />
   </head>
@@ -11,10 +11,12 @@
     <main class="page">
       <header class="hero">
         <p class="eyebrow">Ohana Belltown — Staff</p>
-        <h1>Island Nights</h1>
+        <h1>Entertainment</h1>
         <p>
-          Book performers for upcoming Wednesdays &mdash; photos and a video go straight to the
-          "Coming Up" section on <a href="/entertainment">/entertainment</a>.
+          Book performers for any upcoming night &mdash; photos and a video go straight to that
+          night's own page (e.g. <a href="/entertainment/wednesday">/entertainment/wednesday</a>
+          for Island Nights), and <a href="/entertainment">/entertainment</a> summarizes the
+          whole week.
         </p>
         <p class="admin-link"><a href="/menu">&larr; Back to menu</a></p>
         <div class="staff-tools-nav">
@@ -23,7 +25,7 @@
           <a href="/waitlist-admin.html">Waitlist</a>
           <a href="/table-orders-admin.html">Table Orders</a>
           <a href="/events-admin.html">Events</a>
-          <a href="/island-nights-admin.html" class="active">Island Nights</a>
+          <a href="/entertainment-admin.html" class="active">Entertainment</a>
           <a href="/table-card.html">Table Cards</a>
           <a href="/account.html">My Account</a>
           <a href="/manage-users.html">Manage Users</a>
@@ -40,18 +42,19 @@
 
       <section class="panel">
         <div class="editor-toolbar">
-          <h2>Upcoming Performers</h2>
+          <h2>Upcoming Bookings, All Nights</h2>
           <div class="toolbar-actions">
             <button id="add-performer-btn" type="button" class="secondary">+ Add Performer</button>
             <button id="reload-btn" type="button" class="secondary">Reload</button>
           </div>
         </div>
+        <p class="hint">Pick a date below and the label next to it shows which night's page it'll appear on.</p>
         <div id="performers-list"></div>
       </section>
     </main>
 
     <script src="/nav.js"></script>
     <script src="../staff-auth.js"></script>
-    <script src="../island-nights-admin.js"></script>
+    <script src="../entertainment-admin.js"></script>
   </body>
 </html>

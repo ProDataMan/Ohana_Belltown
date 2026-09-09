@@ -41,7 +41,7 @@ func configure(_ app: Application) throws {
     SwagStore.shared.configure(dataDirectory: dataDirectory)
     SwagOrdersStore.shared.configure(dataDirectory: dataDirectory)
     GiftCardOrdersStore.shared.configure(dataDirectory: dataDirectory)
-    IslandNightsStore.shared.configure(dataDirectory: dataDirectory)
+    EntertainmentStore.shared.configure(dataDirectory: dataDirectory)
 
     app.routes.defaultMaxBodySize = "10mb"
 

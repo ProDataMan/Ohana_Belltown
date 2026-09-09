@@ -34,7 +34,7 @@ final class RouteTests: XCTestCase {
         SwagStore.shared.configure(dataDirectory: tempDir.path)
         SwagOrdersStore.shared.configure(dataDirectory: tempDir.path)
         GiftCardOrdersStore.shared.configure(dataDirectory: tempDir.path)
-        IslandNightsStore.shared.configure(dataDirectory: tempDir.path)
+        EntertainmentStore.shared.configure(dataDirectory: tempDir.path)
     }
 
     override func tearDown() async throws {
@@ -1589,19 +1589,19 @@ final class RouteTests: XCTestCase {
 
     // The inverse of the above — the one feature this role exists for, plus
     // its own account fields, must keep working.
-    func testEntertainmentProviderAllowedOnIslandNightsAndOwnAccount() throws {
+    func testEntertainmentProviderAllowedOnEntertainmentBookingsAndOwnAccount() throws {
         let (_, dj) = try makeAdminAndSecondAccount(username: "dj2", password: "djpass123", role: "entertainmentProvider")
 
-        try app.test(.GET, "api/island-nights", headers: ["Cookie": dj]) { res in
+        try app.test(.GET, "api/entertainment", headers: ["Cookie": dj]) { res in
             XCTAssertEqual(res.status, .ok)
         }
 
         let inWindowDate = dateString(daysFromToday: 14)
         var createdId: String?
-        try app.test(.POST, "api/island-nights", headers: ["Content-Type": "application/json", "Cookie": dj],
+        try app.test(.POST, "api/entertainment", headers: ["Content-Type": "application/json", "Cookie": dj],
                       body: ByteBuffer(string: #"{"date":"\#(inWindowDate)","performerName":"DJ Flow","photos":[]}"#)) { res in
             XCTAssertEqual(res.status, .ok)
-            createdId = try res.content.decode(IslandNightPerformer.self).id
+            createdId = try res.content.decode(EntertainmentBooking.self).id
         }
         XCTAssertNotNil(createdId)
 
@@ -1621,7 +1621,7 @@ final class RouteTests: XCTestCase {
                 XCTAssertEqual(res.status, .forbidden, "\(page) should be blocked for an entertainmentProvider")
             }
         }
-        for page in ["island-nights-admin.html", "account.html", "change-password.html", "help.html"] {
+        for page in ["entertainment-admin.html", "account.html", "change-password.html", "help.html"] {
             try app.test(.GET, page, headers: ["Cookie": dj]) { res in
                 XCTAssertEqual(res.status, .ok, "\(page) should stay reachable for an entertainmentProvider")
             }
@@ -1629,7 +1629,7 @@ final class RouteTests: XCTestCase {
     }
 
     // The 60-day booking window, exercised over real HTTP rather than
-    // calling IslandNightsStore directly (see IslandNightsStoreTests for
+    // calling EntertainmentStore directly (see EntertainmentStoreTests for
     // the pure date-math unit tests) — this confirms the route handlers
     // actually apply the check to the request's role, not just that the
     // underlying math is correct.
@@ -1637,48 +1637,104 @@ final class RouteTests: XCTestCase {
         let (employee, dj) = try makeAdminAndSecondAccount(username: "dj4", password: "djpass123", role: "entertainmentProvider")
 
         let tooFar = dateString(daysFromToday: 90)
-        try app.test(.POST, "api/island-nights", headers: ["Content-Type": "application/json", "Cookie": dj],
+        try app.test(.POST, "api/entertainment", headers: ["Content-Type": "application/json", "Cookie": dj],
                       body: ByteBuffer(string: #"{"date":"\#(tooFar)","performerName":"Too Far Out","photos":[]}"#)) { res in
             XCTAssertEqual(res.status, .forbidden)
         }
 
         // An admin/employee books something outside the DJ's own window...
         var farEntryId: String?
-        try app.test(.POST, "api/island-nights", headers: ["Content-Type": "application/json", "Cookie": employee],
+        try app.test(.POST, "api/entertainment", headers: ["Content-Type": "application/json", "Cookie": employee],
                       body: ByteBuffer(string: #"{"date":"\#(tooFar)","performerName":"Booked By Staff","photos":[]}"#)) { res in
             XCTAssertEqual(res.status, .ok)
-            farEntryId = try res.content.decode(IslandNightPerformer.self).id
+            farEntryId = try res.content.decode(EntertainmentBooking.self).id
         }
         guard let id = farEntryId else { return XCTFail("expected an id") }
 
         // ...and the DJ account can't touch it either way, even though it
         // didn't create it.
-        try app.test(.PUT, "api/island-nights/\(id)", headers: ["Content-Type": "application/json", "Cookie": dj],
+        try app.test(.PUT, "api/entertainment/\(id)", headers: ["Content-Type": "application/json", "Cookie": dj],
                       body: ByteBuffer(string: #"{"date":"\#(tooFar)","performerName":"Hijacked","photos":[]}"#)) { res in
             XCTAssertEqual(res.status, .forbidden)
         }
-        try app.test(.DELETE, "api/island-nights/\(id)", headers: ["Cookie": dj]) { res in
+        try app.test(.DELETE, "api/entertainment/\(id)", headers: ["Cookie": dj]) { res in
             XCTAssertEqual(res.status, .forbidden)
         }
 
         // A DJ's own in-window booking can't be dragged outside the window either.
         let inWindow = dateString(daysFromToday: 10)
         var ownEntryId: String?
-        try app.test(.POST, "api/island-nights", headers: ["Content-Type": "application/json", "Cookie": dj],
+        try app.test(.POST, "api/entertainment", headers: ["Content-Type": "application/json", "Cookie": dj],
                       body: ByteBuffer(string: #"{"date":"\#(inWindow)","performerName":"DJ Flow","photos":[]}"#)) { res in
             XCTAssertEqual(res.status, .ok)
-            ownEntryId = try res.content.decode(IslandNightPerformer.self).id
+            ownEntryId = try res.content.decode(EntertainmentBooking.self).id
         }
         guard let ownId = ownEntryId else { return XCTFail("expected an id") }
-        try app.test(.PUT, "api/island-nights/\(ownId)", headers: ["Content-Type": "application/json", "Cookie": dj],
+        try app.test(.PUT, "api/entertainment/\(ownId)", headers: ["Content-Type": "application/json", "Cookie": dj],
                       body: ByteBuffer(string: #"{"date":"\#(tooFar)","performerName":"DJ Flow","photos":[]}"#)) { res in
             XCTAssertEqual(res.status, .forbidden, "moving an own in-window booking out past 60 days should still be rejected")
         }
 
         // Admin/employee accounts have no window restriction at all.
-        try app.test(.POST, "api/island-nights", headers: ["Content-Type": "application/json", "Cookie": employee],
+        try app.test(.POST, "api/entertainment", headers: ["Content-Type": "application/json", "Cookie": employee],
                       body: ByteBuffer(string: #"{"date":"\#(tooFar)","performerName":"No Limit For Staff","photos":[]}"#)) { res in
             XCTAssertEqual(res.status, .ok)
+        }
+    }
+
+    // A booking's night is derived from its date, so /entertainment/<day>
+    // only ever needs one query param to find the right subset — this
+    // confirms the route actually applies EntertainmentStore.weekday(of:)
+    // rather than, say, returning everything regardless of the filter.
+    func testUpcomingEntertainmentFiltersByWeekdayQueryParam() throws {
+        // 2026-09-09 is a real Wednesday, 2026-09-10 a real Thursday.
+        try app.test(.POST, "api/entertainment", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"date":"2026-09-09","performerName":"Wednesday Act","photos":[]}"#)) { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+
+        let (admin, _) = try makeAdminAndSecondAccount(username: "booker1", password: "bookerpass1", role: "employee")
+        try app.test(.POST, "api/entertainment", headers: ["Content-Type": "application/json", "Cookie": admin],
+                      body: ByteBuffer(string: #"{"date":"2026-09-09","performerName":"Wednesday Act","photos":[]}"#)) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+        try app.test(.POST, "api/entertainment", headers: ["Content-Type": "application/json", "Cookie": admin],
+                      body: ByteBuffer(string: #"{"date":"2026-09-10","performerName":"Thursday Act","photos":[]}"#)) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+
+        try app.test(.GET, "api/entertainment/upcoming?weekday=wednesday") { res in
+            let bookings = try res.content.decode([EntertainmentBooking].self)
+            XCTAssertEqual(bookings.map(\.performerName), ["Wednesday Act"])
+        }
+        try app.test(.GET, "api/entertainment/upcoming?weekday=thursday") { res in
+            let bookings = try res.content.decode([EntertainmentBooking].self)
+            XCTAssertEqual(bookings.map(\.performerName), ["Thursday Act"])
+        }
+        try app.test(.GET, "api/entertainment/upcoming?weekday=friday") { res in
+            let bookings = try res.content.decode([EntertainmentBooking].self)
+            XCTAssertTrue(bookings.isEmpty)
+        }
+        // No filter at all returns everything, unfiltered.
+        try app.test(.GET, "api/entertainment/upcoming") { res in
+            let bookings = try res.content.decode([EntertainmentBooking].self)
+            XCTAssertEqual(Set(bookings.map(\.performerName)), ["Wednesday Act", "Thursday Act"])
+        }
+    }
+
+    // Each of the 7 nights gets its own public page at a known URL; anything
+    // else under /entertainment/ should 404, not silently serve the template.
+    func testEntertainmentNightPagesServeForValidWeekdaysOnly() throws {
+        for weekday in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] {
+            try app.test(.GET, "entertainment/\(weekday)") { res in
+                XCTAssertEqual(res.status, .ok, "/entertainment/\(weekday) should serve the shared night page")
+            }
+        }
+        try app.test(.GET, "entertainment/someday") { res in
+            XCTAssertEqual(res.status, .notFound)
+        }
+        try app.test(.GET, "entertainment/Wednesday") { res in
+            XCTAssertEqual(res.status, .notFound, "the route match is case-sensitive lowercase, matching the JSON weekday values")
         }
     }
 

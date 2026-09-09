@@ -3,19 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Entertainment | Ohana Belltown</title>
-    <meta name="description" content="Island Nights (live island music) every Wednesday, Seattle's best DJs Thursday through Saturday, and karaoke on Sundays at Ohana Belltown in Seattle." />
+    <title id="night-title">Entertainment | Ohana Belltown</title>
+    <meta id="meta-description" name="description" content="This week's entertainment at Ohana Belltown in Seattle." />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Ohana Belltown" />
-    <meta property="og:title" content="Entertainment | Ohana Belltown" />
-    <meta property="og:description" content="Island Nights (live island music) every Wednesday, Seattle's best DJs Thursday through Saturday, and karaoke on Sundays at Ohana Belltown in Seattle." />
-    <meta property="og:url" content="https://www.ohanasushigrill.com/entertainment" />
+    <meta id="meta-og-title" property="og:title" content="Entertainment | Ohana Belltown" />
+    <meta id="meta-og-description" property="og:description" content="This week's entertainment at Ohana Belltown in Seattle." />
+    <meta id="meta-og-url" property="og:url" content="https://www.ohanasushigrill.com/entertainment" />
     <meta property="og:image" content="https://www.ohanasushigrill.com/images/hero-aloha.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Entertainment | Ohana Belltown" />
-    <meta name="twitter:description" content="Island Nights (live island music) every Wednesday, Seattle's best DJs Thursday through Saturday, and karaoke on Sundays at Ohana Belltown in Seattle." />
-    <meta name="twitter:image" content="https://www.ohanasushigrill.com/images/hero-aloha.jpg" />
-    <link rel="canonical" href="https://www.ohanasushigrill.com/entertainment" />
+    <link id="canonical-link" rel="canonical" href="https://www.ohanasushigrill.com/entertainment" />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
@@ -61,45 +58,29 @@
 
     <section class="hero-banner" style="background-image: url('/images/hero-aloha.jpg');">
       <div class="hero-banner-inner">
-        <p class="eyebrow">Ohana Belltown</p>
-        <h1>Entertainment</h1>
-        <p>Live island music, Seattle's best DJs, and karaoke &mdash; something happening most nights of the week.</p>
+        <p class="eyebrow" id="night-eyebrow">Ohana Belltown</p>
+        <h1 id="night-heading">Entertainment</h1>
+        <p id="night-tagline"></p>
       </div>
     </section>
 
     <section class="content-section">
       <div class="panel">
-        <h2>Weekly Lineup</h2>
-        <p class="hint">Tap a night below for full details &mdash; who's playing, photos, and video. Specific DJs and performers rotate week to week, so also follow us on Facebook or Instagram (below) for the latest.</p>
-        <div class="data-table">
-          <table>
-            <thead><tr><th>Night</th><th>Entertainment</th></tr></thead>
-            <tbody>
-              <tr><td><a href="/entertainment/monday">Monday</a></td><td><a href="/entertainment/monday">No entertainment</a></td></tr>
-              <tr><td><a href="/entertainment/tuesday">Tuesday</a></td><td><a href="/entertainment/tuesday">No entertainment</a></td></tr>
-              <tr><td><a href="/entertainment/wednesday"><strong>Wednesday</strong></a></td><td><a href="/entertainment/wednesday"><strong>Island Nights</strong> &mdash; free live island music, 9pm</a></td></tr>
-              <tr><td><a href="/entertainment/thursday">Thursday</a></td><td><a href="/entertainment/thursday">DJ Night &mdash; Seattle's best DJs</a></td></tr>
-              <tr><td><a href="/entertainment/friday">Friday</a></td><td><a href="/entertainment/friday">DJ Night &mdash; Seattle's best DJs</a></td></tr>
-              <tr><td><a href="/entertainment/saturday">Saturday</a></td><td><a href="/entertainment/saturday">DJ Night &mdash; Seattle's best DJs</a></td></tr>
-              <tr><td><a href="/entertainment/sunday">Sunday</a></td><td><a href="/entertainment/sunday">Karaoke</a></td></tr>
-            </tbody>
-          </table>
-        </div>
+        <p class="admin-link"><a href="/entertainment">&larr; Back to the full weekly lineup</a></p>
+        <p id="night-description"></p>
       </div>
     </section>
 
-    <section class="content-section">
-      <div class="content-grid">
-        <div>
-          <p class="eyebrow">Wednesdays, 9pm</p>
-          <h2>Island Nights</h2>
-          <p>
-            Free live island music every Wednesday &mdash; grab a table, order a
-            tropical drink, and soak in the aloha.
-          </p>
-          <a href="/entertainment/wednesday" class="cta-button">See Who's Playing</a>
-        </div>
-        <img src="/images/island-nights.jpg" alt="Live island music at Ohana Belltown's Island Nights" />
+    <section class="content-section" id="night-bookings-section" hidden>
+      <div class="panel">
+        <h2>Coming Up</h2>
+        <div id="night-bookings-list" class="performer-list"></div>
+      </div>
+    </section>
+
+    <section class="content-section" id="night-empty-section" hidden>
+      <div class="panel">
+        <p class="hint" id="night-empty-message"></p>
       </div>
     </section>
 
@@ -141,5 +122,6 @@
     </footer>
     <script src="/nav.js"></script>
     <script src="/lightbox.js"></script>
+    <script src="/entertainment-night.js"></script>
   </body>
 </html>

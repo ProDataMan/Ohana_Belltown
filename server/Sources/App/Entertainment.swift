@@ -1,16 +1,19 @@
 import Vapor
 
-/// A single Wednesday's Island Nights performer — the promoter (see
-/// island-nights-admin.html) lines these up a few weeks ahead. Public-facing
-/// (GET) so /entertainment can show who's playing next; writes require staff
-/// login, same trust model as every other admin-editable content on the site.
-struct IslandNightPerformer: Codable, Content {
+/// A single booking on any night's entertainment page — which night it
+/// belongs to is derived from `date` (see `weekday(of:)`) rather than stored
+/// separately, so it can never disagree with the date itself. Public-facing
+/// (GET) so each /entertainment/<day> page can show who's playing; writes
+/// require staff login, same trust model as every other admin-editable
+/// content on the site.
+struct EntertainmentBooking: Codable, Content {
     var id: String
-    /// "yyyy-MM-dd" — the specific Wednesday this performer is booked for.
+    /// "yyyy-MM-dd" — the specific date this booking is for. Which of the
+    /// 7 per-night pages it shows on is computed from this, not stored.
     var date: String
-    /// "HH:mm" 24-hour, optional — Island Nights defaults to 9pm (shown as a
-    /// placeholder client-side), but a performer/promoter can set a
-    /// different start time for their own date if it varies.
+    /// "HH:mm" 24-hour, optional — each night has its own default start
+    /// time shown as a placeholder client-side, but a performer/promoter
+    /// can set a different one for their own date if it varies.
     var startTime: String?
     var performerName: String
     var bio: String?
@@ -39,11 +42,11 @@ struct IslandNightPerformer: Codable, Content {
     }
 }
 
-struct IslandNightsList: Codable, Content {
-    var performers: [IslandNightPerformer]
+struct EntertainmentBookingsList: Codable, Content {
+    var bookings: [EntertainmentBooking]
 }
 
-struct IslandNightPerformerRequest: Content {
+struct EntertainmentBookingRequest: Content {
     var date: String
     var startTime: String? = nil
     var performerName: String
@@ -52,12 +55,12 @@ struct IslandNightPerformerRequest: Content {
     var videoURL: String? = nil
 }
 
-enum IslandNightsError: Error, Equatable {
+enum EntertainmentError: Error, Equatable {
     case notFound
     case outsideBookingWindow
 }
 
-extension IslandNightsError: AbortError {
+extension EntertainmentError: AbortError {
     var status: HTTPResponseStatus {
         switch self {
         case .notFound: return .notFound
@@ -66,8 +69,8 @@ extension IslandNightsError: AbortError {
     }
     var reason: String {
         switch self {
-        case .notFound: return "Performer entry not found."
-        case .outsideBookingWindow: return "This account can only manage dates within the next \(IslandNightsStore.entertainmentProviderWindowDays) days."
+        case .notFound: return "Booking not found."
+        case .outsideBookingWindow: return "This account can only manage dates within the next \(EntertainmentStore.entertainmentProviderWindowDays) days."
         }
     }
 }
@@ -78,13 +81,13 @@ extension IslandNightsError: AbortError {
 /// than each route reimplementing the date math.
 func requireWithinEntertainmentProviderWindow(user: StaffUser, dateStr: String) throws {
     guard user.role == .entertainmentProvider else { return }
-    guard IslandNightsStore.isWithinEntertainmentProviderWindow(dateStr) else {
-        throw IslandNightsError.outsideBookingWindow
+    guard EntertainmentStore.isWithinEntertainmentProviderWindow(dateStr) else {
+        throw EntertainmentError.outsideBookingWindow
     }
 }
 
-final class IslandNightsStore: @unchecked Sendable {
-    static let shared = IslandNightsStore()
+final class EntertainmentStore: @unchecked Sendable {
+    static let shared = EntertainmentStore()
     static let entertainmentProviderWindowDays = 60
 
     static func isWithinEntertainmentProviderWindow(_ dateStr: String) -> Bool {
@@ -100,15 +103,32 @@ final class IslandNightsStore: @unchecked Sendable {
         return days >= 0 && days <= entertainmentProviderWindowDays
     }
 
+    /// Lowercase English weekday name ("monday"..."sunday") for a "yyyy-MM-dd"
+    /// date string, or nil if it doesn't parse — used to route a booking onto
+    /// the right /entertainment/<day> page.
+    static func weekday(of dateStr: String) -> String? {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "America/Los_Angeles")
+        guard let date = formatter.date(from: dateStr) else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        let weekdayFormatter = DateFormatter()
+        weekdayFormatter.calendar = calendar
+        weekdayFormatter.dateFormat = "EEEE"
+        weekdayFormatter.timeZone = calendar.timeZone
+        return weekdayFormatter.string(from: date).lowercased()
+    }
+
     private let lock = NSLock()
-    private var fileURL = URL(fileURLWithPath: "Data/island-nights.json")
-    private var performers: [IslandNightPerformer] = []
+    private var fileURL = URL(fileURLWithPath: "Data/entertainment.json")
+    private var bookings: [EntertainmentBooking] = []
     private var loaded = false
 
     func configure(dataDirectory: String) {
         lock.lock()
         defer { lock.unlock() }
-        fileURL = URL(fileURLWithPath: dataDirectory).appendingPathComponent("island-nights.json")
+        fileURL = URL(fileURLWithPath: dataDirectory).appendingPathComponent("entertainment.json")
         loaded = false
     }
 
@@ -116,64 +136,64 @@ final class IslandNightsStore: @unchecked Sendable {
         ISO8601DateFormatter().string(from: Date())
     }
 
-    /// Sorted by date so both the admin list and the public "coming up"
+    /// Sorted by date so both the admin list and each night's "coming up"
     /// view can just take the list as-is.
-    func all() throws -> [IslandNightPerformer] {
+    func all() throws -> [EntertainmentBooking] {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
-        return performers.sorted { $0.date < $1.date }
+        return bookings.sorted { $0.date < $1.date }
     }
 
-    /// Only today-or-later entries — what /entertainment should actually show
-    /// a guest, since a past Wednesday's performer isn't useful to surface.
-    func upcoming(from today: String) throws -> [IslandNightPerformer] {
+    /// Only today-or-later entries — what a night's page should actually
+    /// show a guest, since a past date's booking isn't useful to surface.
+    func upcoming(from today: String) throws -> [EntertainmentBooking] {
         try all().filter { $0.date >= today }
     }
 
     @discardableResult
-    func create(_ body: IslandNightPerformerRequest) throws -> IslandNightPerformer {
+    func create(_ body: EntertainmentBookingRequest) throws -> EntertainmentBooking {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
         let timestamp = now()
-        let performer = IslandNightPerformer(
+        let booking = EntertainmentBooking(
             date: body.date, startTime: body.startTime, performerName: body.performerName, bio: body.bio,
             photos: body.photos ?? [], videoURL: body.videoURL,
             createdAt: timestamp, updatedAt: timestamp
         )
-        performers.append(performer)
+        bookings.append(booking)
         try persist()
-        return performer
+        return booking
     }
 
     @discardableResult
-    func update(id: String, _ body: IslandNightPerformerRequest) throws -> IslandNightPerformer {
+    func update(id: String, _ body: EntertainmentBookingRequest) throws -> EntertainmentBooking {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
-        guard let idx = performers.firstIndex(where: { $0.id == id }) else {
-            throw IslandNightsError.notFound
+        guard let idx = bookings.firstIndex(where: { $0.id == id }) else {
+            throw EntertainmentError.notFound
         }
-        performers[idx].date = body.date
-        performers[idx].startTime = body.startTime
-        performers[idx].performerName = body.performerName
-        performers[idx].bio = body.bio
-        if let photos = body.photos { performers[idx].photos = photos }
-        performers[idx].videoURL = body.videoURL
-        performers[idx].updatedAt = now()
+        bookings[idx].date = body.date
+        bookings[idx].startTime = body.startTime
+        bookings[idx].performerName = body.performerName
+        bookings[idx].bio = body.bio
+        if let photos = body.photos { bookings[idx].photos = photos }
+        bookings[idx].videoURL = body.videoURL
+        bookings[idx].updatedAt = now()
         try persist()
-        return performers[idx]
+        return bookings[idx]
     }
 
     func delete(id: String) throws {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
-        guard let idx = performers.firstIndex(where: { $0.id == id }) else {
-            throw IslandNightsError.notFound
+        guard let idx = bookings.firstIndex(where: { $0.id == id }) else {
+            throw EntertainmentError.notFound
         }
-        performers.remove(at: idx)
+        bookings.remove(at: idx)
         try persist()
     }
 
@@ -182,9 +202,9 @@ final class IslandNightsStore: @unchecked Sendable {
         let fileManager = FileManager.default
         if fileManager.fileExists(atPath: fileURL.path) {
             let data = try Data(contentsOf: fileURL)
-            performers = try JSONDecoder().decode(IslandNightsList.self, from: data).performers
+            bookings = try JSONDecoder().decode(EntertainmentBookingsList.self, from: data).bookings
         } else {
-            performers = []
+            bookings = []
             try persist()
         }
         loaded = true
@@ -193,7 +213,7 @@ final class IslandNightsStore: @unchecked Sendable {
     private func persist() throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(IslandNightsList(performers: performers))
+        let data = try encoder.encode(EntertainmentBookingsList(bookings: bookings))
         try data.write(to: fileURL, options: .atomic)
     }
 }

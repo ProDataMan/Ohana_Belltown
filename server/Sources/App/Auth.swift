@@ -70,8 +70,8 @@ func requireAdmin(_ req: Request) throws -> StaffUser {
 }
 
 /// Like requireLogin, but excludes .entertainmentProvider — use this (not
-/// requireLogin) for every staff route that isn't specifically Island
-/// Nights management, its photo/video upload, or a staff member's own
+/// requireLogin) for every staff route that isn't specifically entertainment
+/// booking management, its photo/video upload, or a staff member's own
 /// account fields. entertainmentProvider is a deliberately narrow role for
 /// outside performers/promoters; requireLogin alone would let it reach
 /// everything a regular employee can.
@@ -79,7 +79,7 @@ func requireAdmin(_ req: Request) throws -> StaffUser {
 func requireStaffAccess(_ req: Request) throws -> StaffUser {
     let user = try requireLogin(req)
     guard user.role != .entertainmentProvider else {
-        throw Abort(.forbidden, reason: "This account can only manage Island Nights.")
+        throw Abort(.forbidden, reason: "This account can only manage entertainment bookings.")
     }
     return user
 }
@@ -88,7 +88,7 @@ func requireStaffAccess(_ req: Request) throws -> StaffUser {
 /// they're blocked from every other adminOnly:false staff page — their own
 /// tool plus basic self-service (account/password/help).
 private let entertainmentProviderAllowedPages: Set<String> = [
-    "island-nights-admin.html", "account.html", "change-password.html", "help.html",
+    "entertainment-admin.html", "account.html", "change-password.html", "help.html",
 ]
 
 func serveStaffPage(_ req: Request, file: String, adminOnly: Bool = false) async throws -> Response {
@@ -100,7 +100,7 @@ func serveStaffPage(_ req: Request, file: String, adminOnly: Bool = false) async
     }
     let pageBasename = file.split(separator: "/").last.map(String.init) ?? file
     if user.role == .entertainmentProvider, !entertainmentProviderAllowedPages.contains(pageBasename) {
-        throw Abort(.forbidden, reason: "This account can only manage Island Nights.")
+        throw Abort(.forbidden, reason: "This account can only manage entertainment bookings.")
     }
     let path = req.application.directory.publicDirectory + file
     return try await req.fileio.asyncStreamFile(at: path)

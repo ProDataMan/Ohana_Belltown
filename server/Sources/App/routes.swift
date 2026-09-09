@@ -272,7 +272,7 @@ func routes(_ app: Application) throws {
     // limit — images should stay capped tight (20mb), video needs much more
     // room. Staff-only (unlike the photo upload, which anonymous customers
     // also use for loyalty bonus claims) since the only current caller is
-    // island-nights-admin.html. Served back by the same /uploads/:filename
+    // entertainment-admin.html. Served back by the same /uploads/:filename
     // route above — Vapor's asyncStreamFile handles Range requests, so
     // <video> seeking works without any extra code.
     app.on(.POST, "api", "upload-video", body: .collect(maxSize: "200mb")) { req async throws -> UploadResponse in
@@ -363,51 +363,56 @@ func routes(_ app: Application) throws {
         return saved
     }
 
-    // Island Nights performer roster — public read (so /entertainment can
-    // show who's playing), any logged-in staff can write (not admin-only,
-    // matching menu editing/swag — the promoter booking performers isn't
-    // necessarily an admin account).
-    app.get("api", "island-nights") { _ throws -> [IslandNightPerformer] in
-        try IslandNightsStore.shared.all()
+    // Entertainment bookings, covering all 7 nights — public read (so each
+    // /entertainment/<day> page can show who's playing), any logged-in staff
+    // can write (not admin-only, matching menu editing/swag — booking a
+    // performer isn't necessarily an admin account). Which night a booking
+    // belongs to is derived from its date, not stored separately.
+    app.get("api", "entertainment") { _ throws -> [EntertainmentBooking] in
+        try EntertainmentStore.shared.all()
     }
 
-    app.get("api", "island-nights", "upcoming") { _ throws -> [IslandNightPerformer] in
+    app.get("api", "entertainment", "upcoming") { req throws -> [EntertainmentBooking] in
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         formatter.timeZone = TimeZone(identifier: "America/Los_Angeles")
         let today = formatter.string(from: Date())
-        return try IslandNightsStore.shared.upcoming(from: today)
+        let upcoming = try EntertainmentStore.shared.upcoming(from: today)
+        guard let weekday = req.query[String.self, at: "weekday"]?.lowercased() else {
+            return upcoming
+        }
+        return upcoming.filter { EntertainmentStore.weekday(of: $0.date) == weekday }
     }
 
-    app.post("api", "island-nights") { req throws -> IslandNightPerformer in
+    app.post("api", "entertainment") { req throws -> EntertainmentBooking in
         let user = try requireLogin(req)
-        let body = try req.content.decode(IslandNightPerformerRequest.self)
+        let body = try req.content.decode(EntertainmentBookingRequest.self)
         try requireWithinEntertainmentProviderWindow(user: user, dateStr: body.date)
-        return try IslandNightsStore.shared.create(body)
+        return try EntertainmentStore.shared.create(body)
     }
 
-    app.put("api", "island-nights", ":id") { req throws -> IslandNightPerformer in
+    app.put("api", "entertainment", ":id") { req throws -> EntertainmentBooking in
         let user = try requireLogin(req)
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
-        let body = try req.content.decode(IslandNightPerformerRequest.self)
+        let body = try req.content.decode(EntertainmentBookingRequest.self)
         // Both the entry's existing date and whatever new date is being
         // moved to must fall in the window — otherwise an entertainmentProvider
         // could edit an out-of-window entry they can't see going in, or move
         // an in-window one out past their own booking horizon.
-        if let existing = try IslandNightsStore.shared.all().first(where: { $0.id == id }) {
+        if let existing = try EntertainmentStore.shared.all().first(where: { $0.id == id }) {
             try requireWithinEntertainmentProviderWindow(user: user, dateStr: existing.date)
         }
         try requireWithinEntertainmentProviderWindow(user: user, dateStr: body.date)
-        return try IslandNightsStore.shared.update(id: id, body)
+        return try EntertainmentStore.shared.update(id: id, body)
     }
 
-    app.delete("api", "island-nights", ":id") { req throws -> HTTPStatus in
+    app.delete("api", "entertainment", ":id") { req throws -> HTTPStatus in
         let user = try requireLogin(req)
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
-        if let existing = try IslandNightsStore.shared.all().first(where: { $0.id == id }) {
+        if let existing = try EntertainmentStore.shared.all().first(where: { $0.id == id }) {
             try requireWithinEntertainmentProviderWindow(user: user, dateStr: existing.date)
         }
-        try IslandNightsStore.shared.delete(id: id)
+        try EntertainmentStore.shared.delete(id: id)
         return .ok
     }
 
@@ -1076,6 +1081,18 @@ func routes(_ app: Application) throws {
         }
     }
 
+    // One shared page (pages/entertainment-night.html) for all 7 nights —
+    // the client-side script reads which day from the URL itself
+    // (location.pathname), same pattern as window.MENU_SECTION on the
+    // shared menu pages, rather than needing 7 near-identical HTML files.
+    let validWeekdays: Set<String> = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+    app.get("entertainment", ":weekday") { req async throws -> Response in
+        guard let weekday = req.parameters.get("weekday"), validWeekdays.contains(weekday) else {
+            throw Abort(.notFound)
+        }
+        return try await serveStatic(req, file: "pages/entertainment-night.html")
+    }
+
     let staffPages: [(String, String, Bool)] = [
         ("edit.html", "staff/edit.html", false),
         ("edit-item.html", "staff/edit-item.html", false),
@@ -1083,7 +1100,7 @@ func routes(_ app: Application) throws {
         ("waitlist-admin.html", "staff/waitlist-admin.html", false),
         ("table-orders-admin.html", "staff/table-orders-admin.html", false),
         ("events-admin.html", "staff/events-admin.html", true),
-        ("island-nights-admin.html", "staff/island-nights-admin.html", false),
+        ("entertainment-admin.html", "staff/entertainment-admin.html", false),
         ("account.html", "staff/account.html", false),
         ("change-password.html", "staff/change-password.html", false),
         ("create-account.html", "staff/create-account.html", true),
