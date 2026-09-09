@@ -732,6 +732,42 @@ button.secondary:hover {
   transform: scale(1.05);
 }
 
+.performer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.performer-card {
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--panel-border);
+}
+
+.performer-card:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.performer-card h3 {
+  margin: 0 0 0.4rem;
+}
+
+.performer-photos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  max-width: 480px;
+}
+
+.performer-card video {
+  display: block;
+  width: 100%;
+  max-width: 480px;
+  border-radius: 10px;
+  margin-top: 0.8rem;
+}
+
 .editor-toolbar {
   display: flex;
   justify-content: space-between;

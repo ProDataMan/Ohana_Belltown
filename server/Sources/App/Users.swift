@@ -3,6 +3,13 @@ import Vapor
 enum UserRole: String, Codable, CaseIterable {
     case admin
     case employee
+    /// A narrowly-scoped account for outside performers/promoters (DJs,
+    /// bands) — can only manage their own upcoming Island Nights listing
+    /// (photos/video, within the next 60 days), not the menu, table orders,
+    /// analytics, or any other staff tool. See requireStaffAccess, which
+    /// every other staff-only route/page uses specifically to exclude this
+    /// role, and IslandNightsStore's 60-day window check.
+    case entertainmentProvider
 }
 
 struct StaffUser: Codable {

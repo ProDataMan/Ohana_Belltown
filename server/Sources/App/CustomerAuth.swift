@@ -196,7 +196,7 @@ func registerCustomerAuthRoutes(_ app: Application) throws {
 
     // Staff-facing — who has a birthday coming up, so a server can treat them.
     app.get("api", "customer", "birthdays-upcoming") { req throws -> [CustomerUserPublic] in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         let days = req.query[Int.self, at: "days"] ?? 7
         return try CustomerUserStore.shared.upcomingBirthdays(withinDays: days)
     }

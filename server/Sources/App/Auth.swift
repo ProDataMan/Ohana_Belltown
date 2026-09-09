@@ -69,12 +69,38 @@ func requireAdmin(_ req: Request) throws -> StaffUser {
     return user
 }
 
+/// Like requireLogin, but excludes .entertainmentProvider — use this (not
+/// requireLogin) for every staff route that isn't specifically Island
+/// Nights management, its photo/video upload, or a staff member's own
+/// account fields. entertainmentProvider is a deliberately narrow role for
+/// outside performers/promoters; requireLogin alone would let it reach
+/// everything a regular employee can.
+@discardableResult
+func requireStaffAccess(_ req: Request) throws -> StaffUser {
+    let user = try requireLogin(req)
+    guard user.role != .entertainmentProvider else {
+        throw Abort(.forbidden, reason: "This account can only manage Island Nights.")
+    }
+    return user
+}
+
+/// Pages an entertainmentProvider account may still view even though
+/// they're blocked from every other adminOnly:false staff page — their own
+/// tool plus basic self-service (account/password/help).
+private let entertainmentProviderAllowedPages: Set<String> = [
+    "island-nights-admin.html", "account.html", "change-password.html", "help.html",
+]
+
 func serveStaffPage(_ req: Request, file: String, adminOnly: Bool = false) async throws -> Response {
     guard let user = try currentUser(req) else {
         return req.redirect(to: "/login?next=\(req.url.path)")
     }
     if adminOnly && user.role != .admin {
         throw Abort(.forbidden, reason: "Admin access required.")
+    }
+    let pageBasename = file.split(separator: "/").last.map(String.init) ?? file
+    if user.role == .entertainmentProvider, !entertainmentProviderAllowedPages.contains(pageBasename) {
+        throw Abort(.forbidden, reason: "This account can only manage Island Nights.")
     }
     let path = req.application.directory.publicDirectory + file
     return try await req.fileio.asyncStreamFile(at: path)

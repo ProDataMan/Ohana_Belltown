@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Manage Users — Ohana Belltown</title>
+    <title>Island Nights — Ohana Belltown</title>
     <meta name="robots" content="noindex, nofollow" />
     <link rel="stylesheet" href="../style.css" />
   </head>
@@ -11,7 +11,11 @@
     <main class="page">
       <header class="hero">
         <p class="eyebrow">Ohana Belltown — Staff</p>
-        <h1>Manage Users</h1>
+        <h1>Island Nights</h1>
+        <p>
+          Book performers for upcoming Wednesdays &mdash; photos and a video go straight to the
+          "Coming Up" section on <a href="/entertainment">/entertainment</a>.
+        </p>
         <p class="admin-link"><a href="/menu">&larr; Back to menu</a></p>
         <div class="staff-tools-nav">
           <a href="/edit.html">Menu Editor</a>
@@ -19,10 +23,10 @@
           <a href="/waitlist-admin.html">Waitlist</a>
           <a href="/table-orders-admin.html">Table Orders</a>
           <a href="/events-admin.html">Events</a>
-          <a href="/island-nights-admin.html">Island Nights</a>
+          <a href="/island-nights-admin.html" class="active">Island Nights</a>
           <a href="/table-card.html">Table Cards</a>
           <a href="/account.html">My Account</a>
-          <a href="/manage-users.html" class="active">Manage Users</a>
+          <a href="/manage-users.html">Manage Users</a>
           <a href="/analytics.html">Analytics</a>
           <a href="/staff-rewards-admin.html">Staff Rewards</a>
           <a href="/competitor-pricing-admin.html">Competitor Pricing</a>
@@ -32,20 +36,22 @@
         </div>
       </header>
 
+      <p id="status" class="status"></p>
+
       <section class="panel">
         <div class="editor-toolbar">
-          <h2>Staff Accounts</h2>
+          <h2>Upcoming Performers</h2>
           <div class="toolbar-actions">
-            <a class="cta-button secondary" href="/create-account.html">+ New Account</a>
+            <button id="add-performer-btn" type="button" class="secondary">+ Add Performer</button>
             <button id="reload-btn" type="button" class="secondary">Reload</button>
           </div>
         </div>
-        <div id="users-list"></div>
+        <div id="performers-list"></div>
       </section>
     </main>
 
     <script src="/nav.js"></script>
     <script src="../staff-auth.js"></script>
-    <script src="../manage-users.js"></script>
+    <script src="../island-nights-admin.js"></script>
   </body>
 </html>

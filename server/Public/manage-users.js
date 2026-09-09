@@ -37,6 +37,7 @@ async function loadUsers() {
                   <select class="role-select">
                     <option value="employee" ${u.role === 'employee' ? 'selected' : ''}>Employee</option>
                     <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+                    <option value="entertainmentProvider" ${u.role === 'entertainmentProvider' ? 'selected' : ''}>Entertainment Provider</option>
                   </select>
                 </td>
                 <td><button type="button" class="secondary save-role-btn">Save role</button></td>

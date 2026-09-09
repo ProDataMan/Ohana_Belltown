@@ -4,6 +4,10 @@ struct ImageUpload: Content {
     var image: File
 }
 
+struct VideoUpload: Content {
+    var video: File
+}
+
 struct UploadResponse: Content {
     var url: String
 }

@@ -41,7 +41,6 @@ enum FacebookOAuth {
         var id: String
         var name: String?
         var email: String?
-        var picture: Picture?
     }
 
     static func exchangeCodeAndFetchUser(code: String, redirectURI: String, client: Client) async throws -> OAuthUserInfo {
@@ -69,7 +68,7 @@ enum FacebookOAuth {
 
         var userComponents = URLComponents(string: "https://graph.facebook.com/me")!
         userComponents.queryItems = [
-            URLQueryItem(name: "fields", value: "id,name,email,picture.type(large)"),
+            URLQueryItem(name: "fields", value: "id,name,email"),
             URLQueryItem(name: "access_token", value: token.access_token),
         ]
         guard let userURL = userComponents.url else {
@@ -84,6 +83,26 @@ enum FacebookOAuth {
             throw Abort(.forbidden, reason: "Facebook didn't share an email for this account.")
         }
 
-        return OAuthUserInfo(providerId: info.id, email: email, displayName: info.name ?? email, pictureURL: info.picture?.data?.url)
+        // Fetched as its own call rather than a nested `picture.type(large)` field on
+        // `/me`: on some Facebook Apps that nested form fails with "(#210) This call
+        // requires a Page access token" even though a valid user token is in use. The
+        // dedicated picture edge doesn't have that problem. Best-effort — a picture
+        // fetch failure shouldn't block login.
+        let pictureURL = try? await fetchPictureURL(userId: info.id, accessToken: token.access_token, client: client)
+
+        return OAuthUserInfo(providerId: info.id, email: email, displayName: info.name ?? email, pictureURL: pictureURL)
+    }
+
+    private static func fetchPictureURL(userId: String, accessToken: String, client: Client) async throws -> String? {
+        var pictureComponents = URLComponents(string: "https://graph.facebook.com/\(userId)/picture")!
+        pictureComponents.queryItems = [
+            URLQueryItem(name: "type", value: "large"),
+            URLQueryItem(name: "redirect", value: "false"),
+            URLQueryItem(name: "access_token", value: accessToken),
+        ]
+        guard let pictureURL = pictureComponents.url else { return nil }
+        let pictureResponse = try await client.get(URI(string: pictureURL.absoluteString)).get()
+        guard pictureResponse.status == .ok else { return nil }
+        return try pictureResponse.content.decode(Picture.self).data?.url
     }
 }

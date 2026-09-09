@@ -151,7 +151,7 @@ func routes(_ app: Application) throws {
     }
 
     app.put("api", "menu") { req throws -> Menu in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         let incoming = try req.content.decode(Menu.self)
         return try MenuStore.shared.save(incoming)
     }
@@ -159,12 +159,12 @@ func routes(_ app: Application) throws {
     // Reusable add-on definitions staff pick from when adding a modifier to
     // any item, instead of retyping the same name/price every time.
     app.get("api", "additions-catalog") { req throws -> [AdditionCatalogItem] in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         return try MenuStore.shared.additionsCatalog()
     }
 
     app.put("api", "additions-catalog") { req throws -> [AdditionCatalogItem] in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         let items = try req.content.decode([AdditionCatalogItem].self)
         return try MenuStore.shared.saveAdditionsCatalog(items)
     }
@@ -173,7 +173,7 @@ func routes(_ app: Application) throws {
     // descriptions" — seeds the shared catalog and adds matching modifiers
     // to whichever known items don't already have them. Idempotent.
     app.post("api", "menu", "seed-additions") { req throws -> SeedAdditionsResult in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         return try MenuStore.shared.seedCommonAdditions()
     }
 
@@ -183,7 +183,7 @@ func routes(_ app: Application) throws {
     }
 
     app.on(.PATCH, "api", "menu", "items", ":id") { req throws -> MenuItem in
-        let staff = try requireLogin(req)
+        let staff = try requireStaffAccess(req)
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
         let body = try req.content.decode(MenuItemUpdateRequest.self)
         let before = try? MenuStore.shared.findItem(id: id).item
@@ -205,7 +205,7 @@ func routes(_ app: Application) throws {
     }
 
     app.on(.DELETE, "api", "menu", "items", ":id") { req throws -> HTTPStatus in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
         try MenuStore.shared.deleteItem(id: id)
         return .noContent
@@ -268,13 +268,41 @@ func routes(_ app: Application) throws {
         return try await req.fileio.asyncStreamFile(at: Uploads.directory + filename)
     }
 
+    // A separate route from /api/upload rather than widening that one's size
+    // limit — images should stay capped tight (20mb), video needs much more
+    // room. Staff-only (unlike the photo upload, which anonymous customers
+    // also use for loyalty bonus claims) since the only current caller is
+    // island-nights-admin.html. Served back by the same /uploads/:filename
+    // route above — Vapor's asyncStreamFile handles Range requests, so
+    // <video> seeking works without any extra code.
+    app.on(.POST, "api", "upload-video", body: .collect(maxSize: "200mb")) { req async throws -> UploadResponse in
+        let staffUser = try requireLogin(req)
+        let upload = try req.content.decode(VideoUpload.self)
+        let allowedExtensions = ["mp4", "mov", "webm", "m4v"]
+        let ext = (upload.video.extension ?? "").lowercased()
+        guard allowedExtensions.contains(ext) else {
+            throw Abort(.unsupportedMediaType, reason: "Only mp4, mov, webm, or m4v videos are allowed.")
+        }
+        guard let data = upload.video.data.getData(
+            at: upload.video.data.readerIndex,
+            length: upload.video.data.readableBytes
+        ) else {
+            throw Abort(.badRequest)
+        }
+        let filename = UUID().uuidString + "." + ext
+        let path = Uploads.directory + filename
+        try data.write(to: URL(fileURLWithPath: path))
+        UploadMetadataStore.shared.record(filename: filename, uploadedByName: staffUser.displayName)
+        return UploadResponse(url: "/uploads/\(filename)")
+    }
+
     // Backs the click-to-preview detail panel on the menu photo editors
     // (edit.html / edit-item.html) — resolution and file size are read live
     // off the file itself (no need to store them), date/uploader come from
     // UploadMetadataStore and are simply absent for anything uploaded before
     // that store existed.
     app.get("api", "uploads", ":filename", "info") { req async throws -> UploadInfo in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         guard let filename = req.parameters.get("filename"), !filename.contains("..") else {
             throw Abort(.badRequest)
         }
@@ -296,7 +324,7 @@ func routes(_ app: Application) throws {
     }
 
     app.on(.DELETE, "api", "uploads", ":filename") { req throws -> HTTPStatus in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         guard let filename = req.parameters.get("filename"), !filename.contains("..") else {
             throw Abort(.badRequest)
         }
@@ -335,12 +363,60 @@ func routes(_ app: Application) throws {
         return saved
     }
 
+    // Island Nights performer roster — public read (so /entertainment can
+    // show who's playing), any logged-in staff can write (not admin-only,
+    // matching menu editing/swag — the promoter booking performers isn't
+    // necessarily an admin account).
+    app.get("api", "island-nights") { _ throws -> [IslandNightPerformer] in
+        try IslandNightsStore.shared.all()
+    }
+
+    app.get("api", "island-nights", "upcoming") { _ throws -> [IslandNightPerformer] in
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "America/Los_Angeles")
+        let today = formatter.string(from: Date())
+        return try IslandNightsStore.shared.upcoming(from: today)
+    }
+
+    app.post("api", "island-nights") { req throws -> IslandNightPerformer in
+        let user = try requireLogin(req)
+        let body = try req.content.decode(IslandNightPerformerRequest.self)
+        try requireWithinEntertainmentProviderWindow(user: user, dateStr: body.date)
+        return try IslandNightsStore.shared.create(body)
+    }
+
+    app.put("api", "island-nights", ":id") { req throws -> IslandNightPerformer in
+        let user = try requireLogin(req)
+        guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
+        let body = try req.content.decode(IslandNightPerformerRequest.self)
+        // Both the entry's existing date and whatever new date is being
+        // moved to must fall in the window — otherwise an entertainmentProvider
+        // could edit an out-of-window entry they can't see going in, or move
+        // an in-window one out past their own booking horizon.
+        if let existing = try IslandNightsStore.shared.all().first(where: { $0.id == id }) {
+            try requireWithinEntertainmentProviderWindow(user: user, dateStr: existing.date)
+        }
+        try requireWithinEntertainmentProviderWindow(user: user, dateStr: body.date)
+        return try IslandNightsStore.shared.update(id: id, body)
+    }
+
+    app.delete("api", "island-nights", ":id") { req throws -> HTTPStatus in
+        let user = try requireLogin(req)
+        guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
+        if let existing = try IslandNightsStore.shared.all().first(where: { $0.id == id }) {
+            try requireWithinEntertainmentProviderWindow(user: user, dateStr: existing.date)
+        }
+        try IslandNightsStore.shared.delete(id: id)
+        return .ok
+    }
+
     // Staff rewards: a punch card earned by keeping the site itself up to
     // date (photos, prices, specials on menu-item edits; new events), plus
     // manual admin grants for anything that can't be auto-detected (a
     // social media post, going above and beyond, etc.).
     app.get("api", "staff-rewards", "me") { req throws -> StaffRewardStatus in
-        let staff = try requireLogin(req)
+        let staff = try requireStaffAccess(req)
         return try StaffRewardsStore.shared.status(staffId: staff.id)
     }
 
@@ -359,7 +435,7 @@ func routes(_ app: Application) throws {
     // can see it (so they know what they're saving toward); only an admin
     // can change what's in it or set/update a point cost.
     app.get("api", "staff-rewards", "catalog") { req throws -> [RewardCatalogItem] in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         return try StaffRewardsStore.shared.catalog()
     }
 
@@ -372,7 +448,7 @@ func routes(_ app: Application) throws {
     // How many points each category is worth — staff can see it (it's
     // already shown throughout the rewards pages); only an admin can change it.
     app.get("api", "staff-rewards", "point-values") { req throws -> [String: Int] in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         return try StaffRewardsStore.shared.pointValues()
     }
 
@@ -383,7 +459,7 @@ func routes(_ app: Application) throws {
     }
 
     app.post("api", "staff-rewards", "log") { req throws -> StaffRewardStatus in
-        let staff = try requireLogin(req)
+        let staff = try requireStaffAccess(req)
         let body = try req.content.decode(StaffRewardSelfReportRequest.self)
         return try StaffRewardsStore.shared.selfReport(staffId: staff.id, category: body.category, note: body.note)
     }
@@ -393,7 +469,7 @@ func routes(_ app: Application) throws {
     // customer loyalty bonus-request flow above) — a link is required, and
     // no points land until an admin approves it.
     app.post("api", "staff-rewards", "social-requests") { req throws -> StaffSocialRequest in
-        let staff = try requireLogin(req)
+        let staff = try requireStaffAccess(req)
         let body = try req.content.decode(StaffSocialRequestSubmission.self)
         return try StaffRewardsStore.shared.submitSocialRequest(staffId: staff.id, link: body.link, note: body.note)
     }
@@ -537,7 +613,7 @@ func routes(_ app: Application) throws {
     }
 
     app.put("api", "swag", "products") { req throws -> [SwagProduct] in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         let items = try req.content.decode([SwagProduct].self)
         return try SwagStore.shared.save(items)
     }
@@ -631,12 +707,12 @@ func routes(_ app: Application) throws {
     }
 
     app.get("api", "swag", "orders") { req throws -> [SwagOrder] in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         return try SwagOrdersStore.shared.all()
     }
 
     app.post("api", "swag", "orders", ":id", "deliver") { req throws -> SwagOrder in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
         return try SwagOrdersStore.shared.markDelivered(id: id)
     }
@@ -688,12 +764,12 @@ func routes(_ app: Application) throws {
     }
 
     app.get("api", "gift-cards", "orders") { req throws -> [GiftCardOrder] in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         return try GiftCardOrdersStore.shared.all()
     }
 
     app.post("api", "gift-cards", "orders", ":id", "fulfill") { req throws -> GiftCardOrder in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
         return try GiftCardOrdersStore.shared.markFulfilled(id: id)
     }
@@ -727,29 +803,29 @@ func routes(_ app: Application) throws {
     }
 
     app.post("api", "loyalty", "punch") { req throws -> LoyaltyStatus in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         let body = try req.content.decode(PhoneRequest.self)
         return try LoyaltyStore.shared.addPunch(phone: body.phone)
     }
 
     app.post("api", "loyalty", "redeem") { req throws -> LoyaltyStatus in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         let body = try req.content.decode(PhoneRequest.self)
         return try LoyaltyStore.shared.redeem(phone: body.phone)
     }
 
     app.get("api", "loyalty", "customers") { req throws -> [LoyaltyCustomer] in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         return try LoyaltyStore.shared.allCustomers()
     }
 
     app.get("api", "loyalty", "bonus-requests") { req throws -> [BonusRequest] in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         return try LoyaltyStore.shared.allBonusRequests()
     }
 
     app.post("api", "loyalty", "bonus-requests", ":id", "review") { req throws -> BonusRequest in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
         let body = try req.content.decode(BonusReviewRequest.self)
         return try LoyaltyStore.shared.reviewBonusRequest(id: id, approve: body.approve)
@@ -766,18 +842,18 @@ func routes(_ app: Application) throws {
     }
 
     app.get("api", "waitlist") { req throws -> [WaitlistEntry] in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         return try WaitlistStore.shared.active()
     }
 
     app.post("api", "waitlist", ":id", "notify") { req throws -> WaitlistEntry in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
         return try WaitlistStore.shared.markNotified(id: id)
     }
 
     app.post("api", "waitlist", ":id", "remove") { req throws -> WaitlistEntry in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
         return try WaitlistStore.shared.remove(id: id)
     }
@@ -823,7 +899,7 @@ func routes(_ app: Application) throws {
     }
 
     app.get("api", "table-orders", "dashboard") { req throws -> TableOrdersDashboard in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         return try TableOrdersDashboard(
             needsEntry: TableOrdersStore.shared.needsEntry(),
             awaitingDelivery: TableOrdersStore.shared.awaitingDelivery(),
@@ -832,7 +908,7 @@ func routes(_ app: Application) throws {
     }
 
     app.post("api", "table-orders", ":id", "enter") { req throws -> TableOrderEntry in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
         let staffOnDuty = try StaffingStore.shared.get().staffOnDuty
         let entry = try TableOrdersStore.shared.markEntered(id: id, staffOnDuty: staffOnDuty)
@@ -865,7 +941,7 @@ func routes(_ app: Application) throws {
     // guest shouldn't be able to cancel their own order out from under
     // themselves via the same button that marks it received.
     app.post("api", "table-orders", ":id", "cancel") { req throws -> TableOrderEntry in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
         let body = try? req.content.decode(CancelOrderRequest.self)
         let entry = try TableOrdersStore.shared.cancel(id: id, reason: body?.reason)
@@ -877,7 +953,7 @@ func routes(_ app: Application) throws {
     // wired up (TUYA_* configured) without exposing the credentials
     // themselves — no secrets in the response, just booleans/ids/hex colors.
     app.get("api", "table-orders", "lights") { req async throws -> LightStationsStatus in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         return await LightNotifier.shared.status()
     }
 
@@ -911,12 +987,12 @@ func routes(_ app: Application) throws {
     }
 
     app.get("api", "table-orders", "staffing") { req throws -> StaffingConfig in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         return try StaffingStore.shared.get()
     }
 
     app.post("api", "table-orders", "staffing") { req throws -> StaffingConfig in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         let body = try req.content.decode(StaffingConfig.self)
         return try StaffingStore.shared.setStaffOnDuty(body.staffOnDuty)
     }
@@ -957,7 +1033,7 @@ func routes(_ app: Application) throws {
     }
 
     app.get("api", "feedback", "unacknowledged-count") { req throws -> FeedbackUnacknowledgedCount in
-        try requireLogin(req)
+        try requireStaffAccess(req)
         return FeedbackUnacknowledgedCount(count: try FeedbackStore.shared.unacknowledgedCount())
     }
 
@@ -1006,6 +1082,7 @@ func routes(_ app: Application) throws {
         ("waitlist-admin.html", "staff/waitlist-admin.html", false),
         ("table-orders-admin.html", "staff/table-orders-admin.html", false),
         ("events-admin.html", "staff/events-admin.html", true),
+        ("island-nights-admin.html", "staff/island-nights-admin.html", false),
         ("account.html", "staff/account.html", false),
         ("change-password.html", "staff/change-password.html", false),
         ("create-account.html", "staff/create-account.html", true),
