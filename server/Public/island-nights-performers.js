@@ -17,6 +17,16 @@ function formatIslandNightsDate(dateStr) {
   });
 }
 
+function formatIslandNightsTime(timeStr) {
+  if (!timeStr) return null;
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  if (Number.isNaN(hours)) return null;
+  return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 async function loadIslandNightsPerformers() {
   const section = document.getElementById('island-nights-performers-section');
   const listEl = document.getElementById('island-nights-performers-list');
@@ -32,7 +42,7 @@ async function loadIslandNightsPerformers() {
       .map(
         (p) => `
       <div class="performer-card">
-        <p class="eyebrow">${escapeHtmlIslandNightsPublic(formatIslandNightsDate(p.date))}</p>
+        <p class="eyebrow">${escapeHtmlIslandNightsPublic(formatIslandNightsDate(p.date))}${formatIslandNightsTime(p.startTime) ? ' &middot; ' + escapeHtmlIslandNightsPublic(formatIslandNightsTime(p.startTime)) : ''}</p>
         <h3>${escapeHtmlIslandNightsPublic(p.performerName)}</h3>
         ${p.bio ? `<p>${escapeHtmlIslandNightsPublic(p.bio)}</p>` : ''}
         ${

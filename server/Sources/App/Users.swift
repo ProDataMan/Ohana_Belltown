@@ -340,6 +340,27 @@ final class UserStore: @unchecked Sendable {
         return user
     }
 
+    /// Backs the Facebook Data Deletion callback: unlinks the Facebook
+    /// account from whichever staff member has it linked, without touching
+    /// the rest of the record — a staff account is a real employment record
+    /// the restaurant created, not something Facebook created, so only the
+    /// Facebook-sourced identifier is in scope for deletion. Returns whether
+    /// a match was found, since Facebook expects deletion to be idempotent
+    /// (no error for a user id that was never linked here).
+    @discardableResult
+    func unlinkFacebookId(_ providerId: String) throws -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard let idx = users.firstIndex(where: { $0.facebookId == providerId }) else {
+            return false
+        }
+        users[idx].facebookId = nil
+        users[idx].updatedAt = now()
+        try persist()
+        return true
+    }
+
     @discardableResult
     func linkOAuth(id: String, provider: OAuthProvider, providerId: String, pictureURL: String? = nil, email: String? = nil) throws -> StaffUserPublic {
         lock.lock()

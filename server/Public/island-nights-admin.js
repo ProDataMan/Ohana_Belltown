@@ -54,6 +54,9 @@ function renderPerformers() {
         <label>Date
           <input type="date" class="performer-date-input" value="${escapeHtmlIslandNights(p.date)}" />
         </label>
+        <label>Start time
+          <input type="time" class="performer-time-input" value="${escapeHtmlIslandNights(p.startTime || '21:00')}" />
+        </label>
         <span class="hint performer-date-label">${p.date ? escapeHtmlIslandNights(formatPerformerDate(p.date)) : ''}</span>
         <button type="button" class="secondary performer-remove-btn">Remove</button>
       </div>
@@ -229,6 +232,7 @@ async function savePerformer(card) {
   const index = Number(card.dataset.index);
   const id = card.dataset.id;
   const date = card.querySelector('.performer-date-input').value;
+  const startTime = card.querySelector('.performer-time-input').value || null;
   const performerName = card.querySelector('.performer-name-input').value.trim();
   const bio = card.querySelector('.performer-bio-input').value.trim() || null;
   const statusEl = card.querySelector('.performer-save-status');
@@ -239,6 +243,7 @@ async function savePerformer(card) {
 
   const body = {
     date,
+    startTime,
     performerName,
     bio,
     photos: performers[index].photos || [],
@@ -266,7 +271,7 @@ async function savePerformer(card) {
 }
 
 document.getElementById('add-performer-btn').addEventListener('click', () => {
-  performers.push({ id: null, date: '', performerName: '', bio: '', photos: [], videoURL: null });
+  performers.push({ id: null, date: '', startTime: '21:00', performerName: '', bio: '', photos: [], videoURL: null });
   renderPerformers();
 });
 

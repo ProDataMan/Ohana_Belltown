@@ -92,6 +92,16 @@ Steps followed, for reference (or if credentials ever need regenerating):
    - `https://www.ohanasushigrill.com/auth/facebook/callback`
    - Optional, for testing locally: also add `http://localhost:8080/auth/facebook/callback`
 4. Under **App Settings → Basic**, copy the **App ID** and **App Secret**.
+5. Still under **App Settings → Basic**, scroll to **Data Deletion Request** (required before the
+   app can go Live) and set the **Data Deletion Request URL** to:
+   - `https://www.ohanasushigrill.com/auth/facebook/data-deletion`
+   - This is a real, working callback (`FacebookDataDeletion.swift` / `OAuthRoutes.swift`) — when a
+     user asks Facebook to delete their data via Facebook's own settings, Facebook POSTs a signed
+     request here, the app verifies it (HMAC-SHA256 with the App Secret) and deletes/unlinks any
+     matching customer or staff account, then returns a confirmation URL
+     (`/data-deletion-status`) for Facebook to show the user. No manual follow-up needed.
+   - Separately, customers can also self-serve a full account deletion any time from
+     `/my-account.html`, independent of Facebook — see `CustomerUserStore.deleteAccount`.
 
 These became:
 - `FACEBOOK_OAUTH_APP_ID`

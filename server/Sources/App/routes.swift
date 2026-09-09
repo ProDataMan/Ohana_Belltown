@@ -1068,6 +1068,7 @@ func routes(_ app: Application) throws {
         ("shop", "pages/shop.html"),
         ("gift-cards", "pages/gift-cards.html"),
         ("order-history", "pages/order-history.html"),
+        ("data-deletion-status", "pages/data-deletion-status.html"),
     ]
     for (route, file) in cleanPages {
         app.get(PathComponent(stringLiteral: route)) { req in

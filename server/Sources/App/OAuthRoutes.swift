@@ -140,6 +140,33 @@ func registerOAuthRoutes(_ app: Application) throws {
         return try finishStaffOAuth(req, info: info, provider: .facebook, mode: parsed.mode)
     }
 
+    // MARK: Facebook — Data Deletion Request callback (Facebook Login →
+    // Settings → Data Deletion Request URL). Facebook calls this directly,
+    // server-to-server, when a user asks Facebook to have us delete their
+    // data — no session or browser involved. Deletion happens synchronously,
+    // so the status page we hand back is always accurate by the time the
+    // user could visit it.
+
+    struct FacebookDataDeletionRequestBody: Content {
+        var signed_request: String
+    }
+
+    app.post("auth", "facebook", "data-deletion") { req throws -> Response in
+        let body = try req.content.decode(FacebookDataDeletionRequestBody.self)
+        let facebookUserId = try FacebookDataDeletion.parseUserId(signedRequest: body.signed_request)
+
+        try CustomerUserStore.shared.deleteByFacebookId(facebookUserId)
+        try UserStore.shared.unlinkFacebookId(facebookUserId)
+
+        let confirmationCode = UUID().uuidString
+        let res = Response(status: .ok)
+        try res.content.encode(
+            ["url": "\(base)/data-deletion-status?id=\(confirmationCode)", "confirmation_code": confirmationCode],
+            as: .json
+        )
+        return res
+    }
+
     // MARK: Customer — Apple (hidden in the UI for now, kept working underneath)
 
     app.get("auth", "apple", "customer") { req -> Response in

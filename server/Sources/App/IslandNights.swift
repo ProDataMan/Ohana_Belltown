@@ -8,6 +8,10 @@ struct IslandNightPerformer: Codable, Content {
     var id: String
     /// "yyyy-MM-dd" — the specific Wednesday this performer is booked for.
     var date: String
+    /// "HH:mm" 24-hour, optional — Island Nights defaults to 9pm (shown as a
+    /// placeholder client-side), but a performer/promoter can set a
+    /// different start time for their own date if it varies.
+    var startTime: String?
     var performerName: String
     var bio: String?
     var photos: [String]
@@ -20,11 +24,12 @@ struct IslandNightPerformer: Codable, Content {
     var updatedAt: String
 
     init(
-        id: String = UUID().uuidString, date: String, performerName: String, bio: String? = nil,
+        id: String = UUID().uuidString, date: String, startTime: String? = nil, performerName: String, bio: String? = nil,
         photos: [String] = [], videoURL: String? = nil, createdAt: String, updatedAt: String
     ) {
         self.id = id
         self.date = date
+        self.startTime = startTime
         self.performerName = performerName
         self.bio = bio
         self.photos = photos
@@ -40,10 +45,11 @@ struct IslandNightsList: Codable, Content {
 
 struct IslandNightPerformerRequest: Content {
     var date: String
+    var startTime: String? = nil
     var performerName: String
-    var bio: String?
-    var photos: [String]?
-    var videoURL: String?
+    var bio: String? = nil
+    var photos: [String]? = nil
+    var videoURL: String? = nil
 }
 
 enum IslandNightsError: Error, Equatable {
@@ -132,7 +138,7 @@ final class IslandNightsStore: @unchecked Sendable {
         try loadIfNeeded()
         let timestamp = now()
         let performer = IslandNightPerformer(
-            date: body.date, performerName: body.performerName, bio: body.bio,
+            date: body.date, startTime: body.startTime, performerName: body.performerName, bio: body.bio,
             photos: body.photos ?? [], videoURL: body.videoURL,
             createdAt: timestamp, updatedAt: timestamp
         )
@@ -150,6 +156,7 @@ final class IslandNightsStore: @unchecked Sendable {
             throw IslandNightsError.notFound
         }
         performers[idx].date = body.date
+        performers[idx].startTime = body.startTime
         performers[idx].performerName = body.performerName
         performers[idx].bio = body.bio
         if let photos = body.photos { performers[idx].photos = photos }

@@ -264,6 +264,42 @@ final class CustomerUserStore: @unchecked Sendable {
         return CustomerUserPublic(users[idx])
     }
 
+    /// Permanently removes the caller's own account (self-service only, same
+    /// as deactivate) — unlike deactivate, this actually erases the record
+    /// rather than just flagging it inactive. Idempotent-looking from the
+    /// caller's side: a second call just hits notFound, which the route
+    /// treats the same as success since the end state (no account) matches.
+    func deleteAccount(id: String) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard let idx = users.firstIndex(where: { $0.id == id }) else {
+            throw CustomerUserError.notFound
+        }
+        users.remove(at: idx)
+        try persist()
+    }
+
+    /// Backs the Facebook Data Deletion callback: permanently erases whichever
+    /// customer account has this Facebook id linked. A customer account can be
+    /// created entirely from Facebook-sourced data (see findOrCreateFromOAuth),
+    /// so — unlike staff accounts, which are real employment records Facebook
+    /// never created — the whole record is in scope, not just the link.
+    /// Returns whether a match was found; Facebook expects deletion to be
+    /// idempotent, so a user id that was never on file isn't an error.
+    @discardableResult
+    func deleteByFacebookId(_ providerId: String) throws -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard let idx = users.firstIndex(where: { $0.facebookId == providerId }) else {
+            return false
+        }
+        users.remove(at: idx)
+        try persist()
+        return true
+    }
+
     /// Finds the account linked to this OAuth identity, links it to an existing
     /// account with a matching verified email, or creates a new account.
     /// Whenever the provider supplies a profile photo and the account doesn't

@@ -1,4 +1,5 @@
 import XCTVapor
+import Crypto
 @testable import App
 
 final class RouteTests: XCTestCase {
@@ -33,6 +34,7 @@ final class RouteTests: XCTestCase {
         SwagStore.shared.configure(dataDirectory: tempDir.path)
         SwagOrdersStore.shared.configure(dataDirectory: tempDir.path)
         GiftCardOrdersStore.shared.configure(dataDirectory: tempDir.path)
+        IslandNightsStore.shared.configure(dataDirectory: tempDir.path)
     }
 
     override func tearDown() async throws {
@@ -1283,6 +1285,107 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testCustomerDeleteAccountRequiresLoginAndActuallyErasesTheRecord() throws {
+        let registerBody = ByteBuffer(string: #"{"email":"eraseme@example.com","displayName":"Erase Me","password":"erasepass1"}"#)
+        try app.test(.POST, "api/customer/register", headers: ["Content-Type": "application/json"], body: registerBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+
+        try app.test(.POST, "api/customer/delete-account") { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+
+        var sessionCookie: String?
+        let loginBody = ByteBuffer(string: #"{"email":"eraseme@example.com","password":"erasepass1"}"#)
+        try app.test(.POST, "api/customer/login", headers: ["Content-Type": "application/json"], body: loginBody) { res in
+            XCTAssertEqual(res.status, .ok)
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from login") }
+
+        try app.test(.POST, "api/customer/delete-account", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+
+        // Erased, not just deactivated — re-registering with the same email should succeed,
+        // which a deactivated (but still-present) account would block with emailTaken.
+        try app.test(.POST, "api/customer/register", headers: ["Content-Type": "application/json"], body: registerBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+    }
+
+    /// Builds a Facebook-style `signed_request`: base64url(HMAC-SHA256 of the
+    /// payload) + "." + base64url(JSON payload) — mirrors what Facebook's
+    /// Data Deletion callback actually sends.
+    private func makeFacebookSignedRequest(userId: String, secret: String) -> String {
+        func base64URLEncode(_ data: Data) -> String {
+            data.base64EncodedString()
+                .replacingOccurrences(of: "+", with: "-")
+                .replacingOccurrences(of: "/", with: "_")
+                .replacingOccurrences(of: "=", with: "")
+        }
+        let payload = try! JSONSerialization.data(withJSONObject: [
+            "user_id": userId, "algorithm": "HMAC-SHA256", "issued_at": Int(Date().timeIntervalSince1970),
+        ])
+        let payloadB64 = base64URLEncode(payload)
+        let key = SymmetricKey(data: Data(secret.utf8))
+        let signature = HMAC<SHA256>.authenticationCode(for: Data(payloadB64.utf8), using: key)
+        return "\(base64URLEncode(Data(signature))).\(payloadB64)"
+    }
+
+    func testFacebookDataDeletionCallbackDeletesMatchingCustomer() throws {
+        setenv("FACEBOOK_OAUTH_APP_SECRET", "test-secret", 1)
+        defer { unsetenv("FACEBOOK_OAUTH_APP_SECRET") }
+
+        let customer = try CustomerUserStore.shared.findOrCreateFromOAuth(
+            provider: .facebook, providerId: "fb-customer-1", email: "fan@example.com", displayName: "Fan"
+        )
+
+        let signedRequest = makeFacebookSignedRequest(userId: "fb-customer-1", secret: "test-secret")
+        let body = ByteBuffer(string: "signed_request=\(signedRequest)")
+        try app.test(.POST, "auth/facebook/data-deletion", headers: ["Content-Type": "application/x-www-form-urlencoded"], body: body) { res in
+            XCTAssertEqual(res.status, .ok)
+            struct Ack: Decodable { var url: String; var confirmation_code: String }
+            let ack = try res.content.decode(Ack.self)
+            XCTAssertTrue(ack.url.contains("/data-deletion-status?id="))
+        }
+
+        XCTAssertThrowsError(try CustomerUserStore.shared.find(id: customer.id))
+    }
+
+    func testFacebookDataDeletionCallbackUnlinksStaffWithoutDeletingTheAccount() throws {
+        setenv("FACEBOOK_OAUTH_APP_SECRET", "test-secret", 1)
+        defer { unsetenv("FACEBOOK_OAUTH_APP_SECRET") }
+
+        let staff = try UserStore.shared.create(
+            username: "server1", displayName: "Server One", password: "staffpass1", role: .employee, mustChangePassword: false
+        )
+        try UserStore.shared.linkOAuth(id: staff.id, provider: .facebook, providerId: "fb-staff-1")
+
+        let signedRequest = makeFacebookSignedRequest(userId: "fb-staff-1", secret: "test-secret")
+        let body = ByteBuffer(string: "signed_request=\(signedRequest)")
+        try app.test(.POST, "auth/facebook/data-deletion", headers: ["Content-Type": "application/x-www-form-urlencoded"], body: body) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+
+        let updated = try UserStore.shared.find(id: staff.id)
+        XCTAssertNil(updated.facebookId, "the Facebook link should be gone")
+        XCTAssertEqual(updated.username, "server1", "the staff record itself is a real employment record, not Facebook-sourced data — it should survive")
+    }
+
+    func testFacebookDataDeletionCallbackRejectsBadSignature() throws {
+        setenv("FACEBOOK_OAUTH_APP_SECRET", "test-secret", 1)
+        defer { unsetenv("FACEBOOK_OAUTH_APP_SECRET") }
+
+        let signedRequest = makeFacebookSignedRequest(userId: "someone", secret: "wrong-secret")
+        let body = ByteBuffer(string: "signed_request=\(signedRequest)")
+        try app.test(.POST, "auth/facebook/data-deletion", headers: ["Content-Type": "application/x-www-form-urlencoded"], body: body) { res in
+            XCTAssertEqual(res.status, .badRequest)
+        }
+    }
+
     func testPopularItemsExcludesSoldOutAndRanksByViews() throws {
         let menuBody = ByteBuffer(string: #"""
         {"restaurant":"Ohana","lastUpdated":"now","categories":[
@@ -1425,5 +1528,167 @@ final class RouteTests: XCTestCase {
         try app.test(.POST, "api/loyalty/bonus-request", headers: ["Content-Type": "application/json"], body: socialWithoutItem) { res in
             XCTAssertEqual(res.status, .ok, "a social tag isn't always about one specific dish, so it should stay optional")
         }
+    }
+
+    // MARK: - entertainmentProvider role boundary
+
+    /// Bootstraps an admin, creates one more account with the given role,
+    /// logs both in, and returns their session cookies.
+    private func makeAdminAndSecondAccount(username: String, password: String, role: String) throws -> (admin: String, other: String) {
+        var adminCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"admin-\#(username)","displayName":"Admin","password":"adminpass123"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                adminCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let admin = adminCookie else { XCTFail("expected a session cookie from bootstrap"); return ("", "") }
+
+        let createBody = ByteBuffer(string: #"{"username":"\#(username)","displayName":"\#(username)","password":"\#(password)","role":"\#(role)"}"#)
+        try app.test(.POST, "api/users", headers: ["Content-Type": "application/json", "Cookie": admin], body: createBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+
+        var otherCookie: String?
+        try app.test(.POST, "api/auth/login", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"\#(username)","password":"\#(password)"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                otherCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let other = otherCookie else { XCTFail("expected a session cookie from login"); return ("", "") }
+        return (admin, other)
+    }
+
+    // A representative sample across every staff area — menu, table orders,
+    // loyalty (customer PII), waitlist (customer phone numbers), swag,
+    // gift cards, staff rewards — confirming requireStaffAccess actually
+    // rejects this role at the API level, not just on the HTML page.
+    func testEntertainmentProviderBlockedFromOtherStaffRoutes() throws {
+        let (admin, dj) = try makeAdminAndSecondAccount(username: "dj1", password: "djpass123", role: "entertainmentProvider")
+
+        let getEndpoints: [String] = [
+            "api/table-orders/dashboard", "api/loyalty/customers", "api/waitlist",
+            "api/swag/orders", "api/gift-cards/orders", "api/staff-rewards/catalog",
+            "api/customer/birthdays-upcoming",
+        ]
+        for path in getEndpoints {
+            try app.test(.GET, path, headers: ["Cookie": dj]) { res in
+                XCTAssertEqual(res.status, .forbidden, "\(path) should reject an entertainmentProvider")
+            }
+            try app.test(.GET, path, headers: ["Cookie": admin]) { res in
+                XCTAssertNotEqual(res.status, .forbidden, "\(path) should still allow an admin")
+            }
+        }
+
+        try app.test(.PUT, "api/menu", headers: ["Content-Type": "application/json", "Cookie": dj],
+                      body: ByteBuffer(string: #"{"categories":[]}"#)) { res in
+            XCTAssertEqual(res.status, .forbidden, "menu editing must stay blocked for an entertainmentProvider")
+        }
+    }
+
+    // The inverse of the above — the one feature this role exists for, plus
+    // its own account fields, must keep working.
+    func testEntertainmentProviderAllowedOnIslandNightsAndOwnAccount() throws {
+        let (_, dj) = try makeAdminAndSecondAccount(username: "dj2", password: "djpass123", role: "entertainmentProvider")
+
+        try app.test(.GET, "api/island-nights", headers: ["Cookie": dj]) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+
+        let inWindowDate = dateString(daysFromToday: 14)
+        var createdId: String?
+        try app.test(.POST, "api/island-nights", headers: ["Content-Type": "application/json", "Cookie": dj],
+                      body: ByteBuffer(string: #"{"date":"\#(inWindowDate)","performerName":"DJ Flow","photos":[]}"#)) { res in
+            XCTAssertEqual(res.status, .ok)
+            createdId = try res.content.decode(IslandNightPerformer.self).id
+        }
+        XCTAssertNotNil(createdId)
+
+        try app.test(.POST, "api/account/change-password", headers: ["Content-Type": "application/json", "Cookie": dj],
+                      body: ByteBuffer(string: #"{"currentPassword":"djpass123","newPassword":"newdjpass123"}"#)) { res in
+            XCTAssertEqual(res.status, .ok, "an entertainmentProvider must still be able to manage their own account")
+        }
+    }
+
+    // Page-level check — serveStaffPage's own allowlist, separate from the
+    // API-level requireStaffAccess checks above.
+    func testEntertainmentProviderPageAccessAllowlist() throws {
+        let (_, dj) = try makeAdminAndSecondAccount(username: "dj3", password: "djpass123", role: "entertainmentProvider")
+
+        for page in ["edit.html", "table-orders-admin.html", "loyalty-admin.html", "swag-admin.html", "waitlist-admin.html"] {
+            try app.test(.GET, page, headers: ["Cookie": dj]) { res in
+                XCTAssertEqual(res.status, .forbidden, "\(page) should be blocked for an entertainmentProvider")
+            }
+        }
+        for page in ["island-nights-admin.html", "account.html", "change-password.html", "help.html"] {
+            try app.test(.GET, page, headers: ["Cookie": dj]) { res in
+                XCTAssertEqual(res.status, .ok, "\(page) should stay reachable for an entertainmentProvider")
+            }
+        }
+    }
+
+    // The 60-day booking window, exercised over real HTTP rather than
+    // calling IslandNightsStore directly (see IslandNightsStoreTests for
+    // the pure date-math unit tests) — this confirms the route handlers
+    // actually apply the check to the request's role, not just that the
+    // underlying math is correct.
+    func testEntertainmentProviderBookingWindowEnforcedOverHTTP() throws {
+        let (employee, dj) = try makeAdminAndSecondAccount(username: "dj4", password: "djpass123", role: "entertainmentProvider")
+
+        let tooFar = dateString(daysFromToday: 90)
+        try app.test(.POST, "api/island-nights", headers: ["Content-Type": "application/json", "Cookie": dj],
+                      body: ByteBuffer(string: #"{"date":"\#(tooFar)","performerName":"Too Far Out","photos":[]}"#)) { res in
+            XCTAssertEqual(res.status, .forbidden)
+        }
+
+        // An admin/employee books something outside the DJ's own window...
+        var farEntryId: String?
+        try app.test(.POST, "api/island-nights", headers: ["Content-Type": "application/json", "Cookie": employee],
+                      body: ByteBuffer(string: #"{"date":"\#(tooFar)","performerName":"Booked By Staff","photos":[]}"#)) { res in
+            XCTAssertEqual(res.status, .ok)
+            farEntryId = try res.content.decode(IslandNightPerformer.self).id
+        }
+        guard let id = farEntryId else { return XCTFail("expected an id") }
+
+        // ...and the DJ account can't touch it either way, even though it
+        // didn't create it.
+        try app.test(.PUT, "api/island-nights/\(id)", headers: ["Content-Type": "application/json", "Cookie": dj],
+                      body: ByteBuffer(string: #"{"date":"\#(tooFar)","performerName":"Hijacked","photos":[]}"#)) { res in
+            XCTAssertEqual(res.status, .forbidden)
+        }
+        try app.test(.DELETE, "api/island-nights/\(id)", headers: ["Cookie": dj]) { res in
+            XCTAssertEqual(res.status, .forbidden)
+        }
+
+        // A DJ's own in-window booking can't be dragged outside the window either.
+        let inWindow = dateString(daysFromToday: 10)
+        var ownEntryId: String?
+        try app.test(.POST, "api/island-nights", headers: ["Content-Type": "application/json", "Cookie": dj],
+                      body: ByteBuffer(string: #"{"date":"\#(inWindow)","performerName":"DJ Flow","photos":[]}"#)) { res in
+            XCTAssertEqual(res.status, .ok)
+            ownEntryId = try res.content.decode(IslandNightPerformer.self).id
+        }
+        guard let ownId = ownEntryId else { return XCTFail("expected an id") }
+        try app.test(.PUT, "api/island-nights/\(ownId)", headers: ["Content-Type": "application/json", "Cookie": dj],
+                      body: ByteBuffer(string: #"{"date":"\#(tooFar)","performerName":"DJ Flow","photos":[]}"#)) { res in
+            XCTAssertEqual(res.status, .forbidden, "moving an own in-window booking out past 60 days should still be rejected")
+        }
+
+        // Admin/employee accounts have no window restriction at all.
+        try app.test(.POST, "api/island-nights", headers: ["Content-Type": "application/json", "Cookie": employee],
+                      body: ByteBuffer(string: #"{"date":"\#(tooFar)","performerName":"No Limit For Staff","photos":[]}"#)) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+    }
+
+    private func dateString(daysFromToday: Int) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "America/Los_Angeles")
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        let date = calendar.date(byAdding: .day, value: daysFromToday, to: calendar.startOfDay(for: Date()))!
+        return formatter.string(from: date)
     }
 }

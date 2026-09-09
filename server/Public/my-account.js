@@ -263,6 +263,28 @@ document.getElementById('deactivate-btn').addEventListener('click', async () => 
   }
 });
 
+document.getElementById('delete-account-btn').addEventListener('click', async () => {
+  const statusEl = document.getElementById('delete-account-status');
+  if (!window.confirm('Permanently delete your account? This erases your name, email, photo, and any Google/Apple/Facebook link, and cannot be undone.')) {
+    return;
+  }
+  const typed = window.prompt('Type DELETE to confirm.');
+  if (typed !== 'DELETE') {
+    return;
+  }
+  setMyAccountStatus(statusEl, 'Deleting...', false);
+  try {
+    const response = await fetch('/api/customer/delete-account', { method: 'POST' });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.reason || `Failed (${response.status}).`);
+    }
+    window.location.href = '/';
+  } catch (error) {
+    setMyAccountStatus(statusEl, error.message, true);
+  }
+});
+
 function orderStatusLabel(order) {
   if (order.status === 'delivered') return 'Delivered';
   if (order.status === 'entered') return 'Being prepared';

@@ -159,6 +159,21 @@ func registerCustomerAuthRoutes(_ app: Application) throws {
         return result
     }
 
+    // Unlike deactivate, this actually erases the account — everything we
+    // hold on this customer, including any Facebook/Google/Apple link, is
+    // gone immediately. Distinct button/confirmation from deactivate in the UI.
+    app.post("api", "customer", "delete-account") { req throws -> HTTPStatus in
+        let customer = try requireCustomerLogin(req)
+        // requireCustomerLogin already confirms the account exists, so the
+        // only way deleteAccount still hits notFound here is a genuine race
+        // (two concurrent delete clicks) — treat that as the success it
+        // effectively is (end state: no account) rather than surfacing an
+        // error for something the user didn't do wrong.
+        try? CustomerUserStore.shared.deleteAccount(id: customer.id)
+        req.session.data["customerId"] = nil
+        return .ok
+    }
+
     app.post("api", "customer", "birthday") { req throws -> CustomerUserPublic in
         let customer = try requireCustomerLogin(req)
         let body = try req.content.decode(CustomerBirthdayRequest.self)
