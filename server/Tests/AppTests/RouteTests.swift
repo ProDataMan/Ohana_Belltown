@@ -1687,19 +1687,24 @@ final class RouteTests: XCTestCase {
     // confirms the route actually applies EntertainmentStore.weekday(of:)
     // rather than, say, returning everything regardless of the filter.
     func testUpcomingEntertainmentFiltersByWeekdayQueryParam() throws {
-        // 2026-09-09 is a real Wednesday, 2026-09-10 a real Thursday.
+        // Computed relative to "today" (not hardcoded) so this test can't
+        // rot into the past the way an earlier version of it did — a
+        // hardcoded date stops being "upcoming" the moment it passes.
+        let wednesdayDate = nextDate(forWeekday: "wednesday")
+        let thursdayDate = nextDate(forWeekday: "thursday")
+
         try app.test(.POST, "api/entertainment", headers: ["Content-Type": "application/json"],
-                      body: ByteBuffer(string: #"{"date":"2026-09-09","performerName":"Wednesday Act","photos":[]}"#)) { res in
+                      body: ByteBuffer(string: #"{"date":"\#(wednesdayDate)","performerName":"Wednesday Act","photos":[]}"#)) { res in
             XCTAssertEqual(res.status, .unauthorized)
         }
 
         let (admin, _) = try makeAdminAndSecondAccount(username: "booker1", password: "bookerpass1", role: "employee")
         try app.test(.POST, "api/entertainment", headers: ["Content-Type": "application/json", "Cookie": admin],
-                      body: ByteBuffer(string: #"{"date":"2026-09-09","performerName":"Wednesday Act","photos":[]}"#)) { res in
+                      body: ByteBuffer(string: #"{"date":"\#(wednesdayDate)","performerName":"Wednesday Act","photos":[]}"#)) { res in
             XCTAssertEqual(res.status, .ok)
         }
         try app.test(.POST, "api/entertainment", headers: ["Content-Type": "application/json", "Cookie": admin],
-                      body: ByteBuffer(string: #"{"date":"2026-09-10","performerName":"Thursday Act","photos":[]}"#)) { res in
+                      body: ByteBuffer(string: #"{"date":"\#(thursdayDate)","performerName":"Thursday Act","photos":[]}"#)) { res in
             XCTAssertEqual(res.status, .ok)
         }
 
@@ -1746,5 +1751,19 @@ final class RouteTests: XCTestCase {
         calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
         let date = calendar.date(byAdding: .day, value: daysFromToday, to: calendar.startOfDay(for: Date()))!
         return formatter.string(from: date)
+    }
+
+    /// The next "yyyy-MM-dd" (today or later) that falls on the given
+    /// weekday name — used instead of a hardcoded date so a test comparing
+    /// against "upcoming" bookings can't rot into the past the way a fixed
+    /// literal date eventually does.
+    private func nextDate(forWeekday weekday: String) -> String {
+        for offset in 0...7 {
+            let candidate = dateString(daysFromToday: offset)
+            if EntertainmentStore.weekday(of: candidate) == weekday {
+                return candidate
+            }
+        }
+        fatalError("no matching weekday found within a week — should never happen")
     }
 }

@@ -2525,6 +2525,61 @@ fieldset legend {
   margin-top: 0.75rem;
 }
 
+/* ---- Visual punch card (rewards.html, "My Punch Card") ----
+   punch-card-bg.png is the card art (purple gradient, gold frame, Ohana
+   logo) with its lower half left deliberately clear — the 10 punch dots
+   below are a live HTML overlay, not baked into the image, since the
+   punch count is different for every guest and changes in real time. */
+.punch-card {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  aspect-ratio: 1200 / 756;
+  margin: 0.5rem 0 1rem;
+  border-radius: 18px;
+  background-image: url('/images/punch-card-bg.png');
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 14px 32px rgba(36, 27, 46, 0.28);
+}
+
+.punch-card-dots {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 54%;
+  bottom: 10%;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 6%;
+}
+
+.punch-dot {
+  border-radius: 50%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(0.7rem, 3.2vw, 1.3rem);
+  font-weight: 800;
+  font-family: var(--font-ui);
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.punch-dot.punched {
+  border-color: transparent;
+  background: var(--gold-bright);
+  color: var(--purple);
+  box-shadow: inset 0 2px 4px rgba(36, 27, 46, 0.35), 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.punch-card-reward-ready {
+  margin-top: 0.9rem;
+}
+
 /* ---- Analytics: collapsible summary-card grid + single-section detail view ---- */
 
 .analytics-page-toolbar {

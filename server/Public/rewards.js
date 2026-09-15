@@ -50,18 +50,35 @@ async function loadPunchCard() {
   }
 
   prefillPhoneFields(loyalty.linkedPhone);
-  if (loyalty.status) {
-    loyaltyCardSummary.innerHTML = `
-      <div class="loyalty-card-summary">
-        <span class="pill ${loyalty.status.rewardReady ? 'pill-approved' : ''}">${loyalty.status.punches} / ${loyalty.status.punchesNeeded} punches</span>
-        ${loyalty.status.bonusPoints > 0 ? `<span class="pill">+${loyalty.status.bonusPoints}/10 toward your next punch from shares</span>` : ''}
-        ${loyalty.status.rewardReady ? '<span class="pill pill-approved">Free roll ready — show this to your server!</span>' : ''}
-      </div>
-    `;
-  } else {
-    loyaltyCardSummary.innerHTML = `<p class="hint">Card linked to ${loyalty.linkedPhone} &mdash; no punches yet. Order sushi to start earning!</p>`;
-  }
+  renderPunchCard(loyalty.status);
   showLoyaltySection('card');
+}
+
+// A real punch card, not a number — punch-card-bg.png is the card art (10
+// dot slots left visually clear since the count is different per guest);
+// this just fills in however many of the 10 are actually earned. Capped at
+// 10 filled even if the server total is briefly higher (e.g. a reward
+// earned but not yet redeemed at the register) so the grid never overflows.
+function renderPunchCard(status) {
+  const punches = status ? Math.min(status.punches, 10) : 0;
+  const dots = Array.from({ length: 10 }, (_, i) => `<span class="punch-dot ${i < punches ? 'punched' : ''}">${i < punches ? '&#10003;' : ''}</span>`).join('');
+  const rewardReady = Boolean(status && status.rewardReady);
+  const bonusPoints = status ? status.bonusPoints : 0;
+
+  loyaltyCardSummary.innerHTML = `
+    <div class="punch-card">
+      <div class="punch-card-dots">${dots}</div>
+    </div>
+    ${
+      rewardReady
+        ? '<p class="punch-card-reward-ready"><span class="pill pill-approved">Free roll ready — show this to your server!</span></p>'
+        : bonusPoints > 0
+          ? `<p class="punch-card-reward-ready"><span class="pill">+${bonusPoints}/10 toward your next punch from shares</span></p>`
+          : !status
+            ? '<p class="hint" style="margin-top: 0.75rem;">No punches yet — order sushi to start earning!</p>'
+            : ''
+    }
+  `;
 }
 
 loyaltyPhoneForm.addEventListener('submit', async (event) => {
