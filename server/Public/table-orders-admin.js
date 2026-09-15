@@ -318,6 +318,56 @@ document.getElementById('staffing-form').addEventListener('submit', async (event
 
 document.getElementById('reload-table-orders-btn').addEventListener('click', loadTableOrders);
 
+// Admin-only, same bar as the loyalty redemption cap — this flips ordering
+// on/off site-wide, not a routine per-shift number like Staff On Duty above.
+const orderSystemPanelEl = document.getElementById('order-system-panel');
+
+async function loadOrderSystemPhase() {
+  try {
+    const response = await staffFetch('/api/order-system/phase');
+    if (!response.ok) return;
+    const config = await response.json();
+    document.getElementById('order-system-select').value = config.phase;
+  } catch {
+    // leave the select at its default
+  }
+}
+
+document.getElementById('order-system-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const statusEl = document.getElementById('order-system-status');
+  const phase = document.getElementById('order-system-select').value;
+  statusEl.textContent = 'Saving...';
+  statusEl.classList.remove('status-error', 'status-ok');
+  try {
+    const response = await staffFetch('/api/order-system/phase', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phase }),
+    });
+    if (!response.ok) throw new Error(`Failed (${response.status}).`);
+    statusEl.textContent = 'Updated!';
+    statusEl.classList.add('status-ok');
+  } catch (error) {
+    statusEl.textContent = error.message;
+    statusEl.classList.add('status-error');
+  }
+});
+
+(async () => {
+  try {
+    const response = await fetch('/api/auth/me');
+    if (!response.ok) return;
+    const user = await response.json();
+    if (user.role === 'admin') {
+      orderSystemPanelEl.hidden = false;
+      loadOrderSystemPhase();
+    }
+  } catch {
+    // Panel just stays hidden — the backend enforces the real boundary regardless.
+  }
+})();
+
 loadStaffing();
 loadFloorMap().then(loadTableOrders);
 setInterval(loadTableOrders, 15000);

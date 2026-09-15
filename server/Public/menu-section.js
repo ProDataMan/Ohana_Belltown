@@ -562,8 +562,11 @@ function renderMenu(data) {
   const priceView = getPriceViewFlag();
   // A signed-in customer can order without a table at all (pickup) — see
   // sendPendingOrder(). Everywhere below that gates ordering/price/extras
-  // on tableId also allows this.
-  const canOrder = Boolean(tableId) || customerLoggedIn;
+  // on tableId also allows this. The order system itself is also gated on
+  // orderSystemPhase — see checkOrderSystemPhase() — so during the
+  // menu-only/ready-to-order rollout phases nobody can order regardless of
+  // how they got here; prices still show off tableId alone (unaffected).
+  const canOrder = orderSystemPhase === 'fullOrdering' && (Boolean(tableId) || customerLoggedIn);
   const activeOrders = canOrder ? getActiveOrders() : {};
   const pendingCart = canOrder ? getPendingCart() : {};
 
@@ -827,8 +830,9 @@ async function openItemModal(index) {
   // A signed-in customer can order without a table (pickup) — see
   // sendPendingOrder(). Shown whenever the item has any add-ons/choice
   // groups, same as prices above — a scanned table, a logged-in customer,
-  // or a logged-in staff member previewing the menu.
-  const canOrder = Boolean(tableId) || customerLoggedIn;
+  // or a logged-in staff member previewing the menu. Also gated on
+  // orderSystemPhase, same reasoning as the main list render above.
+  const canOrder = orderSystemPhase === 'fullOrdering' && (Boolean(tableId) || customerLoggedIn);
   const canSeeExtras = canOrder || staffLoggedIn;
 
   const modifiersEl = modal.querySelector('.item-modal-modifiers');
@@ -1211,9 +1215,26 @@ async function checkCustomerLoggedIn() {
   }
 }
 
+// Which of the 3 rollout phases table ordering is currently in — see
+// OrderSystemSettings.swift. Defaults (and fails back) to 'menuOnly', the
+// safe/paused state, so a failed fetch never accidentally exposes ordering
+// UI that's supposed to be off. Resolved before the first renderMenu() call,
+// same reasoning as customerLoggedIn above.
+let orderSystemPhase = 'menuOnly';
+async function checkOrderSystemPhase() {
+  try {
+    const response = await fetch('/api/order-system/phase');
+    if (!response.ok) return;
+    const { phase } = await response.json();
+    orderSystemPhase = phase;
+  } catch {
+    // Stays at the safe default.
+  }
+}
+
 async function loadMenu() {
   try {
-    const [response] = await Promise.all([fetch('/api/menu'), checkCustomerLoggedIn()]);
+    const [response] = await Promise.all([fetch('/api/menu'), checkCustomerLoggedIn(), checkOrderSystemPhase()]);
     if (!response.ok) {
       throw new Error('Unable to load the menu data.');
     }

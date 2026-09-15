@@ -138,7 +138,7 @@
     <section class="content-section">
       <div class="panel">
         <h2>Submit a Bonus Punch</h2>
-        <p class="hint">Share a photo of your dish, or tag @ohanabelltown on Instagram or Facebook, then tell us about it here. Our staff reviews every submission — each approved share is worth 1/10 of a punch (10 add up to a full punch), and only your first 2 per visit count toward it.</p>
+        <p class="hint">Share a photo of your dish, tag @ohanabelltown on Instagram or Facebook, or upload a receipt from today's visit — our staff reviews every submission. A photo/social share is worth 1/10 of a punch (10 add up to a full punch, first 2 per visit count); an approved receipt is worth a full punch on its own (one per day).</p>
         <form id="bonus-form">
           <label>Your phone number
             <input type="tel" id="bonus-phone-input" required />
@@ -148,6 +148,7 @@
             <legend>What are you sharing?</legend>
             <label><input type="radio" name="bonus-type" value="photo" checked /> A photo of my dish</label>
             <label><input type="radio" name="bonus-type" value="social" /> A social media tag</label>
+            <label><input type="radio" name="bonus-type" value="receipt" /> A receipt from today</label>
           </fieldset>
 
           <label id="bonus-menu-item-label">Which dish is this? <span class="hint" id="bonus-menu-item-hint">(required for a photo)</span>
@@ -158,6 +159,7 @@
           <label id="bonus-photo-label">Choose a photo
             <input type="file" id="bonus-photo-input" accept="image/*" />
           </label>
+          <p class="hint" id="bonus-receipt-hint" hidden>Make sure today's date is clearly visible on the receipt &mdash; staff will check it before approving.</p>
 
           <label id="bonus-social-label" hidden>Link to your post (or your @handle)
             <input type="text" id="bonus-social-input" placeholder="https://instagram.com/p/... or @yourhandle" />

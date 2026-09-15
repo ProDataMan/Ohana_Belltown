@@ -34,6 +34,7 @@ func configure(_ app: Application) throws {
     WaitlistStore.shared.configure(dataDirectory: dataDirectory)
     TableOrdersStore.shared.configure(dataDirectory: dataDirectory)
     StaffingStore.shared.configure(dataDirectory: dataDirectory)
+    OrderSystemStore.shared.configure(dataDirectory: dataDirectory)
     FeedbackStore.shared.configure(dataDirectory: dataDirectory)
     StaffRewardsStore.shared.configure(dataDirectory: dataDirectory)
     CompetitorPricingStore.shared.configure(dataDirectory: dataDirectory)

@@ -54,6 +54,24 @@
         <div class="floor-map-canvas" id="floor-map-canvas"></div>
       </section>
 
+      <section class="panel" id="order-system-panel" hidden>
+        <div class="editor-toolbar">
+          <h2>Table Ordering Rollout</h2>
+        </div>
+        <p class="hint">Phased rollout so guests and staff can get used to QR scanning before the full order system goes live. Every table's QR code always carries its table number along regardless of phase &mdash; only what the menu page does with it changes. Admin-only, since this turns ordering on/off site-wide.</p>
+        <form id="order-system-form" class="cta-row">
+          <label>Current phase
+            <select id="order-system-select">
+              <option value="menuOnly">1. Menu with prices only (no ordering)</option>
+              <option value="readyToOrder" disabled>2. Menu with prices + "Ready to Order" alert (not built yet)</option>
+              <option value="fullOrdering">3. Full item-by-item ordering (original system)</option>
+            </select>
+          </label>
+          <button type="submit">Save</button>
+          <p id="order-system-status" class="status"></p>
+        </form>
+      </section>
+
       <section class="panel">
         <div class="editor-toolbar">
           <h2>Staff On Duty</h2>

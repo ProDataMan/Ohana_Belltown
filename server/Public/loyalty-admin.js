@@ -152,13 +152,15 @@ async function loadBonusRequests() {
                 <td>${escapeHtmlLoyalty(r.phone)}</td>
                 <td>${escapeHtmlLoyalty(r.type)}</td>
                 <td>${r.menuItemName ? escapeHtmlLoyalty(r.menuItemName) : '<span class="hint">&mdash;</span>'}</td>
-                <td>${r.type === 'photo'
-                  ? `<a href="${escapeHtmlLoyalty(r.content)}" target="_blank" rel="noopener">View photo</a>`
+                <td>${r.type === 'photo' || r.type === 'receipt'
+                  ? `<a href="${escapeHtmlLoyalty(r.content)}" target="_blank" rel="noopener">${r.type === 'receipt' ? 'View receipt' : 'View photo'}</a>`
                   : escapeHtmlLoyalty(r.content)}</td>
                 <td>${escapeHtmlLoyalty(r.note || '')}</td>
                 <td><span class="pill ${r.status === 'approved' ? 'pill-approved' : r.status === 'denied' ? 'pill-denied' : ''}">${r.status}</span></td>
                 <td>${r.status === 'approved'
-                  ? (r.pointsAwarded > 0 ? '+1/10' : '<span class="hint">0 (daily cap)</span>')
+                  ? (r.pointsAwarded > 0
+                      ? (r.type === 'receipt' ? '+1 punch' : '+1/10')
+                      : '<span class="hint">0 (daily cap)</span>')
                   : ''}</td>
                 <td>
                   ${r.status === 'pending'

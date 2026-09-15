@@ -27,6 +27,7 @@ final class RouteTests: XCTestCase {
         WaitlistStore.shared.configure(dataDirectory: tempDir.path)
         TableOrdersStore.shared.configure(dataDirectory: tempDir.path)
         StaffingStore.shared.configure(dataDirectory: tempDir.path)
+        OrderSystemStore.shared.configure(dataDirectory: tempDir.path)
         FeedbackStore.shared.configure(dataDirectory: tempDir.path)
         StaffRewardsStore.shared.configure(dataDirectory: tempDir.path)
         CompetitorPricingStore.shared.configure(dataDirectory: tempDir.path)
@@ -1756,6 +1757,92 @@ final class RouteTests: XCTestCase {
         let socialWithoutItem = ByteBuffer(string: #"{"phone":"2065550100","type":"social","content":"@someone"}"#)
         try app.test(.POST, "api/loyalty/bonus-request", headers: ["Content-Type": "application/json"], body: socialWithoutItem) { res in
             XCTAssertEqual(res.status, .ok, "a social tag isn't always about one specific dish, so it should stay optional")
+        }
+    }
+
+    // Receipt claims exist specifically so a customer can earn a punch
+    // without the table-order system being live (see the order-system-phase
+    // tests below) — needs no menu item, and an approved one is worth a
+    // full punch rather than the 1/10 a photo/social share earns.
+    func testReceiptClaimNeedsNoMenuItemAndAwardsAFullPunchOnApproval() throws {
+        let receiptBody = ByteBuffer(string: #"{"phone":"2065550200","type":"receipt","content":"/uploads/receipt.jpg"}"#)
+        var requestId: String?
+        try app.test(.POST, "api/loyalty/bonus-request", headers: ["Content-Type": "application/json"], body: receiptBody) { res in
+            XCTAssertEqual(res.status, .ok, "a receipt claim shouldn't need a menu item")
+            let request = try res.content.decode(BonusRequest.self)
+            XCTAssertNil(request.menuItemId)
+            requestId = request.id
+        }
+        guard let id = requestId else { return XCTFail("expected a created bonus request") }
+
+        var adminCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                adminCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let admin = adminCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        try app.test(.POST, "api/loyalty/bonus-requests/\(id)/review", headers: ["Content-Type": "application/json", "Cookie": admin],
+                      body: ByteBuffer(string: #"{"approve":true}"#)) { res in
+            XCTAssertEqual(res.status, .ok)
+            let reviewed = try res.content.decode(BonusRequest.self)
+            XCTAssertEqual(reviewed.pointsAwarded, 10)
+        }
+
+        try app.test(.POST, "api/loyalty/lookup", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"phone":"2065550200"}"#)) { res in
+            let status = try res.content.decode(LoyaltyStatus.self)
+            XCTAssertEqual(status.punches, 1)
+        }
+    }
+
+    // The order-system phase decides whether the menu page's ordering UI is
+    // live at all (see OrderSystemSettings.swift + menu-section.js) —
+    // reading it is public, but flipping it is a whole-site rollout
+    // decision, so it gets the same admin-only bar as the redemption cap.
+    func testOrderSystemPhaseIsPublicToReadButAdminOnlyToChange() throws {
+        try app.test(.GET, "api/order-system/phase") { res in
+            XCTAssertEqual(res.status, .ok)
+            let config = try res.content.decode(OrderSystemConfig.self)
+            XCTAssertEqual(config.phase, .menuOnly, "should default to paused/menu-only until an admin turns ordering back on")
+        }
+
+        var adminCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                adminCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let admin = adminCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        let createBody = ByteBuffer(string: #"{"username":"employee1","displayName":"Employee","password":"employeepass","role":"employee"}"#)
+        try app.test(.POST, "api/users", headers: ["Content-Type": "application/json", "Cookie": admin], body: createBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+        var employeeCookie: String?
+        try app.test(.POST, "api/auth/login", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"employee1","password":"employeepass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                employeeCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let employee = employeeCookie else { return XCTFail("expected a session cookie from login") }
+
+        let phaseBody = ByteBuffer(string: #"{"phase":"fullOrdering"}"#)
+        try app.test(.PUT, "api/order-system/phase", headers: ["Content-Type": "application/json", "Cookie": employee], body: phaseBody) { res in
+            XCTAssertEqual(res.status, .forbidden, "a plain employee shouldn't be able to flip ordering on site-wide")
+        }
+        try app.test(.PUT, "api/order-system/phase", headers: ["Content-Type": "application/json", "Cookie": admin], body: phaseBody) { res in
+            XCTAssertEqual(res.status, .ok)
+            let updated = try res.content.decode(OrderSystemConfig.self)
+            XCTAssertEqual(updated.phase, .fullOrdering)
+        }
+        try app.test(.GET, "api/order-system/phase") { res in
+            let current = try res.content.decode(OrderSystemConfig.self)
+            XCTAssertEqual(current.phase, .fullOrdering)
         }
     }
 

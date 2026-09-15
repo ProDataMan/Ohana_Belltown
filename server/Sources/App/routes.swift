@@ -815,8 +815,8 @@ func routes(_ app: Application) throws {
 
     app.post("api", "loyalty", "bonus-request") { req throws -> BonusRequest in
         let body = try req.content.decode(BonusClaimRequest.self)
-        guard ["photo", "social"].contains(body.type) else {
-            throw Abort(.badRequest, reason: "type must be 'photo' or 'social'")
+        guard ["photo", "social", "receipt"].contains(body.type) else {
+            throw Abort(.badRequest, reason: "type must be 'photo', 'social', or 'receipt'")
         }
         // A photo needs a dish to land in once approved; a social tag isn't
         // always about one specific dish, so it's optional there.
@@ -1037,6 +1037,20 @@ func routes(_ app: Application) throws {
         try requireStaffAccess(req)
         let body = try req.content.decode(StaffingConfig.self)
         return try StaffingStore.shared.setStaffOnDuty(body.staffOnDuty)
+    }
+
+    // Public — menu-section.js reads this before its first render to decide
+    // whether ordering UI belongs on the page at all (see OrderSystemSettings.swift).
+    app.get("api", "order-system", "phase") { req throws -> OrderSystemConfig in
+        try OrderSystemStore.shared.get()
+    }
+
+    // Admin-only — this is a whole-site rollout decision, not a routine
+    // staffing number, so it gets the same bar as the loyalty redemption cap.
+    app.put("api", "order-system", "phase") { req throws -> OrderSystemConfig in
+        try requireAdmin(req)
+        let body = try req.content.decode(OrderSystemConfig.self)
+        return try OrderSystemStore.shared.setPhase(body.phase)
     }
 
     // Feedback: a widget on every public page lets a guest leave feedback on

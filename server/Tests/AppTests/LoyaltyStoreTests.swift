@@ -146,6 +146,42 @@ final class LoyaltyStoreTests: XCTestCase {
         XCTAssertEqual(status.bonusPoints, 2, "only the first 2 claims that day should have counted")
     }
 
+    func testApprovedReceiptClaimAddsAFullPunchNotATenth() throws {
+        let request = try LoyaltyStore.shared.submitBonusRequest(
+            phone: "2065551234", type: "receipt", content: "/uploads/receipt.jpg", note: nil
+        )
+        let reviewed = try LoyaltyStore.shared.reviewBonusRequest(id: request.id, approve: true)
+        XCTAssertEqual(reviewed.status, "approved")
+        XCTAssertEqual(reviewed.pointsAwarded, 10, "an approved receipt should be worth a full punch, not 1/10")
+
+        let status = try LoyaltyStore.shared.lookup(phone: "2065551234")
+        XCTAssertEqual(status.punches, 1)
+        XCTAssertEqual(status.bonusPoints, 0, "a receipt punch shouldn't touch the separate bonus-points ladder")
+    }
+
+    func testOnlyOneReceiptClaimPerDayEarnsAPunch() throws {
+        let phone = "2065551234"
+        let first = try LoyaltyStore.shared.submitBonusRequest(phone: phone, type: "receipt", content: "/uploads/r1.jpg", note: nil)
+        let second = try LoyaltyStore.shared.submitBonusRequest(phone: phone, type: "receipt", content: "/uploads/r2.jpg", note: nil)
+
+        let reviewedFirst = try LoyaltyStore.shared.reviewBonusRequest(id: first.id, approve: true)
+        let reviewedSecond = try LoyaltyStore.shared.reviewBonusRequest(id: second.id, approve: true)
+        XCTAssertEqual(reviewedFirst.pointsAwarded, 10)
+        XCTAssertEqual(reviewedSecond.pointsAwarded, 0, "a second receipt approved the same day shouldn't earn another punch")
+
+        let status = try LoyaltyStore.shared.lookup(phone: phone)
+        XCTAssertEqual(status.punches, 1)
+    }
+
+    func testReceiptClaimDoesNotRequireAMenuItem() throws {
+        let request = try LoyaltyStore.shared.submitBonusRequest(
+            phone: "2065551234", type: "receipt", content: "/uploads/receipt.jpg", note: nil,
+            menuItemId: nil, menuItemName: nil
+        )
+        XCTAssertNil(request.menuItemId)
+        XCTAssertEqual(request.status, "pending")
+    }
+
     func testDeniedBonusRequestDoesNotAddPunch() throws {
         let request = try LoyaltyStore.shared.submitBonusRequest(
             phone: "2065559999", type: "social", content: "@someone", note: nil

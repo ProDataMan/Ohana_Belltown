@@ -157,14 +157,21 @@ document.getElementById('referral-form').addEventListener('submit', async (event
 const typeRadios = document.querySelectorAll('input[name="bonus-type"]');
 const photoLabel = document.getElementById('bonus-photo-label');
 const socialLabel = document.getElementById('bonus-social-label');
+const menuItemLabel = document.getElementById('bonus-menu-item-label');
 const menuItemHint = document.getElementById('bonus-menu-item-hint');
+const receiptHint = document.getElementById('bonus-receipt-hint');
 
+// A receipt claim reuses the same photo-upload field as a dish photo (it's
+// still just "upload one picture"), but skips the dish picker entirely —
+// a receipt isn't about one specific item — and shows its own hint instead.
 typeRadios.forEach((radio) => {
   radio.addEventListener('change', () => {
-    const isPhoto = document.querySelector('input[name="bonus-type"]:checked').value === 'photo';
-    photoLabel.hidden = !isPhoto;
-    socialLabel.hidden = isPhoto;
-    menuItemHint.textContent = isPhoto ? '(required for a photo)' : '(optional)';
+    const type = document.querySelector('input[name="bonus-type"]:checked').value;
+    photoLabel.hidden = type === 'social';
+    socialLabel.hidden = type !== 'social';
+    menuItemLabel.hidden = type === 'receipt';
+    menuItemHint.textContent = type === 'photo' ? '(required for a photo)' : '(optional)';
+    receiptHint.hidden = type !== 'receipt';
   });
 });
 
@@ -235,9 +242,9 @@ document.getElementById('bonus-form').addEventListener('submit', async (event) =
   setRewardsStatus(statusEl, 'Submitting...', false);
   try {
     let content;
-    if (type === 'photo') {
+    if (type === 'photo' || type === 'receipt') {
       const file = document.getElementById('bonus-photo-input').files[0];
-      if (!file) return setRewardsStatus(statusEl, 'Choose a photo to share.', true);
+      if (!file) return setRewardsStatus(statusEl, type === 'receipt' ? 'Choose a photo of your receipt.' : 'Choose a photo to share.', true);
       const formData = new FormData();
       formData.append('image', file);
       const uploadResponse = await fetch('/api/upload', { method: 'POST', body: formData });
@@ -260,8 +267,8 @@ document.getElementById('bonus-form').addEventListener('submit', async (event) =
         type,
         content,
         note,
-        menuItemId: menuItem ? menuItem.id : null,
-        menuItemName: menuItem ? menuItem.name : null,
+        menuItemId: type === 'photo' && menuItem ? menuItem.id : null,
+        menuItemName: type === 'photo' && menuItem ? menuItem.name : null,
       }),
     });
     if (!response.ok) {
@@ -272,13 +279,17 @@ document.getElementById('bonus-form').addEventListener('submit', async (event) =
       statusEl,
       type === 'photo'
         ? "Thanks! Once approved, your photo joins that dish's gallery — approved shares are worth 1/10 of a punch, up to 2 per visit."
-        : "Thanks! We'll review it soon — approved shares are worth 1/10 of a punch, up to 2 per visit.",
+        : type === 'receipt'
+          ? "Thanks! We'll review it soon — an approved receipt is worth a full punch (one per day)."
+          : "Thanks! We'll review it soon — approved shares are worth 1/10 of a punch, up to 2 per visit.",
       false
     );
     event.target.reset();
     photoLabel.hidden = false;
     socialLabel.hidden = true;
+    menuItemLabel.hidden = false;
     menuItemHint.textContent = '(required for a photo)';
+    receiptHint.hidden = true;
   } catch (error) {
     setRewardsStatus(statusEl, error.message, true);
   }

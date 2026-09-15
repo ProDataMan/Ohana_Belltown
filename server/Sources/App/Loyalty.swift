@@ -69,8 +69,11 @@ struct BonusRequest: Codable, Content {
     var status: String
     var createdAt: String
     var reviewedAt: String?
-    /// Tenths of a punch this specific claim actually earned (0 or 1) —
-    /// 0 once the daily cap on rewarded claims has already been hit that day.
+    /// Tenths of a punch this specific claim actually earned — 0 or 1 for a
+    /// "photo"/"social" claim (0 once the 2-per-day cap on rewarded claims
+    /// has already been hit that day), or the full bonusPointsPerPunch (a
+    /// whole punch) for an approved "receipt" claim, 0 if one was already
+    /// awarded that same day.
     var pointsAwarded: Int
     /// Which dish this is about — required for a "photo" claim (so the
     /// photo has somewhere to go once approved), optional for "social"
@@ -480,22 +483,45 @@ final class LoyaltyStore: @unchecked Sendable {
         if approve {
             let phone = data.bonusRequests[idx].phone
             let visitDay = Self.dayKey(fromISO8601: data.bonusRequests[idx].createdAt)
-            let alreadyAwardedToday = data.bonusRequests.filter { other in
-                other.id != id && other.phone == phone && other.pointsAwarded > 0
-                    && Self.dayKey(fromISO8601: other.createdAt) == visitDay
-            }.count
 
-            if alreadyAwardedToday < Self.maxAwardedBonusClaimsPerDay {
-                data.bonusRequests[idx].pointsAwarded = 1
-                let customerIdx = findOrCreateCustomerIndex(phone: phone)
-                data.customers[customerIdx].bonusPoints += 1
-                if data.customers[customerIdx].bonusPoints >= Self.bonusPointsPerPunch {
-                    data.customers[customerIdx].punches += data.customers[customerIdx].bonusPoints / Self.bonusPointsPerPunch
-                    data.customers[customerIdx].bonusPoints %= Self.bonusPointsPerPunch
+            if data.bonusRequests[idx].type == "receipt" {
+                // A receipt is evidence of a real purchase, not just
+                // engagement, so it's worth a full punch — but still capped
+                // at one per day (by the day the receipt/visit happened, not
+                // the day staff got around to reviewing it) so the same
+                // day's receipt can't be split into multiple claims.
+                let alreadyAwardedToday = data.bonusRequests.contains { other in
+                    other.id != id && other.type == "receipt" && other.phone == phone && other.pointsAwarded > 0
+                        && Self.dayKey(fromISO8601: other.createdAt) == visitDay
                 }
-                data.customers[customerIdx].updatedAt = now()
+                if alreadyAwardedToday {
+                    data.bonusRequests[idx].pointsAwarded = 0
+                } else {
+                    data.bonusRequests[idx].pointsAwarded = Self.bonusPointsPerPunch
+                    let customerIdx = findOrCreateCustomerIndex(phone: phone)
+                    let wasFirstPunch = data.customers[customerIdx].punches == 0
+                    data.customers[customerIdx].punches += 1
+                    data.customers[customerIdx].updatedAt = now()
+                    if wasFirstPunch { awardReferralBonusIfNeeded(customerIdx: customerIdx) }
+                }
             } else {
-                data.bonusRequests[idx].pointsAwarded = 0
+                let alreadyAwardedToday = data.bonusRequests.filter { other in
+                    other.id != id && other.phone == phone && other.pointsAwarded > 0
+                        && Self.dayKey(fromISO8601: other.createdAt) == visitDay
+                }.count
+
+                if alreadyAwardedToday < Self.maxAwardedBonusClaimsPerDay {
+                    data.bonusRequests[idx].pointsAwarded = 1
+                    let customerIdx = findOrCreateCustomerIndex(phone: phone)
+                    data.customers[customerIdx].bonusPoints += 1
+                    if data.customers[customerIdx].bonusPoints >= Self.bonusPointsPerPunch {
+                        data.customers[customerIdx].punches += data.customers[customerIdx].bonusPoints / Self.bonusPointsPerPunch
+                        data.customers[customerIdx].bonusPoints %= Self.bonusPointsPerPunch
+                    }
+                    data.customers[customerIdx].updatedAt = now()
+                } else {
+                    data.bonusRequests[idx].pointsAwarded = 0
+                }
             }
 
             // Publish the photo into the dish's own gallery, if the customer
