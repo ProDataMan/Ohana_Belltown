@@ -2580,6 +2580,37 @@ fieldset legend {
   margin-top: 0.9rem;
 }
 
+/* ---- Loyalty admin: program-at-a-glance stat tiles ---- */
+.loyalty-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.9rem;
+  margin-top: 0.75rem;
+}
+
+.loyalty-stat-tile {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 1rem 0.9rem;
+  text-align: center;
+}
+
+.loyalty-stat-tile .stat-number {
+  display: block;
+  font-size: 1.7rem;
+  font-weight: 800;
+  font-family: var(--font-ui);
+  color: var(--purple);
+}
+
+.loyalty-stat-tile .stat-label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+
 /* ---- Analytics: collapsible summary-card grid + single-section detail view ---- */
 
 .analytics-page-toolbar {

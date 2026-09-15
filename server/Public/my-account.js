@@ -73,17 +73,7 @@ async function loadLoyalty() {
       return;
     }
     phoneInput.value = data.linkedPhone;
-    if (data.status) {
-      el.innerHTML = `
-        <div class="loyalty-card-summary">
-          <span class="pill pill-approved">${data.status.punches} / ${data.status.punchesNeeded} punches</span>
-          ${data.status.rewardReady ? '<span class="pill pill-approved">Reward ready!</span>' : ''}
-          <span class="pill">${data.status.totalRedeemed} redeemed all-time</span>
-        </div>
-      `;
-    } else {
-      el.textContent = `Linked to ${data.linkedPhone} — no punches yet.`;
-    }
+    renderPunchCardInto(el, data.status);
   } catch (error) {
     el.textContent = error.message;
   }

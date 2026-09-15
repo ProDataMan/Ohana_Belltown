@@ -22,20 +22,65 @@ function showLoyaltySection(section) {
   loyaltyCardDisplayEl.hidden = section !== 'card';
 }
 
-// Once we know the guest's linked phone, prefill it into the referral/bonus
-// forms below so a logged-in guest doesn't have to type it a second time —
-// those forms still work standalone for anyone not logged in.
+// Once we know the guest's linked phone, prefill it into the bonus-punch
+// form below so a logged-in guest doesn't have to type it a second time —
+// that form still works standalone for anyone not logged in. The referral
+// form is handled separately (see showReferralSection below) since it only
+// works for a phone that's never punched before — pre-filling an existing
+// customer's own number into it would just guarantee a rejection.
 function prefillPhoneFields(phone) {
-  const referralPhoneInput = document.getElementById('referral-phone-input');
   const bonusPhoneInput = document.getElementById('bonus-phone-input');
-  if (referralPhoneInput && !referralPhoneInput.value) referralPhoneInput.value = phone;
   if (bonusPhoneInput && !bonusPhoneInput.value) bonusPhoneInput.value = phone;
 }
+
+const referralExistingCardEl = document.getElementById('referral-existing-card');
+const referralNewCustomerEl = document.getElementById('referral-new-customer');
+const referralShareLinkInput = document.getElementById('referral-share-link');
+
+// A customer who already has a card (linked phone) can't use the "Refer a
+// Friend" form for themselves — LoyaltyStore.setReferrer only accepts a
+// phone that's never punched before, so submitting their own number always
+// fails. Swap the form for a shareable link instead, which pre-fills
+// "Referred by" for whoever actually is new (see the ?ref= handling below).
+function showReferralSection(linkedPhone) {
+  if (linkedPhone) {
+    referralNewCustomerEl.hidden = true;
+    referralExistingCardEl.hidden = false;
+    const url = new URL('/rewards', window.location.origin);
+    url.searchParams.set('ref', linkedPhone);
+    referralShareLinkInput.value = url.toString();
+  } else {
+    referralExistingCardEl.hidden = true;
+    referralNewCustomerEl.hidden = false;
+  }
+}
+
+// A friend arriving via a shared referral link (?ref=<phone>) shouldn't have
+// to know or type the referrer's number — works regardless of whether this
+// visitor ends up logging in, since the referral form itself doesn't
+// require it.
+const refParam = new URLSearchParams(window.location.search).get('ref');
+if (refParam) {
+  const referrerInput = document.getElementById('referral-referrer-input');
+  if (referrerInput) referrerInput.value = refParam;
+}
+
+document.getElementById('copy-referral-link-btn').addEventListener('click', async () => {
+  const statusEl = document.getElementById('referral-copy-status');
+  try {
+    await navigator.clipboard.writeText(referralShareLinkInput.value);
+    setRewardsStatus(statusEl, 'Copied!', false);
+  } catch {
+    referralShareLinkInput.select();
+    setRewardsStatus(statusEl, 'Select and copy the link above.', false);
+  }
+});
 
 async function loadPunchCard() {
   const meResponse = await fetch('/api/customer/me');
   if (meResponse.status === 401) {
     showLoyaltySection('logged-out');
+    showReferralSection(null);
     return;
   }
   if (!meResponse.ok) return;
@@ -46,39 +91,14 @@ async function loadPunchCard() {
 
   if (!loyalty.linkedPhone) {
     showLoyaltySection('link-phone');
+    showReferralSection(null);
     return;
   }
 
   prefillPhoneFields(loyalty.linkedPhone);
-  renderPunchCard(loyalty.status);
+  renderPunchCardInto(loyaltyCardSummary, loyalty.status);
   showLoyaltySection('card');
-}
-
-// A real punch card, not a number — punch-card-bg.png is the card art (10
-// dot slots left visually clear since the count is different per guest);
-// this just fills in however many of the 10 are actually earned. Capped at
-// 10 filled even if the server total is briefly higher (e.g. a reward
-// earned but not yet redeemed at the register) so the grid never overflows.
-function renderPunchCard(status) {
-  const punches = status ? Math.min(status.punches, 10) : 0;
-  const dots = Array.from({ length: 10 }, (_, i) => `<span class="punch-dot ${i < punches ? 'punched' : ''}">${i < punches ? '&#10003;' : ''}</span>`).join('');
-  const rewardReady = Boolean(status && status.rewardReady);
-  const bonusPoints = status ? status.bonusPoints : 0;
-
-  loyaltyCardSummary.innerHTML = `
-    <div class="punch-card">
-      <div class="punch-card-dots">${dots}</div>
-    </div>
-    ${
-      rewardReady
-        ? '<p class="punch-card-reward-ready"><span class="pill pill-approved">Free roll ready — show this to your server!</span></p>'
-        : bonusPoints > 0
-          ? `<p class="punch-card-reward-ready"><span class="pill">+${bonusPoints}/10 toward your next punch from shares</span></p>`
-          : !status
-            ? '<p class="hint" style="margin-top: 0.75rem;">No punches yet — order sushi to start earning!</p>'
-            : ''
-    }
-  `;
+  showReferralSection(loyalty.linkedPhone);
 }
 
 loyaltyPhoneForm.addEventListener('submit', async (event) => {

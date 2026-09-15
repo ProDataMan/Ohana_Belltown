@@ -253,6 +253,52 @@ async function loadBirthdays() {
 
 document.getElementById('reload-birthdays-btn').addEventListener('click', loadBirthdays);
 
+// Program-at-a-glance stats, computed entirely from the two lists the page
+// already loads elsewhere (customers + bonus requests) — no new backend
+// endpoint. There's no per-punch event log (LoyaltyCustomer only stores a
+// running total), so this deliberately sticks to numbers that really are
+// derivable from what's stored: lifetime/point-in-time counts, not "punches
+// given out this week" which nothing here can actually answer yet.
+const statsGridEl = document.getElementById('loyalty-stats-grid');
+
+function daysAgo(isoString) {
+  return (Date.now() - new Date(isoString).getTime()) / (1000 * 60 * 60 * 24);
+}
+
+async function loadStats() {
+  statsGridEl.innerHTML = '<p class="hint">Loading...</p>';
+  try {
+    const [customersRes, bonusRes] = await Promise.all([
+      staffFetch('/api/loyalty/customers'),
+      staffFetch('/api/loyalty/bonus-requests'),
+    ]);
+    if (!customersRes.ok || !bonusRes.ok) throw new Error('Unable to load stats.');
+    const customers = await customersRes.json();
+    const bonusRequests = await bonusRes.json();
+    const currentYear = new Date().getFullYear();
+
+    const stats = [
+      { number: customers.length, label: 'Total cards' },
+      { number: customers.filter((c) => c.punches >= 10).length, label: 'Rewards ready now' },
+      { number: customers.reduce((sum, c) => sum + c.totalRedeemed, 0), label: 'Free rolls redeemed (lifetime)' },
+      { number: customers.filter((c) => daysAgo(c.updatedAt) <= 30).length, label: 'Active in last 30 days' },
+      { number: customers.filter((c) => c.referralBonusPaid).length, label: 'Referral bonuses paid' },
+      { number: customers.filter((c) => c.lastBirthdayBonusYear === currentYear).length, label: `Birthday bonuses paid (${currentYear})` },
+      { number: bonusRequests.filter((r) => r.status === 'approved').length, label: 'Photo/social shares approved' },
+      { number: bonusRequests.filter((r) => r.status === 'pending').length, label: 'Shares awaiting review' },
+    ];
+
+    statsGridEl.innerHTML = stats
+      .map((s) => `<div class="loyalty-stat-tile"><span class="stat-number">${s.number}</span><span class="stat-label">${s.label}</span></div>`)
+      .join('');
+  } catch (error) {
+    statsGridEl.innerHTML = `<p class="status status-error">${escapeHtmlLoyalty(error.message)}</p>`;
+  }
+}
+
+document.getElementById('reload-stats-btn').addEventListener('click', loadStats);
+
+loadStats();
 loadBonusRequests();
 loadCustomers();
 loadBirthdays();

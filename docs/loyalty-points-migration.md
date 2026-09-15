@@ -25,8 +25,18 @@ not invent a new one.
 - `bonusPoints: Int` — **tenths of a punch**, 0–9, from approved photo/social
   bonus claims; rolls over into a real punch at 10
 - `totalRedeemed: Int` — lifetime free-roll count
+- `referredByPhone`/`referralBonusPaid` — who referred this card, and
+  whether that referrer has already been paid their bonus punch (pays out
+  once, at the referred customer's first real punch)
+- `lastAutoPunchDay` — caps the automatic per-sushi-order punch at once/day
+- `lastBirthdayBonusYear` — caps the birthday bonus at once/year
 
 `LoyaltyStore.punchesNeeded = 10` is the only redemption rule that exists.
+A punch card is display-only as a `.punch-card` image + 10-dot overlay on
+`/rewards` and `/my-account.html` (`punch-card.js`, shared between both) —
+worth keeping in mind for a points redesign, since "10 filled dots" doesn't
+generalize cleanly to an arbitrary points balance the way a plain number
+would.
 
 ## A clean conversion falls out of the current data
 
@@ -78,8 +88,8 @@ admin can edit from a new `/loyalty-admin.html` panel, not hardcoded:
 | Sushi order (today's 1 punch) | 10 | anchor value, keeps the 100-point free roll identical to today |
 | Approved photo/social share | 1 | unchanged from today's bonusPoints |
 | Dine-in vs. to-go | +? | not tracked today — would need a new field on the order/visit if this distinction matters |
-| Referral / first visit bonus | ? | doesn't exist today |
-| Birthday Club month bonus | ? | `my-account.html` already has the birthday field; currently unused for rewards |
+| Referral bonus | 10 | **shipped 2026-09-08**, not hypothetical — `LoyaltyStore.setReferrer`/`awardReferralBonusIfNeeded` already pay a full bonus punch (10 points equivalent) to the referrer at the referred customer's first real punch. A points model just needs to keep paying the same amount, not invent the mechanic. |
+| Birthday Club bonus | 10 | **shipped 2026-09-08**, not hypothetical — a daily sweep (`LoyaltyBirthdayBonus.swift`) already pays a bonus punch on a customer's birthday if they've linked a rewards phone. Same note as referral: preserve the existing payout, don't redesign it. |
 
 ## Redemption catalog
 
@@ -127,8 +137,7 @@ distinct feature (real checkout/payment) and out of scope for this doc.
 
 - Does existing progress (current punches/bonusPoints) get honored 1:1 via
   the conversion above (recommended), or reset with an announcement?
-- Do dine-in vs. to-go, referrals, or birthday-month bonuses actually need
-  new point categories, or is "1 order = 10 points" still the whole rule?
+- Referral and birthday bonuses are shipped (see table above) and already pay a flat 1 punch each — the only open part of this question now is dine-in vs. to-go, which still isn't tracked anywhere.
 - Swag: real point cost, and how staff mark one redeemed/out of stock (the
   current staff-rewards catalog has no inventory concept at all — redeeming
   a T-shirt 50 times doesn't run out of T-shirts today, which may not be
