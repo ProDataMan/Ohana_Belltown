@@ -35,6 +35,7 @@ final class RouteTests: XCTestCase {
         SwagOrdersStore.shared.configure(dataDirectory: tempDir.path)
         GiftCardOrdersStore.shared.configure(dataDirectory: tempDir.path)
         EntertainmentStore.shared.configure(dataDirectory: tempDir.path)
+        MenuItemEngagementStore.shared.configure(dataDirectory: tempDir.path)
     }
 
     override func tearDown() async throws {
@@ -1244,6 +1245,98 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    // The redemption cap protects program economics, so reading it is
+    // public (rewards.js states it in its own copy) but changing it is
+    // admin-only — a plain employee shouldn't be able to raise the ceiling
+    // on what a free roll can cost.
+    func testRedemptionCapIsPublicToReadButAdminOnlyToChange() throws {
+        try app.test(.GET, "api/loyalty/redemption-cap") { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+
+        var adminCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                adminCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let admin = adminCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        let createBody = ByteBuffer(string: #"{"username":"employee1","displayName":"Employee","password":"employeepass","role":"employee"}"#)
+        try app.test(.POST, "api/users", headers: ["Content-Type": "application/json", "Cookie": admin], body: createBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+        var employeeCookie: String?
+        try app.test(.POST, "api/auth/login", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"employee1","password":"employeepass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                employeeCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let employee = employeeCookie else { return XCTFail("expected a session cookie from login") }
+
+        let capBody = ByteBuffer(string: #"{"maxRedemptionPrice":15.0}"#)
+        try app.test(.PUT, "api/loyalty/redemption-cap", headers: ["Content-Type": "application/json", "Cookie": employee], body: capBody) { res in
+            XCTAssertEqual(res.status, .forbidden, "a plain employee shouldn't be able to change the redemption cap")
+        }
+        try app.test(.PUT, "api/loyalty/redemption-cap", headers: ["Content-Type": "application/json", "Cookie": admin], body: capBody) { res in
+            XCTAssertEqual(res.status, .ok)
+            let updated = try res.content.decode(RedemptionCapResponse.self)
+            XCTAssertEqual(updated.maxRedemptionPrice, 15.0)
+        }
+        try app.test(.GET, "api/loyalty/redemption-cap") { res in
+            let current = try res.content.decode(RedemptionCapResponse.self)
+            XCTAssertEqual(current.maxRedemptionPrice, 15.0)
+        }
+    }
+
+    // The whole point of the cap: a customer who racked up 10 punches on
+    // cheap orders shouldn't be able to redeem against the priciest thing
+    // on the menu. Confirms it end to end through the actual HTTP route.
+    func testRedeemRejectsAMenuItemOverTheCapButAllowsOneUnderIt() throws {
+        var adminCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                adminCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let admin = adminCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        let cap = try LoyaltyStore.shared.redemptionCap()
+        let menuBody = ByteBuffer(string: #"""
+        {"restaurant":"Ohana Belltown","lastUpdated":"","categories":[{"section":"sushi","name":"Rolls","items":[
+            {"name":"Cheap Roll","price":\#(cap - 1)},
+            {"name":"Pricey Roll","price":\#(cap + 10)}
+        ]}]}
+        """#)
+        var cheapId: String?
+        var priceyId: String?
+        try app.test(.PUT, "api/menu", headers: ["Content-Type": "application/json", "Cookie": admin], body: menuBody) { res in
+            XCTAssertEqual(res.status, .ok)
+            let menu = try res.content.decode(Menu.self)
+            cheapId = menu.categories[0].items[0].id
+            priceyId = menu.categories[0].items[1].id
+        }
+        guard let cheapItemId = cheapId, let priceyItemId = priceyId else { return XCTFail("expected saved menu items") }
+
+        try LoyaltyStore.shared.addPunch(phone: "2065559876", count: 10)
+
+        try app.test(.POST, "api/loyalty/redeem", headers: ["Content-Type": "application/json", "Cookie": admin],
+                      body: ByteBuffer(string: #"{"phone":"2065559876","menuItemId":"\#(priceyItemId)"}"#)) { res in
+            XCTAssertEqual(res.status, .badRequest, "should reject an item priced over the cap")
+        }
+
+        try app.test(.POST, "api/loyalty/redeem", headers: ["Content-Type": "application/json", "Cookie": admin],
+                      body: ByteBuffer(string: #"{"phone":"2065559876","menuItemId":"\#(cheapItemId)"}"#)) { res in
+            XCTAssertEqual(res.status, .ok, "should allow an item priced at or under the cap")
+            let status = try res.content.decode(LoyaltyStatus.self)
+            XCTAssertEqual(status.punches, 0)
+            XCTAssertEqual(status.totalRedeemed, 1)
+        }
+    }
+
     func testStaffBootstrapLoginAndSessionGatedRoute() throws {
         let bootstrapBody = ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)
         var sessionCookie: String?
@@ -1383,6 +1476,142 @@ final class RouteTests: XCTestCase {
         let body = ByteBuffer(string: "signed_request=\(signedRequest)")
         try app.test(.POST, "auth/facebook/data-deletion", headers: ["Content-Type": "application/x-www-form-urlencoded"], body: body) { res in
             XCTAssertEqual(res.status, .badRequest)
+        }
+    }
+
+    func testMenuItemEngagementTracksByItemDeviceAndClickType() throws {
+        func record(item: String, clickType: String, device: String) throws {
+            try app.test(
+                .POST, "api/analytics/menu-item-engagement", headers: ["Content-Type": "application/json"],
+                body: ByteBuffer(string: #"{"itemName":"\#(item)","clickType":"\#(clickType)","deviceId":"\#(device)"}"#)
+            ) { res in
+                XCTAssertEqual(res.status, .ok)
+            }
+        }
+
+        // Two devices tap the photo, one of them twice — should count 3 total
+        // clicks but only 2 unique devices. A third device only opens details.
+        try record(item: "Poke Bowl", clickType: "photo", device: "device-a")
+        try record(item: "Poke Bowl", clickType: "photo", device: "device-a")
+        try record(item: "Poke Bowl", clickType: "photo", device: "device-b")
+        try record(item: "Poke Bowl", clickType: "details", device: "device-c")
+
+        // Garbage input should be silently ignored, not error — this is a
+        // fire-and-forget beacon from the page, never something that should
+        // surface a failure to a customer.
+        try app.test(
+            .POST, "api/analytics/menu-item-engagement", headers: ["Content-Type": "application/json"],
+            body: ByteBuffer(string: #"{"itemName":"Poke Bowl","clickType":"bogus","deviceId":"device-d"}"#)
+        ) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+        try app.test(
+            .POST, "api/analytics/menu-item-engagement", headers: ["Content-Type": "application/json"],
+            body: ByteBuffer(string: #"{"itemName":"","clickType":"photo","deviceId":"device-e"}"#)
+        ) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+
+        try app.test(.GET, "api/analytics/menu-item-engagement") { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        try app.test(.GET, "api/analytics/menu-item-engagement", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+            let counts = try res.content.decode([MenuItemEngagementCount].self)
+            guard let photoCount = counts.first(where: { $0.menuItemName == "Poke Bowl" && $0.clickType == "photo" }) else {
+                return XCTFail("expected a photo-click entry for Poke Bowl")
+            }
+            XCTAssertEqual(photoCount.totalClicks, 3)
+            XCTAssertEqual(photoCount.uniqueDevices, 2)
+
+            guard let detailsCount = counts.first(where: { $0.menuItemName == "Poke Bowl" && $0.clickType == "details" }) else {
+                return XCTFail("expected a details-click entry for Poke Bowl")
+            }
+            XCTAssertEqual(detailsCount.totalClicks, 1)
+            XCTAssertEqual(detailsCount.uniqueDevices, 1)
+        }
+    }
+
+    func testMenuItemTapRateCombinesImpressionsAndTaps() throws {
+        func recordImpressions(_ items: [String], device: String) throws {
+            let itemsJSON = items.map { #""\#($0)""# }.joined(separator: ",")
+            try app.test(
+                .POST, "api/analytics/menu-item-impressions", headers: ["Content-Type": "application/json"],
+                body: ByteBuffer(string: #"{"itemNames":[\#(itemsJSON)],"deviceId":"\#(device)"}"#)
+            ) { res in
+                XCTAssertEqual(res.status, .ok)
+            }
+        }
+        func recordTap(item: String, clickType: String, device: String) throws {
+            try app.test(
+                .POST, "api/analytics/menu-item-engagement", headers: ["Content-Type": "application/json"],
+                body: ByteBuffer(string: #"{"itemName":"\#(item)","clickType":"\#(clickType)","deviceId":"\#(device)"}"#)
+            ) { res in
+                XCTAssertEqual(res.status, .ok)
+            }
+        }
+
+        // "Volcano Roll": shown to 2 devices, tapped once (by one of them) — tap rate 1/2.
+        try recordImpressions(["Volcano Roll", "Rainbow Roll"], device: "device-a")
+        try recordImpressions(["Volcano Roll"], device: "device-b")
+        try recordTap(item: "Volcano Roll", clickType: "details", device: "device-a")
+
+        // "Rainbow Roll": shown once, never tapped — tap rate 0, not nil, since it *was* shown.
+        // "Never Shown Special": tapped without ever having a recorded impression — tap rate nil.
+        try recordTap(item: "Never Shown Special", clickType: "photo", device: "device-c")
+
+        // A batch with no deviceId should no-op rather than error — same
+        // fire-and-forget contract as the single-event endpoint.
+        try app.test(
+            .POST, "api/analytics/menu-item-impressions", headers: ["Content-Type": "application/json"],
+            body: ByteBuffer(string: #"{"itemNames":["Volcano Roll"]}"#)
+        ) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        try app.test(.GET, "api/analytics/menu-item-tap-rate", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+            let rates = try res.content.decode([MenuItemTapRate].self)
+
+            guard let volcano = rates.first(where: { $0.menuItemName == "Volcano Roll" }) else {
+                return XCTFail("expected a Volcano Roll entry")
+            }
+            XCTAssertEqual(volcano.impressions, 2)
+            XCTAssertEqual(volcano.taps, 1)
+            XCTAssertEqual(volcano.tapRate ?? -1, 0.5, accuracy: 0.0001)
+
+            guard let rainbow = rates.first(where: { $0.menuItemName == "Rainbow Roll" }) else {
+                return XCTFail("expected a Rainbow Roll entry")
+            }
+            XCTAssertEqual(rainbow.impressions, 1)
+            XCTAssertEqual(rainbow.taps, 0)
+            XCTAssertEqual(rainbow.tapRate ?? -1, 0, accuracy: 0.0001)
+
+            guard let neverShown = rates.first(where: { $0.menuItemName == "Never Shown Special" }) else {
+                return XCTFail("expected a Never Shown Special entry")
+            }
+            XCTAssertEqual(neverShown.impressions, 0)
+            XCTAssertEqual(neverShown.taps, 1)
+            XCTAssertNil(neverShown.tapRate, "an item with no recorded impressions should report a nil rate, not a misleading 0 or divide-by-zero")
         }
     }
 

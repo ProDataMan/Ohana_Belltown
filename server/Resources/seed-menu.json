@@ -419,6 +419,7 @@
     {
       "items": [
         {
+          "description": "Our homemade potato & macaroni salad.",
           "featured": false,
           "images": [],
           "name": "Potato & Mac Salad",
@@ -426,6 +427,7 @@
           "tags": []
         },
         {
+          "description": "Fresh shredded cabbage & carrot slaw in a creamy dressing.",
           "featured": false,
           "images": [],
           "name": "Coleslaw",
@@ -433,6 +435,7 @@
           "tags": []
         },
         {
+          "description": "Crispy golden french fries, salted.",
           "featured": false,
           "images": [],
           "name": "Fries",
@@ -440,6 +443,7 @@
           "tags": []
         },
         {
+          "description": "Steamed broccoli.",
           "featured": false,
           "images": [],
           "name": "Broccoli (Small)",
@@ -447,6 +451,7 @@
           "tags": []
         },
         {
+          "description": "Steamed broccoli, a larger portion.",
           "featured": false,
           "images": [],
           "name": "Broccoli (Large)",
@@ -454,6 +459,7 @@
           "tags": []
         },
         {
+          "description": "A side of steamed white rice.",
           "featured": false,
           "images": [],
           "name": "White Rice",
@@ -461,6 +467,7 @@
           "tags": []
         },
         {
+          "description": "Traditional Japanese soybean paste soup with tofu, seaweed & green onion.",
           "featured": false,
           "images": [],
           "name": "Miso Soup",
@@ -468,6 +475,7 @@
           "tags": []
         },
         {
+          "description": "Your choice of our homemade BBQ sauce or brown gravy, on the side.",
           "featured": false,
           "images": [],
           "name": "BBQ Sauce or Gravy",
@@ -1696,12 +1704,14 @@
     {
       "items": [
         {
+          "description": "Ask your server what's currently on tap.",
           "featured": false,
           "images": [],
           "name": "Draft Beer",
           "tags": []
         },
         {
+          "description": "Ask your server which cider is currently pouring.",
           "featured": false,
           "images": [],
           "name": "Rotating Hard Cider",
@@ -1715,12 +1725,14 @@
           "tags": []
         },
         {
+          "description": "Our well vodka, gin, rum, tequila & whiskey, poured straight or as a mixed drink.",
           "featured": false,
           "images": [],
           "name": "House Wells",
           "tags": []
         },
         {
+          "description": "Japanese rice wine, served hot or cold.",
           "featured": false,
           "images": [],
           "name": "Hot or Cold Sake",

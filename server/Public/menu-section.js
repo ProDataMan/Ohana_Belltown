@@ -76,6 +76,76 @@ function getDeviceId() {
   return id;
 }
 
+/// Fires on a tap of an item's photo ('photo') or the rest of its card
+/// ('details', which opens the detail modal) — separate from the older,
+/// anonymous /api/analytics/item-view call below, which keeps feeding the
+/// existing aggregate "most-viewed items" report untouched.
+function recordMenuItemEngagement(itemName, clickType) {
+  fetch('/api/analytics/menu-item-engagement', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ itemName, clickType, deviceId: getDeviceId() }),
+  }).catch(() => {});
+}
+
+/// Impression tracking — how often a card is actually scrolled into view,
+/// the denominator "tap rate" (taps ÷ impressions) needs to tell a genuinely
+/// under-tapped item apart from one that's merely near the bottom of a long
+/// category. Queued and flushed in batches rather than one request per card,
+/// since a full menu page is 200+ items.
+const impressedItemNames = new Set();
+let pendingImpressions = [];
+let impressionFlushTimer = null;
+let impressionObserver = null;
+
+function flushPendingImpressions(useBeacon) {
+  if (!pendingImpressions.length) return;
+  const itemNames = pendingImpressions;
+  pendingImpressions = [];
+  const payload = JSON.stringify({ itemNames, deviceId: getDeviceId() });
+  if (useBeacon && navigator.sendBeacon) {
+    navigator.sendBeacon('/api/analytics/menu-item-impressions', new Blob([payload], { type: 'application/json' }));
+    return;
+  }
+  fetch('/api/analytics/menu-item-impressions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: payload,
+  }).catch(() => {});
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushPendingImpressions(true);
+});
+
+/// Re-observes every rendered `.item` card — called once per renderMenu().
+/// Each card is unobserved after its first qualifying impression (50%
+/// visible), both so a card scrolled past twice in one visit is only
+/// counted once and so the observer's own workload shrinks as you scroll.
+function observeItemImpressions() {
+  if (impressionObserver) impressionObserver.disconnect();
+  if (typeof IntersectionObserver !== 'function') return;
+
+  impressionObserver = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        impressionObserver.unobserve(entry.target);
+        const itemEntry = itemsByIndex[Number(entry.target.dataset.index)];
+        if (!itemEntry || impressedItemNames.has(itemEntry.item.name)) continue;
+        impressedItemNames.add(itemEntry.item.name);
+        pendingImpressions.push(itemEntry.item.name);
+      }
+      if (pendingImpressions.length) {
+        clearTimeout(impressionFlushTimer);
+        impressionFlushTimer = setTimeout(flushPendingImpressions, 1500);
+      }
+    },
+    { threshold: 0.5 }
+  );
+  menuContainer.querySelectorAll('.item').forEach((el) => impressionObserver.observe(el));
+}
+
 /// Orders placed this session that haven't been marked received yet, keyed
 /// by item name — lets the "Order" button turn into "Mark Received" and
 /// stay that way across a re-render (e.g. navigating to another menu page).
@@ -560,14 +630,23 @@ function renderMenu(data) {
                 </div>`
               : '';
           const choiceGroupsMarkup = renderChoiceGroupsMarkup(item, canOrder, soldOut, orderLocked, `item-${index}`);
+          // Nothing on the card previously signaled it was tappable besides
+          // a CSS cursor, which mobile (70%+ of traffic, arriving via a
+          // table QR scan) never sees — so there was no visible invitation
+          // to open the detail view at all. This hint plus the photo/name
+          // both being real tap targets is the fix; role="button" +
+          // tabindex make the card keyboard-operable too, which it wasn't
+          // before (see the keydown handler below).
+          const tapHintMarkup = soldOut ? '' : `<p class="item-tap-hint" aria-hidden="true">Tap for details <span class="item-tap-hint-arrow">&rsaquo;</span></p>`;
           return `
-            <article class="item${soldOut ? ' item-sold-out' : ''}" data-search="${escapeHtml(searchText)}" data-index="${index}" data-tags="${escapeHtml(tags.join(','))}">
+            <article class="item${soldOut ? ' item-sold-out' : ''}" data-search="${escapeHtml(searchText)}" data-index="${index}" data-tags="${escapeHtml(tags.join(','))}" role="button" tabindex="0" aria-label="View details for ${escapeHtml(item.name)}">
               ${imageMarkup}
               <div class="item-body">
                 ${soldOutBadge}${specialBadge}
                 <h3>${escapeHtml(item.name)}</h3>
                 ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ''}
                 ${tagsMarkup}
+                ${tapHintMarkup}
                 ${modifiersMarkup}
                 ${choiceGroupsMarkup}
               </div>
@@ -593,6 +672,7 @@ function renderMenu(data) {
   renderOrderingHint(canOrder);
   injectMenuSchema(categories, tableId);
   updateCartBadge();
+  observeItemImpressions();
 }
 
 // A one-time orientation for guests actively at a table (tableId set) —
@@ -715,6 +795,7 @@ async function openItemModal(index) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: item.name }),
   }).catch(() => {});
+  recordMenuItemEngagement(item.name, 'details');
 
   modal.querySelector('.item-modal-category').textContent = categoryName;
   modal.querySelector('.item-modal-sold-out').hidden = item.available !== false;
@@ -916,6 +997,9 @@ menuContainer.addEventListener('click', (event) => {
   }
   const photo = event.target.closest('.item-photo');
   if (photo) {
+    const photoItemEl = photo.closest('.item');
+    const entry = photoItemEl && photoItemEl.dataset.index != null ? itemsByIndex[Number(photoItemEl.dataset.index)] : null;
+    if (entry) recordMenuItemEngagement(entry.item.name, 'photo');
     window.openLightbox(photo.src, photo.alt);
     return;
   }
@@ -923,6 +1007,17 @@ menuContainer.addEventListener('click', (event) => {
   if (itemEl && itemEl.dataset.index != null) {
     openItemModal(Number(itemEl.dataset.index));
   }
+});
+
+// Keyboard equivalent of the click handler above — only fires when the card
+// itself (not a nested button/input, which handles its own Enter/Space) has
+// focus, since the card is now a role="button" tabindex="0" element.
+menuContainer.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  const itemEl = event.target.closest('.item');
+  if (!itemEl || event.target !== itemEl || itemEl.dataset.index == null) return;
+  event.preventDefault();
+  openItemModal(Number(itemEl.dataset.index));
 });
 
 // A floating "Your Order" button (bottom-left, opposite the Feedback tab)

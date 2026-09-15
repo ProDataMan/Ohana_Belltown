@@ -2211,6 +2211,41 @@ select {
   cursor: pointer;
 }
 
+.item:focus-visible {
+  outline: none;
+  border-radius: 10px;
+  box-shadow: 0 0 0 3px rgba(255, 47, 143, 0.35);
+}
+
+/* Specificity note: `.item p` (line ~146) is `.item` + type, which beats a
+   single class selector — `.item-body .item-tap-hint` matches it so these
+   rules actually win instead of silently falling back to the muted/0.95rem
+   paragraph default. */
+.item-body .item-tap-hint {
+  color: var(--pink-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--font-ui);
+  letter-spacing: 0.02em;
+  margin: 0.3rem 0 0;
+  opacity: 0.85;
+}
+
+.item:hover .item-tap-hint,
+.item:focus-visible .item-tap-hint {
+  opacity: 1;
+}
+
+.item-tap-hint-arrow {
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+
+.item:hover .item-tap-hint-arrow,
+.item:focus-visible .item-tap-hint-arrow {
+  transform: translateX(3px);
+}
+
 .item-modal-overlay {
   position: fixed;
   inset: 0;

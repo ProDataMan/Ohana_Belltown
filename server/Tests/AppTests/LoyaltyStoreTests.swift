@@ -36,19 +36,57 @@ final class LoyaltyStoreTests: XCTestCase {
         XCTAssertEqual(status.punches, 10)
     }
 
+    private func configureMenuWithRedeemableItem(price: Double = 10) throws -> String {
+        let menuTempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: menuTempDir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: menuTempDir) }
+        MenuStore.shared.configure(dataDirectory: menuTempDir.path, resourcesDirectory: menuTempDir.path)
+        let saved = try MenuStore.shared.save(Menu(
+            restaurant: "Ohana Belltown", lastUpdated: "",
+            categories: [MenuCategory(section: "menu", name: "Rolls", note: nil, items: [MenuItem(name: "Volcano Roll", price: price)])]
+        ))
+        return saved.categories[0].items[0].id
+    }
+
     func testRedeemRequiresTenPunches() throws {
+        let itemId = try configureMenuWithRedeemableItem()
         try LoyaltyStore.shared.addPunch(phone: "2065551234", count: 5)
-        XCTAssertThrowsError(try LoyaltyStore.shared.redeem(phone: "2065551234")) { error in
+        XCTAssertThrowsError(try LoyaltyStore.shared.redeem(phone: "2065551234", menuItemId: itemId)) { error in
             XCTAssertTrue(error is LoyaltyError)
         }
     }
 
     func testRedeemResetsPunchesAndIncrementsTotal() throws {
+        let itemId = try configureMenuWithRedeemableItem()
         try LoyaltyStore.shared.addPunch(phone: "2065551234", count: 10)
-        let status = try LoyaltyStore.shared.redeem(phone: "2065551234")
+        let status = try LoyaltyStore.shared.redeem(phone: "2065551234", menuItemId: itemId)
         XCTAssertEqual(status.punches, 0)
         XCTAssertEqual(status.totalRedeemed, 1)
         XCTAssertFalse(status.rewardReady)
+    }
+
+    func testRedeemRejectsItemsOverTheCap() throws {
+        let cap = try LoyaltyStore.shared.redemptionCap()
+        let itemId = try configureMenuWithRedeemableItem(price: cap + 5)
+        try LoyaltyStore.shared.addPunch(phone: "2065551234", count: 10)
+        XCTAssertThrowsError(try LoyaltyStore.shared.redeem(phone: "2065551234", menuItemId: itemId)) { error in
+            guard let loyaltyError = error as? LoyaltyError else { return XCTFail("wrong error type") }
+            XCTAssertEqual(loyaltyError, .redemptionItemTooExpensive(itemPrice: cap + 5, cap: cap))
+        }
+    }
+
+    func testRedeemRejectsUnknownMenuItem() throws {
+        _ = try configureMenuWithRedeemableItem()
+        try LoyaltyStore.shared.addPunch(phone: "2065551234", count: 10)
+        XCTAssertThrowsError(try LoyaltyStore.shared.redeem(phone: "2065551234", menuItemId: "not-a-real-id")) { error in
+            guard let loyaltyError = error as? LoyaltyError else { return XCTFail("wrong error type") }
+            XCTAssertEqual(loyaltyError, .redemptionItemNotFound)
+        }
+    }
+
+    func testSetRedemptionCapUpdatesTheStoredCap() throws {
+        XCTAssertEqual(try LoyaltyStore.shared.setRedemptionCap(9.5), 9.5)
+        XCTAssertEqual(try LoyaltyStore.shared.redemptionCap(), 9.5)
     }
 
     func testLookupUnknownPhoneThrows() throws {

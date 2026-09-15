@@ -197,6 +197,21 @@ async function loadMenuItemsForPicker() {
 }
 loadMenuItemsForPicker();
 
+// States the real redemption cap in the "How It Works" copy instead of a
+// hardcoded number, so raising or lowering it from the admin side (see
+// loyalty-admin.js) doesn't leave stale copy on this page.
+(async () => {
+  try {
+    const response = await fetch('/api/loyalty/redemption-cap');
+    if (!response.ok) return;
+    const { maxRedemptionPrice } = await response.json();
+    const capCopyEl = document.getElementById('redemption-cap-copy');
+    if (capCopyEl) capCopyEl.textContent = `$${maxRedemptionPrice.toFixed(0)} and under`;
+  } catch {
+    // Copy just keeps its default placeholder amount.
+  }
+})();
+
 function selectedMenuItem() {
   const typed = menuItemInput.value.trim();
   const id = menuItemsByName[typed];

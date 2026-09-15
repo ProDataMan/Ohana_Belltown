@@ -9,6 +9,19 @@ struct LoyaltyReferralRequest: Content {
     var referrerPhone: String
 }
 
+struct RedeemRequest: Content {
+    var phone: String
+    var menuItemId: String
+}
+
+struct RedemptionCapRequest: Content {
+    var maxRedemptionPrice: Double
+}
+
+struct RedemptionCapResponse: Content {
+    var maxRedemptionPrice: Double
+}
+
 struct BonusClaimRequest: Content {
     var phone: String
     var type: String
@@ -95,6 +108,17 @@ struct WaitlistJoinRequest: Content {
 
 struct ItemViewRequest: Content {
     var name: String
+}
+
+struct MenuItemEngagementRequest: Content {
+    var itemName: String
+    var clickType: String
+    var deviceId: String?
+}
+
+struct MenuItemImpressionsRequest: Content {
+    var itemNames: [String]
+    var deviceId: String?
 }
 
 struct DwellRequest: Content {
@@ -815,8 +839,21 @@ func routes(_ app: Application) throws {
 
     app.post("api", "loyalty", "redeem") { req throws -> LoyaltyStatus in
         try requireStaffAccess(req)
-        let body = try req.content.decode(PhoneRequest.self)
-        return try LoyaltyStore.shared.redeem(phone: body.phone)
+        let body = try req.content.decode(RedeemRequest.self)
+        return try LoyaltyStore.shared.redeem(phone: body.phone, menuItemId: body.menuItemId)
+    }
+
+    app.get("api", "loyalty", "redemption-cap") { req throws -> RedemptionCapResponse in
+        RedemptionCapResponse(maxRedemptionPrice: try LoyaltyStore.shared.redemptionCap())
+    }
+
+    app.put("api", "loyalty", "redemption-cap") { req throws -> RedemptionCapResponse in
+        try requireAdmin(req)
+        let body = try req.content.decode(RedemptionCapRequest.self)
+        guard body.maxRedemptionPrice > 0 else {
+            throw Abort(.badRequest, reason: "Redemption cap must be greater than $0.")
+        }
+        return RedemptionCapResponse(maxRedemptionPrice: try LoyaltyStore.shared.setRedemptionCap(body.maxRedemptionPrice))
     }
 
     app.get("api", "loyalty", "customers") { req throws -> [LoyaltyCustomer] in
@@ -1137,6 +1174,61 @@ func routes(_ app: Application) throws {
         let body = try req.content.decode(DwellRequest.self)
         AnalyticsStore.shared.recordDwell(path: body.path, seconds: body.seconds)
         return .ok
+    }
+
+    // A tap on an item's photo or on the rest of its card (which opens the
+    // detail modal) — attributed to the same per-browser deviceId order
+    // history already uses, plus customerId when signed in. Deliberately a
+    // separate store from the anonymous item-view counter above; see
+    // MenuItemEngagementStore's doc comment for why.
+    app.post("api", "analytics", "menu-item-engagement") { req throws -> HTTPStatus in
+        let body = try req.content.decode(MenuItemEngagementRequest.self)
+        let itemName = body.itemName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let deviceId = body.deviceId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !itemName.isEmpty, !deviceId.isEmpty,
+              let clickType = MenuItemEngagementStore.ClickType(rawValue: body.clickType) else {
+            return .ok
+        }
+        let customerId = try? currentCustomer(req)?.id
+        try MenuItemEngagementStore.shared.record(
+            menuItemName: itemName, clickType: clickType, deviceId: deviceId, customerId: customerId
+        )
+        return .ok
+    }
+
+    // Staff-facing breakdown of the above: click totals and unique
+    // visitor counts per item, split by photo vs. details taps.
+    app.get("api", "analytics", "menu-item-engagement") { req throws -> [MenuItemEngagementCount] in
+        try requireAdmin(req)
+        let days = req.query[Int.self, at: "days"] ?? 30
+        return try MenuItemEngagementStore.shared.summary(days: days)
+    }
+
+    // A batch of item cards that scrolled into view — the client queues
+    // these and flushes periodically rather than firing one request per
+    // card, since a full menu is 200+ items. Capped defensively; a real
+    // menu page never approaches this many distinct items at once.
+    app.post("api", "analytics", "menu-item-impressions") { req throws -> HTTPStatus in
+        let body = try req.content.decode(MenuItemImpressionsRequest.self)
+        let deviceId = body.deviceId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let itemNames = body.itemNames
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .prefix(500)
+        guard !deviceId.isEmpty, !itemNames.isEmpty else { return .ok }
+        let customerId = try? currentCustomer(req)?.id
+        try MenuItemEngagementStore.shared.recordBatch(
+            menuItemNames: Array(itemNames), clickType: .impression, deviceId: deviceId, customerId: customerId
+        )
+        return .ok
+    }
+
+    // Tap rate (taps ÷ impressions) per item — the "most-tapped relative to
+    // how often it's shown" view, not just a raw click count.
+    app.get("api", "analytics", "menu-item-tap-rate") { req throws -> [MenuItemTapRate] in
+        try requireAdmin(req)
+        let days = req.query[Int.self, at: "days"] ?? 30
+        return try MenuItemEngagementStore.shared.tapRateSummary(days: days)
     }
 
     // Most-viewed items over a rolling window, cross-referenced against the

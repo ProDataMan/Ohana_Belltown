@@ -121,6 +121,31 @@ struct BonusRequest: Codable, Content {
 struct LoyaltyData: Codable, Content {
     var customers: [LoyaltyCustomer]
     var bonusRequests: [BonusRequest]
+    /// The most expensive menu item price a "free roll" redemption can be
+    /// applied to — added after launch, once real menu prices showed a
+    /// redemption with no cap at all could cost far more than the punches
+    /// earning it were worth (see docs/loyalty-points-migration.md history).
+    /// Admin-editable (`PUT /api/loyalty/redemption-cap`) rather than a
+    /// hardcoded constant, since the right number depends on real food-cost
+    /// data the restaurant will refine over time.
+    var maxRedemptionPrice: Double
+
+    enum CodingKeys: String, CodingKey {
+        case customers, bonusRequests, maxRedemptionPrice
+    }
+
+    init(customers: [LoyaltyCustomer], bonusRequests: [BonusRequest], maxRedemptionPrice: Double = LoyaltyStore.defaultMaxRedemptionPrice) {
+        self.customers = customers
+        self.bonusRequests = bonusRequests
+        self.maxRedemptionPrice = maxRedemptionPrice
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        customers = try container.decode([LoyaltyCustomer].self, forKey: .customers)
+        bonusRequests = try container.decode([BonusRequest].self, forKey: .bonusRequests)
+        maxRedemptionPrice = try container.decodeIfPresent(Double.self, forKey: .maxRedemptionPrice) ?? LoyaltyStore.defaultMaxRedemptionPrice
+    }
 }
 
 struct LoyaltyStatus: Content {
@@ -138,13 +163,24 @@ enum LoyaltyError: Error, Equatable {
     case noRewardAvailable
     case cannotReferSelf
     case referralOnlyForNewCards
+    /// Redemption named a menu item id that doesn't exist (typo, or an item
+    /// deleted since staff last looked at the menu).
+    case redemptionItemNotFound
+    /// The item exists but has no price set — can't verify it's under the
+    /// cap, so it's not eligible until the menu item itself has a real price.
+    case redemptionItemHasNoPrice
+    /// The item's real price is over the current redemption cap — the
+    /// specific numbers are included so the error message (and the staff
+    /// UI showing it) are self-explanatory without a second lookup.
+    case redemptionItemTooExpensive(itemPrice: Double, cap: Double)
 }
 
 extension LoyaltyError: AbortError {
     var status: HTTPResponseStatus {
         switch self {
-        case .customerNotFound, .bonusRequestNotFound: return .notFound
-        case .noRewardAvailable, .cannotReferSelf, .referralOnlyForNewCards: return .badRequest
+        case .customerNotFound, .bonusRequestNotFound, .redemptionItemNotFound: return .notFound
+        case .noRewardAvailable, .cannotReferSelf, .referralOnlyForNewCards,
+             .redemptionItemHasNoPrice, .redemptionItemTooExpensive: return .badRequest
         }
     }
 
@@ -155,6 +191,10 @@ extension LoyaltyError: AbortError {
         case .noRewardAvailable: return "This card doesn't have enough punches for a reward yet."
         case .cannotReferSelf: return "You can't refer yourself — enter a friend's phone number instead."
         case .referralOnlyForNewCards: return "Looks like you already have a punch card — referral bonuses are only for brand-new cards."
+        case .redemptionItemNotFound: return "That menu item wasn't found — pick one from the list."
+        case .redemptionItemHasNoPrice: return "That item doesn't have a price set on the menu yet, so it can't be verified as eligible — add a price or pick a different item."
+        case .redemptionItemTooExpensive(let itemPrice, let cap):
+            return "That item is $\(String(format: "%.2f", itemPrice)), which is over the $\(String(format: "%.2f", cap)) redemption cap — pick something at or under the cap."
         }
     }
 }
@@ -162,6 +202,11 @@ extension LoyaltyError: AbortError {
 final class LoyaltyStore: @unchecked Sendable {
     static let shared = LoyaltyStore()
     static let punchesNeeded = 10
+    /// Starting redemption cap, until an admin sets a real one from actual
+    /// food-cost data — chosen as roughly the average price of a menu item
+    /// in the "Rolls" category, so a typical redemption is a normal roll,
+    /// not the most expensive thing on the menu.
+    static let defaultMaxRedemptionPrice: Double = 12.00
     /// Approved photo/social bonus claims are worth a tenth of a punch each —
     /// 10 approved claims add up to 1 real punch, rather than each claim
     /// granting a full punch outright.
@@ -328,8 +373,34 @@ final class LoyaltyStore: @unchecked Sendable {
         data.customers[referrerIdx].updatedAt = now()
     }
 
+    /// The current redemption cap — the most expensive menu item price a
+    /// free-roll redemption can be applied to. Public/read-only (so
+    /// /rewards can state the real number in its own copy); only an admin
+    /// can change it (see setRedemptionCap).
+    func redemptionCap() throws -> Double {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        return data.maxRedemptionPrice
+    }
+
     @discardableResult
-    func redeem(phone rawPhone: String) throws -> LoyaltyStatus {
+    func setRedemptionCap(_ price: Double) throws -> Double {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        data.maxRedemptionPrice = price
+        try persist()
+        return price
+    }
+
+    /// Redeems a free reward against a specific menu item — the item's real
+    /// price is checked against the redemption cap so a customer can't
+    /// redeem their 10 punches against whatever the most expensive thing on
+    /// the menu happens to be. See docs/loyalty-points-migration.md for the
+    /// economics behind why this cap exists at all.
+    @discardableResult
+    func redeem(phone rawPhone: String, menuItemId: String) throws -> LoyaltyStatus {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
@@ -339,6 +410,15 @@ final class LoyaltyStore: @unchecked Sendable {
         }
         guard data.customers[idx].punches >= Self.punchesNeeded else {
             throw LoyaltyError.noRewardAvailable
+        }
+        guard let location = try? MenuStore.shared.findItem(id: menuItemId) else {
+            throw LoyaltyError.redemptionItemNotFound
+        }
+        guard let price = location.item.price else {
+            throw LoyaltyError.redemptionItemHasNoPrice
+        }
+        guard price <= data.maxRedemptionPrice else {
+            throw LoyaltyError.redemptionItemTooExpensive(itemPrice: price, cap: data.maxRedemptionPrice)
         }
         data.customers[idx].punches -= Self.punchesNeeded
         data.customers[idx].totalRedeemed += 1

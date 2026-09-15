@@ -68,18 +68,54 @@ async function doPunch() {
   }
 }
 
+// A dish picker with real search, mirroring the same pattern used on
+// /rewards for the bonus-punch dish field — a <datalist> gives free
+// substring-filtered autocomplete without a custom dropdown widget, and a
+// name->id map covers the gap since the datalist can only carry display text.
+const redeemItemInput = document.getElementById('redeem-item-input');
+const redeemItemOptionsEl = document.getElementById('redeem-item-options');
+let redeemMenuItemsByName = {};
+
+async function loadMenuItemsForRedeemPicker() {
+  try {
+    const response = await fetch('/api/menu');
+    if (!response.ok) return;
+    const menu = await response.json();
+    (menu.categories || []).forEach((category) => {
+      (category.items || []).forEach((item) => {
+        redeemMenuItemsByName[item.name] = item.id;
+      });
+    });
+    redeemItemOptionsEl.innerHTML = Object.keys(redeemMenuItemsByName)
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => `<option value="${name.replaceAll('"', '&quot;')}"></option>`)
+      .join('');
+  } catch {
+    // The picker just won't offer suggestions — redeeming still validates
+    // against whatever was typed, which will simply fail to match anything.
+  }
+}
+loadMenuItemsForRedeemPicker();
+
 async function doRedeem() {
   const phone = phoneInput.value.trim();
   if (!phone) return setLoyaltyStatus(cardStatus, 'Enter a phone number first.', true);
+  const typedItem = redeemItemInput.value.trim();
+  const menuItemId = redeemMenuItemsByName[typedItem];
+  if (!menuItemId) return setLoyaltyStatus(cardStatus, 'Pick which menu item they\'re redeeming from the list.', true);
   setLoyaltyStatus(cardStatus, 'Redeeming...', false);
   try {
     const response = await staffFetch('/api/loyalty/redeem', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone }),
+      body: JSON.stringify({ phone, menuItemId }),
     });
-    if (!response.ok) throw new Error(`Redeem failed (${response.status}) — this card may not have 10 punches yet.`);
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw new Error(body?.reason || `Redeem failed (${response.status}) — this card may not have 10 punches yet.`);
+    }
     renderCard(await response.json());
+    redeemItemInput.value = '';
     setLoyaltyStatus(cardStatus, 'Reward redeemed — enjoy the free roll!', false);
   } catch (error) {
     setLoyaltyStatus(cardStatus, error.message, true);
@@ -298,7 +334,60 @@ async function loadStats() {
 
 document.getElementById('reload-stats-btn').addEventListener('click', loadStats);
 
+// Redemption cap: the number itself is public (GET), but only an admin can
+// change it, since it directly controls program economics — the input is
+// shown to everyone as a read-only hint and only unlocked into an editable
+// panel once /api/auth/me confirms the admin role.
+const redeemCapHintEl = document.getElementById('redeem-cap-hint');
+const redemptionCapPanelEl = document.getElementById('redemption-cap-panel');
+const redemptionCapInputEl = document.getElementById('redemption-cap-input');
+const redemptionCapStatusEl = document.getElementById('redemption-cap-status');
+
+async function loadRedemptionCap() {
+  try {
+    const response = await fetch('/api/loyalty/redemption-cap');
+    if (!response.ok) return;
+    const { maxRedemptionPrice } = await response.json();
+    redeemCapHintEl.textContent = `$${maxRedemptionPrice.toFixed(2)}`;
+    redemptionCapInputEl.value = maxRedemptionPrice.toFixed(2);
+  } catch {
+    // Hint just keeps its default text.
+  }
+}
+
+async function saveRedemptionCap() {
+  const value = parseFloat(redemptionCapInputEl.value);
+  if (!(value > 0)) return setLoyaltyStatus(redemptionCapStatusEl, 'Enter a cap greater than $0.', true);
+  setLoyaltyStatus(redemptionCapStatusEl, 'Saving...', false);
+  try {
+    const response = await staffFetch('/api/loyalty/redemption-cap', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ maxRedemptionPrice: value }),
+    });
+    if (!response.ok) throw new Error(`Save failed (${response.status}).`);
+    await loadRedemptionCap();
+    setLoyaltyStatus(redemptionCapStatusEl, 'Redemption cap updated.', false);
+  } catch (error) {
+    setLoyaltyStatus(redemptionCapStatusEl, error.message, true);
+  }
+}
+
+document.getElementById('save-redemption-cap-btn').addEventListener('click', saveRedemptionCap);
+
+(async () => {
+  try {
+    const response = await fetch('/api/auth/me');
+    if (!response.ok) return;
+    const user = await response.json();
+    if (user.role === 'admin') redemptionCapPanelEl.hidden = false;
+  } catch {
+    // Panel just stays hidden — the backend enforces the real boundary regardless.
+  }
+})();
+
 loadStats();
 loadBonusRequests();
 loadCustomers();
 loadBirthdays();
+loadRedemptionCap();

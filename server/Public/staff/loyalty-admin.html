@@ -55,10 +55,26 @@
           <input type="tel" id="phone-input" placeholder="Phone number" />
           <button id="lookup-btn" type="button" class="secondary">Look up</button>
           <button id="punch-btn" type="button">+1 Punch (sushi order)</button>
+        </div>
+        <div class="cta-row">
+          <label for="redeem-item-input" style="margin: 0;">Redeeming:</label>
+          <input type="text" id="redeem-item-input" list="redeem-item-options" placeholder="Start typing a menu item..." autocomplete="off" />
+          <datalist id="redeem-item-options"></datalist>
           <button id="redeem-btn" type="button" class="secondary">Redeem free roll</button>
         </div>
+        <p class="hint">Only items at or under the redemption cap (<span id="redeem-cap-hint">$12.00</span>) are eligible for a free-roll redemption.</p>
         <p id="card-status" class="status"></p>
         <div id="card-result"></div>
+      </section>
+
+      <section class="panel" id="redemption-cap-panel" hidden>
+        <h2>Redemption Cap</h2>
+        <p class="hint">The most expensive menu item price a free-roll redemption can be applied to &mdash; keeps a worst-case redemption from costing more than the program can afford. Admin-only.</p>
+        <div class="cta-row">
+          <input type="number" id="redemption-cap-input" step="0.01" min="0.01" style="max-width: 8rem;" />
+          <button id="save-redemption-cap-btn" type="button">Save cap</button>
+        </div>
+        <p id="redemption-cap-status" class="status"></p>
       </section>
 
       <section class="panel">
