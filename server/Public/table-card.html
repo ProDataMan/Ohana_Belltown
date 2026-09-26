@@ -55,6 +55,17 @@
         color: transparent;
       }
 
+      /* Happy Hour's own back-of-card accent (gold, matching the brand's
+         existing --gold/--gold-bright tokens) instead of the regular pink→
+         purple heading, so front vs. back is obvious at a glance even
+         before scanning. */
+      .table-card.happy-hour h2 {
+        background: linear-gradient(92deg, var(--gold-bright), var(--gold));
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+
       .table-card img.qr {
         width: 220px;
         height: 220px;
@@ -135,13 +146,20 @@
       <p>
         Print this page (Cmd/Ctrl+P) to get table-ready cards sized for a standard 4&times;6" acrylic
         stand — one per table/seat across the dining room, bar, sushi bar, and deck, matching the
-        real floor plan. Each QR code is unique to its spot: scanning it lands on Happy Hour
+        real floor plan. Each QR code is unique to its spot: scanning the front lands on Happy Hour
         automatically during Happy Hour (Mon&ndash;Fri, 3&ndash;6pm) or the full menu the rest of the
         time, and unlocks an "Add to Order" button next to every menu item. A guest can tap that on
         as many dishes as they want, from any menu page, then tap the floating "Review &amp; Send"
         button once they're ready — they see everything they picked, with a note that a staff
         member will come confirm it before it's sent to the kitchen, so nothing gets flagged for
         the kitchen until a real person has actually looked at it.
+      </p>
+      <p>
+        Each table also gets a <strong>gold-accented "Scan for Happy Hour" card</strong> — print it,
+        cut it, and glue it to the back of that same table's card so a guest can flip it over and
+        jump straight to Happy Hour any time, instead of waiting for the automatic time-based switch
+        above. It's paired right after its matching front card below, in the same table order, to
+        make cutting and gluing them back-to-back easy.
       </p>
       <p>
         The three cards at the top aren't tied to a table — <strong>"While You Wait"</strong> is meant
@@ -213,6 +231,13 @@
                     <h2>Scan for Menu</h2>
                     <img class="qr" src="/images/table-qr-${entry.id}.png" alt="QR code for ${label}, linking to the Ohana Belltown menu" />
                     <p>Food &middot; Sushi &middot; Drinks &middot; Happy Hour</p>
+                  </div>
+                  <div class="table-card happy-hour">
+                    <img class="logo" src="/images/logo.png" alt="" />
+                    <span class="table-number">${label} — ${sectionLabels[entry.section] || entry.section} (back)</span>
+                    <h2>Scan for Happy Hour</h2>
+                    <img class="qr" src="/images/table-qr-hh-${entry.id}.png" alt="QR code for ${label}, linking straight to the Ohana Belltown Happy Hour menu" />
+                    <p>Always Happy Hour pricing, any time you scan it</p>
                   </div>
                 `;
               })

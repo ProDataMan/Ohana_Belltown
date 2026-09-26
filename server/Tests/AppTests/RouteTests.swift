@@ -88,6 +88,21 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    // The "flip the table card over" Happy Hour QR — always lands on Happy
+    // Hour, unlike the plain table QR above which is time-of-day dependent
+    // (see testScanRedirectsToMenuOrHappyHour), and still carries the table
+    // id through so ordering/price-unlock behaves the same as the front card.
+    func testScanHappyHourFlagAlwaysLandsOnHappyHourRegardlessOfTime() throws {
+        try app.test(.GET, "scan?hh=1") { res in
+            XCTAssertEqual(res.status, .seeOther)
+            XCTAssertEqual(res.headers.first(name: .location), "/happy-hour")
+        }
+        try app.test(.GET, "scan?table=5&hh=1") { res in
+            XCTAssertEqual(res.status, .seeOther)
+            XCTAssertEqual(res.headers.first(name: .location), "/happy-hour?table=5")
+        }
+    }
+
     // analytics.html itself is admin-gated at the page level, but its data
     // came from a mix of requireLogin/requireAdmin endpoints underneath —
     // meaning a logged-in-but-non-admin employee could hit those APIs

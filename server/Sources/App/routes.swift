@@ -153,6 +153,13 @@ func routes(_ app: Application) throws {
     // menu page can show a per-item Order button tied to that table.
     app.get("scan") { req in
         var target = HappyHourSchedule.landingPath()
+        // The "flip the table card over" Happy Hour QR — always lands on
+        // Happy Hour regardless of the time-of-day check above, so a guest
+        // who deliberately scans that side sees it whenever they want,
+        // same as browsing there from the nav any other time.
+        if req.query[String.self, at: "hh"] == "1" {
+            target = "/happy-hour"
+        }
         var queryParts: [String] = []
         if let table = req.query[String.self, at: "table"]?.trimmingCharacters(in: .whitespacesAndNewlines), !table.isEmpty,
            let encoded = table.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
