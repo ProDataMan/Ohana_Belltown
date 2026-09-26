@@ -17,6 +17,25 @@ private func parseState(_ state: String) -> (csrf: String, audience: String, mod
     return (parts[0], parts[1], parts[2])
 }
 
+/// Wraps the part of an OAuth callback that can fail after the code/state
+/// checks pass — a provider API hiccup, our own store, anything. Any throw
+/// in here redirects to a friendly error page instead of letting Vapor's
+/// raw error response reach the browser: undecorated, a full-page
+/// navigation to an error response with no file extension in the URL gets
+/// downloaded as a file instead of shown (this is exactly how a Facebook
+/// Graph API content-type quirk once turned into a customer's browser
+/// downloading "callback.json" mid-login — see
+/// FacebookOAuth.decodeFacebookJSON's doc comment). Logged server-side so
+/// the real cause is still diagnosable from the Container App logs.
+private func oauthCallbackFallback(_ req: Request, errorRedirect: String, work: () async throws -> Response) async -> Response {
+    do {
+        return try await work()
+    } catch {
+        req.logger.error("OAuth callback failed: \(error)")
+        return req.redirect(to: errorRedirect)
+    }
+}
+
 private func finishStaffOAuth(_ req: Request, info: OAuthUserInfo, provider: OAuthProvider, mode: String) throws -> Response {
     if mode == "link" {
         let currentStaff = try requireLogin(req)
@@ -72,7 +91,7 @@ func registerOAuthRoutes(_ app: Application) throws {
         return req.redirect(to: url)
     }
 
-    app.get("auth", "google", "callback") { req async throws -> Response in
+    app.get("auth", "google", "callback") { req async -> Response in
         guard let code = req.query[String.self, at: "code"],
               let state = req.query[String.self, at: "state"],
               state == req.session.data["oauthState"],
@@ -80,19 +99,22 @@ func registerOAuthRoutes(_ app: Application) throws {
             return req.redirect(to: "/login?error=oauth_failed")
         }
         req.session.data["oauthState"] = nil
-        let info = try await GoogleOAuth.exchangeCodeAndFetchUser(
-            code: code, redirectURI: "\(base)/auth/google/callback", client: req.client
-        )
-
-        if parsed.audience == "customer" {
-            let customer = try CustomerUserStore.shared.findOrCreateFromOAuth(
-                provider: .google, providerId: info.providerId, email: info.email, displayName: info.displayName,
-                pictureURL: info.pictureURL
+        let errorRedirect = parsed.audience == "customer" ? "/account-login?error=oauth_failed" : "/login?error=oauth_failed"
+        return await oauthCallbackFallback(req, errorRedirect: errorRedirect) {
+            let info = try await GoogleOAuth.exchangeCodeAndFetchUser(
+                code: code, redirectURI: "\(base)/auth/google/callback", client: req.client
             )
-            req.session.data["customerId"] = customer.id
-            return req.redirect(to: "/logged-in")
+
+            if parsed.audience == "customer" {
+                let customer = try CustomerUserStore.shared.findOrCreateFromOAuth(
+                    provider: .google, providerId: info.providerId, email: info.email, displayName: info.displayName,
+                    pictureURL: info.pictureURL
+                )
+                req.session.data["customerId"] = customer.id
+                return req.redirect(to: "/logged-in")
+            }
+            return try finishStaffOAuth(req, info: info, provider: .google, mode: parsed.mode)
         }
-        return try finishStaffOAuth(req, info: info, provider: .google, mode: parsed.mode)
     }
 
     // MARK: Facebook — one shared callback URL for both customers and staff,
@@ -117,7 +139,7 @@ func registerOAuthRoutes(_ app: Application) throws {
         return req.redirect(to: url)
     }
 
-    app.get("auth", "facebook", "callback") { req async throws -> Response in
+    app.get("auth", "facebook", "callback") { req async -> Response in
         guard let code = req.query[String.self, at: "code"],
               let state = req.query[String.self, at: "state"],
               state == req.session.data["oauthState"],
@@ -125,19 +147,22 @@ func registerOAuthRoutes(_ app: Application) throws {
             return req.redirect(to: "/login?error=oauth_failed")
         }
         req.session.data["oauthState"] = nil
-        let info = try await FacebookOAuth.exchangeCodeAndFetchUser(
-            code: code, redirectURI: "\(base)/auth/facebook/callback", client: req.client
-        )
-
-        if parsed.audience == "customer" {
-            let customer = try CustomerUserStore.shared.findOrCreateFromOAuth(
-                provider: .facebook, providerId: info.providerId, email: info.email, displayName: info.displayName,
-                pictureURL: info.pictureURL
+        let errorRedirect = parsed.audience == "customer" ? "/account-login?error=oauth_failed" : "/login?error=oauth_failed"
+        return await oauthCallbackFallback(req, errorRedirect: errorRedirect) {
+            let info = try await FacebookOAuth.exchangeCodeAndFetchUser(
+                code: code, redirectURI: "\(base)/auth/facebook/callback", client: req.client
             )
-            req.session.data["customerId"] = customer.id
-            return req.redirect(to: "/logged-in")
+
+            if parsed.audience == "customer" {
+                let customer = try CustomerUserStore.shared.findOrCreateFromOAuth(
+                    provider: .facebook, providerId: info.providerId, email: info.email, displayName: info.displayName,
+                    pictureURL: info.pictureURL
+                )
+                req.session.data["customerId"] = customer.id
+                return req.redirect(to: "/logged-in")
+            }
+            return try finishStaffOAuth(req, info: info, provider: .facebook, mode: parsed.mode)
         }
-        return try finishStaffOAuth(req, info: info, provider: .facebook, mode: parsed.mode)
     }
 
     // MARK: Facebook — Data Deletion Request callback (Facebook Login →
@@ -182,14 +207,16 @@ func registerOAuthRoutes(_ app: Application) throws {
             return req.redirect(to: "/account-login?error=oauth_failed")
         }
         req.session.data["oauthState"] = nil
-        let info = try await AppleOAuth.exchangeCodeAndFetchUser(
-            code: code, redirectURI: "\(base)/auth/apple/customer/callback", userField: body.user, client: req.client
-        )
-        let customer = try CustomerUserStore.shared.findOrCreateFromOAuth(
-            provider: .apple, providerId: info.providerId, email: info.email, displayName: info.displayName
-        )
-        req.session.data["customerId"] = customer.id
-        return req.redirect(to: "/logged-in")
+        return await oauthCallbackFallback(req, errorRedirect: "/account-login?error=oauth_failed") {
+            let info = try await AppleOAuth.exchangeCodeAndFetchUser(
+                code: code, redirectURI: "\(base)/auth/apple/customer/callback", userField: body.user, client: req.client
+            )
+            let customer = try CustomerUserStore.shared.findOrCreateFromOAuth(
+                provider: .apple, providerId: info.providerId, email: info.email, displayName: info.displayName
+            )
+            req.session.data["customerId"] = customer.id
+            return req.redirect(to: "/logged-in")
+        }
     }
 
     // MARK: Staff — Apple (hidden in the UI for now, kept working underneath)
@@ -212,9 +239,11 @@ func registerOAuthRoutes(_ app: Application) throws {
             return req.redirect(to: "/login?error=oauth_failed")
         }
         req.session.data["oauthState"] = nil
-        let info = try await AppleOAuth.exchangeCodeAndFetchUser(
-            code: code, redirectURI: "\(base)/auth/apple/staff/callback", userField: body.user, client: req.client
-        )
-        return try finishStaffOAuth(req, info: info, provider: .apple, mode: parsed.mode)
+        return await oauthCallbackFallback(req, errorRedirect: "/login?error=oauth_failed") {
+            let info = try await AppleOAuth.exchangeCodeAndFetchUser(
+                code: code, redirectURI: "\(base)/auth/apple/staff/callback", userField: body.user, client: req.client
+            )
+            return try finishStaffOAuth(req, info: info, provider: .apple, mode: parsed.mode)
+        }
     }
 }

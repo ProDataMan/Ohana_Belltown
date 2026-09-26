@@ -1538,6 +1538,41 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    /// Regression test for a real production bug: a failed OAuth exchange
+    /// used to propagate as Vapor's raw, undecorated error response — which,
+    /// hit via a full-page browser navigation with no file extension in the
+    /// URL, got downloaded by the browser as "callback.json" instead of
+    /// showing anything. `oauthCallbackFallback` (OAuthRoutes.swift) now
+    /// catches any failure after the code/state check and redirects instead.
+    /// `FACEBOOK_OAUTH_APP_ID` alone (no `_APP_SECRET`) reproduces exactly
+    /// that failure shape: the authorization redirect succeeds, but the
+    /// callback's token exchange throws.
+    func testFacebookCallbackRedirectsInsteadOfLeakingRawErrorOnFailure() throws {
+        setenv("FACEBOOK_OAUTH_APP_ID", "test-app-id", 1)
+        defer { unsetenv("FACEBOOK_OAUTH_APP_ID") }
+
+        var sessionCookie: String?
+        var capturedState: String?
+        try app.test(.GET, "auth/facebook/customer") { res in
+            XCTAssertEqual(res.status, .seeOther)
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+            let location = res.headers.first(name: .location) ?? ""
+            capturedState = URLComponents(string: location)?.queryItems?.first(where: { $0.name == "state" })?.value
+        }
+        guard let cookie = sessionCookie, let state = capturedState else {
+            return XCTFail("expected a session cookie and an encoded state from the Facebook authorization redirect")
+        }
+        let encodedState = state.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? state
+
+        try app.test(.GET, "auth/facebook/callback?code=whatever&state=\(encodedState)", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .seeOther, "a failed exchange should redirect, never leak Vapor's raw error response")
+            XCTAssertEqual(res.headers.first(name: .location), "/account-login?error=oauth_failed")
+            XCTAssertNotEqual(res.headers.contentType?.description, "application/json", "the whole point is that this is no longer a downloadable JSON error body")
+        }
+    }
+
     func testMenuItemEngagementTracksByItemDeviceAndClickType() throws {
         func record(item: String, clickType: String, device: String) throws {
             try app.test(

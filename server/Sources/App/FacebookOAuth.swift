@@ -1,4 +1,6 @@
 import Vapor
+import NIOFoundationCompat
+import struct Foundation.Data
 
 /// Facebook Login — free to set up (a Meta for Developers app, no paid tier
 /// required for basic sign-in), unlike X/Twitter's current API pricing.
@@ -64,7 +66,7 @@ enum FacebookOAuth {
         guard tokenResponse.status == .ok else {
             throw Abort(.badGateway, reason: "Facebook token exchange failed.")
         }
-        let token = try tokenResponse.content.decode(TokenResponse.self)
+        let token = try decodeFacebookJSON(TokenResponse.self, from: tokenResponse)
 
         var userComponents = URLComponents(string: "https://graph.facebook.com/me")!
         userComponents.queryItems = [
@@ -78,7 +80,7 @@ enum FacebookOAuth {
         guard userResponse.status == .ok else {
             throw Abort(.badGateway, reason: "Facebook user info request failed.")
         }
-        let info = try userResponse.content.decode(UserInfoResponse.self)
+        let info = try decodeFacebookJSON(UserInfoResponse.self, from: userResponse)
         guard let email = info.email else {
             throw Abort(.forbidden, reason: "Facebook didn't share an email for this account.")
         }
@@ -103,6 +105,21 @@ enum FacebookOAuth {
         guard let pictureURL = pictureComponents.url else { return nil }
         let pictureResponse = try await client.get(URI(string: pictureURL.absoluteString)).get()
         guard pictureResponse.status == .ok else { return nil }
-        return try pictureResponse.content.decode(Picture.self).data?.url
+        return try decodeFacebookJSON(Picture.self, from: pictureResponse).data?.url
+    }
+
+    /// The Graph API's replies are JSON, but it frequently labels them
+    /// `Content-Type: text/javascript; charset=UTF-8` — a long-standing
+    /// Facebook quirk, not an error. `response.content.decode(_:)` picks its
+    /// decoder from that header, and Vapor has nothing registered for
+    /// `text/javascript`, so it throws a 415 even though the body decodes
+    /// fine — which, uncaught, is what let a customer's browser download
+    /// Vapor's raw error response as "callback.json" mid-login. Decoding
+    /// directly with `JSONDecoder` sidesteps the header entirely.
+    private static func decodeFacebookJSON<T: Decodable>(_: T.Type, from response: ClientResponse) throws -> T {
+        guard let body = response.body else {
+            throw Abort(.badGateway, reason: "Facebook returned an empty response.")
+        }
+        return try JSONDecoder().decode(T.self, from: Data(buffer: body))
     }
 }
