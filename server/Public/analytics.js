@@ -75,6 +75,7 @@ async function loadAnalytics() {
   const browserEl = document.getElementById('browser-breakdown');
   const deviceModelEl = document.getElementById('device-model-breakdown');
   const topItemsEl = document.getElementById('top-items');
+  const qrScansEl = document.getElementById('qr-scans');
   const dwellEl = document.getElementById('page-dwell');
   const days = document.getElementById('range-select').value;
 
@@ -150,6 +151,12 @@ async function loadAnalytics() {
       ...(summary.topItems[0] ? [{ label: `Most viewed: ${summary.topItems[0].name} (${summary.topItems[0].count})`, cls: 'pill-approved' }] : []),
     ]);
 
+    const topTableScan = summary.qrScans.find((s) => s.table !== 'Front Door / No Table');
+    renderSummaryPills(document.getElementById('qr-scans-summary'), [
+      { label: `${summary.qrScans.reduce((sum, s) => sum + s.count, 0)} total scans` },
+      ...(topTableScan ? [{ label: `Busiest table: ${topTableScan.table} (${topTableScan.count})`, cls: 'pill-approved' }] : []),
+    ]);
+
     const totalDwellSamples = summary.pageDwell.reduce((sum, d) => sum + d.samples, 0);
     const weightedAvg = totalDwellSamples
       ? Math.round(summary.pageDwell.reduce((sum, d) => sum + d.avgSeconds * d.samples, 0) / totalDwellSamples)
@@ -210,6 +217,12 @@ async function loadAnalytics() {
       topItemsEl,
       summary.topItems.map((i) => ({ label: i.name, value: i.count })),
       { labelHeader: 'Item', valueHeader: 'Detail views' }
+    );
+
+    renderHbarTable(
+      qrScansEl,
+      summary.qrScans.map((s) => ({ label: s.table, value: s.count })),
+      { labelHeader: 'Table', valueHeader: 'Scans' }
     );
 
     renderHbarTable(

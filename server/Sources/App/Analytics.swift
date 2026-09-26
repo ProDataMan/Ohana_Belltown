@@ -15,15 +15,17 @@ struct DailyPageviews: Codable {
     var osCounts: [String: Int]
     var browserCounts: [String: Int]
     var deviceModelCounts: [String: Int]
+    var qrScanCounts: [String: Int]
 
     enum CodingKeys: String, CodingKey {
-        case date, counts, deviceCounts, itemViewCounts, dwell, osCounts, browserCounts, deviceModelCounts
+        case date, counts, deviceCounts, itemViewCounts, dwell, osCounts, browserCounts, deviceModelCounts, qrScanCounts
     }
 
     init(
         date: String, counts: [String: Int], deviceCounts: [String: Int] = [:],
         itemViewCounts: [String: Int] = [:], dwell: [String: DwellStat] = [:],
-        osCounts: [String: Int] = [:], browserCounts: [String: Int] = [:], deviceModelCounts: [String: Int] = [:]
+        osCounts: [String: Int] = [:], browserCounts: [String: Int] = [:], deviceModelCounts: [String: Int] = [:],
+        qrScanCounts: [String: Int] = [:]
     ) {
         self.date = date
         self.counts = counts
@@ -33,6 +35,7 @@ struct DailyPageviews: Codable {
         self.osCounts = osCounts
         self.browserCounts = browserCounts
         self.deviceModelCounts = deviceModelCounts
+        self.qrScanCounts = qrScanCounts
     }
 
     init(from decoder: Decoder) throws {
@@ -45,6 +48,7 @@ struct DailyPageviews: Codable {
         osCounts = try container.decodeIfPresent([String: Int].self, forKey: .osCounts) ?? [:]
         browserCounts = try container.decodeIfPresent([String: Int].self, forKey: .browserCounts) ?? [:]
         deviceModelCounts = try container.decodeIfPresent([String: Int].self, forKey: .deviceModelCounts) ?? [:]
+        qrScanCounts = try container.decodeIfPresent([String: Int].self, forKey: .qrScanCounts) ?? [:]
     }
 }
 
@@ -58,6 +62,12 @@ struct AnalyticsSummary: Content {
     var osBreakdown: [OSCount]
     var browserBreakdown: [BrowserCount]
     var deviceModelBreakdown: [DeviceModelCount]
+    var qrScans: [QRScanCount]
+}
+
+struct QRScanCount: Content {
+    var table: String
+    var count: Int
 }
 
 struct PageCount: Content {
@@ -112,6 +122,11 @@ final class AnalyticsStore: @unchecked Sendable {
     /// not representative of someone actually reading the page.
     static let minDwellSeconds: Double = 1
     static let maxDwellSeconds: Double = 1800
+
+    /// The bucket a `/scan` hit with no `table` id falls into — the
+    /// front-door "While You Wait" QR by the host stand, or any other scan
+    /// that isn't tied to a specific table.
+    static let genericScanLabel = "Front Door / No Table"
 
     private let lock = NSLock()
     private var fileURL = URL(fileURLWithPath: "Data/analytics.json")
@@ -224,6 +239,22 @@ final class AnalyticsStore: @unchecked Sendable {
         try? persist()
     }
 
+    /// A `/scan` hit — `table` is the raw table/seat id off the physical QR
+    /// (e.g. "5", "B2", "R1"), matching what's printed on the card itself, or
+    /// `Self.genericScanLabel` for the front-door QR (no table). Recorded
+    /// server-side in the `/scan` redirect itself, independent of whatever
+    /// the guest does next (browse only, or actually place an order) — the
+    /// only way to see "which tables are using the QR menu" at all, since an
+    /// order-based report misses everyone who scanned and just browsed.
+    func recordQRScan(table: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        try? loadIfNeeded()
+        let idx = todayIndex()
+        days[idx].qrScanCounts[table, default: 0] += 1
+        try? persist()
+    }
+
     func recordDwell(path: String, seconds: Double) {
         guard seconds >= Self.minDwellSeconds, seconds <= Self.maxDwellSeconds else { return }
         lock.lock()
@@ -250,6 +281,7 @@ final class AnalyticsStore: @unchecked Sendable {
         var osTotals: [String: Int] = [:]
         var browserTotals: [String: Int] = [:]
         var deviceModelTotals: [String: Int] = [:]
+        var qrScanTotals: [String: Int] = [:]
         for day in recent {
             for (path, count) in day.counts {
                 totals[path, default: 0] += count
@@ -274,6 +306,9 @@ final class AnalyticsStore: @unchecked Sendable {
             }
             for (model, count) in day.deviceModelCounts {
                 deviceModelTotals[model, default: 0] += count
+            }
+            for (table, count) in day.qrScanCounts {
+                qrScanTotals[table, default: 0] += count
             }
         }
 
@@ -311,6 +346,17 @@ final class AnalyticsStore: @unchecked Sendable {
             .prefix(15)
             .map { DeviceModelCount(model: $0.key, count: $0.value) }
 
+        // Most-scanned table first; the front-door/generic bucket always
+        // last regardless of its count — it isn't a table, so it shouldn't
+        // compete in a "which table gets scanned most" ranking.
+        let qrScans = qrScanTotals
+            .sorted { lhs, rhs in
+                if lhs.key == Self.genericScanLabel { return false }
+                if rhs.key == Self.genericScanLabel { return true }
+                return lhs.value > rhs.value
+            }
+            .map { QRScanCount(table: $0.key, count: $0.value) }
+
         return AnalyticsSummary(
             days: recent.sorted { $0.date < $1.date },
             totalViews: totals.values.reduce(0, +),
@@ -320,7 +366,8 @@ final class AnalyticsStore: @unchecked Sendable {
             pageDwell: Array(pageDwell),
             osBreakdown: osBreakdown,
             browserBreakdown: browserBreakdown,
-            deviceModelBreakdown: Array(deviceModelBreakdown)
+            deviceModelBreakdown: Array(deviceModelBreakdown),
+            qrScans: qrScans
         )
     }
 

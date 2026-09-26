@@ -103,6 +103,49 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    // Every real /scan hit should show up in the QR-scan report regardless
+    // of whether the guest goes on to order — this is what makes "which
+    // tables are using the QR menu, or is it the front-door generic one"
+    // reportable at all, since order data alone misses browse-only scans.
+    func testScanRecordsQRScanByTableOrGenericFrontDoor() throws {
+        try app.test(.GET, "scan?table=5") { _ in }
+        try app.test(.GET, "scan?table=5&hh=1") { _ in }
+        try app.test(.GET, "scan?table=9") { _ in }
+        try app.test(.GET, "scan?prices=1") { _ in } // the front-door "While You Wait" QR — no table
+        try app.test(.GET, "scan") { _ in } // defensively, a bare hit with nothing at all
+
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],
+                      body: ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        try app.test(.GET, "api/analytics/summary?days=1", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+            let summary = try res.content.decode(AnalyticsSummary.self)
+
+            guard let table5 = summary.qrScans.first(where: { $0.table == "5" }) else {
+                return XCTFail("expected a scan entry for table 5")
+            }
+            XCTAssertEqual(table5.count, 2, "the table QR and its Happy Hour back-of-card both count toward the same table")
+
+            guard let table9 = summary.qrScans.first(where: { $0.table == "9" }) else {
+                return XCTFail("expected a scan entry for table 9")
+            }
+            XCTAssertEqual(table9.count, 1)
+
+            guard let generic = summary.qrScans.first(where: { $0.table == AnalyticsStore.genericScanLabel }) else {
+                return XCTFail("expected a generic front-door scan entry")
+            }
+            XCTAssertEqual(generic.count, 2, "both the prices=1 front-door scan and the bare /scan hit have no table")
+
+            XCTAssertEqual(summary.qrScans.last?.table, AnalyticsStore.genericScanLabel, "the generic bucket should sort last, not compete in the table ranking")
+        }
+    }
+
     // analytics.html itself is admin-gated at the page level, but its data
     // came from a mix of requireLogin/requireAdmin endpoints underneath —
     // meaning a logged-in-but-non-admin employee could hit those APIs

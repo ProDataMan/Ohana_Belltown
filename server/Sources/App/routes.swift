@@ -160,8 +160,17 @@ func routes(_ app: Application) throws {
         if req.query[String.self, at: "hh"] == "1" {
             target = "/happy-hour"
         }
+
+        // Recorded here, not on whatever page it redirects to — this fires
+        // on every real QR scan regardless of what the guest does next
+        // (browse only, or actually place an order), which is the only way
+        // to report "which tables are using the QR menu" at all: an
+        // order-based report misses everyone who scanned and just browsed.
+        let scannedTable = req.query[String.self, at: "table"]?.trimmingCharacters(in: .whitespacesAndNewlines)
+        AnalyticsStore.shared.recordQRScan(table: (scannedTable?.isEmpty ?? true) ? AnalyticsStore.genericScanLabel : scannedTable!)
+
         var queryParts: [String] = []
-        if let table = req.query[String.self, at: "table"]?.trimmingCharacters(in: .whitespacesAndNewlines), !table.isEmpty,
+        if let table = scannedTable, !table.isEmpty,
            let encoded = table.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
             queryParts.append("table=\(encoded)")
         }
