@@ -7,6 +7,11 @@ struct OAuthUserInfo {
     /// A profile photo URL, when the provider supplies one. Google does;
     /// Apple Sign In never does, so this is always nil for that provider.
     var pictureURL: String? = nil
+    /// "MM-DD" (year always discarded, same privacy stance as the rest of
+    /// the Birthday Club — see CustomerUser.birthday), when the provider
+    /// supplies one. Only Facebook does today (see FacebookOAuth.swift);
+    /// nil for every other provider/whenever the user hasn't shared it.
+    var birthday: String? = nil
 }
 
 enum OAuthConfigError: Error {

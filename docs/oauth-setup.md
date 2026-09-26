@@ -134,6 +134,19 @@ the same field a user gets from signing up with a plain email/password.
 It's never shared with third parties or used for marketing without a
 separate opt-in."
 
+**`user_birthday`** (added 2026-09-26 — requires its own Advanced Access
+request under **Permissions and Features**, separate from the
+`public_profile`/`email` default access above) — "Ohana Belltown uses
+user_birthday to offer the user's Birthday Club perk (one free bonus punch
+on their sushi punch card every year on their birthday) without asking them
+to type their birthday in twice. We discard the year entirely — only the
+month and day are ever stored (`CustomerUser.birthday`, format `MM-DD`) —
+and only fill this field the first time it's empty; a user's own edit from
+their account page always takes precedence and is never overwritten by a
+later Facebook login. The birthday is shown back to the user on their own
+account page and can be changed or cleared there at any time, independent
+of Facebook."
+
 **Data deletion** — "If a user removes Ohana Belltown from their Facebook
 account, or requests deletion via Facebook's own settings, Facebook sends a
 signed server-to-server request to our Data Deletion Request URL

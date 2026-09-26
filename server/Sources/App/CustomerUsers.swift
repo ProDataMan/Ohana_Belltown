@@ -304,21 +304,39 @@ final class CustomerUserStore: @unchecked Sendable {
     /// account with a matching verified email, or creates a new account.
     /// Whenever the provider supplies a profile photo and the account doesn't
     /// have one on file yet, it's backfilled — covers both a brand-new signup
-    /// and an account that linked Google before this field existed.
+    /// and an account that linked Google before this field existed. Birthday
+    /// follows the exact same backfill rule (provider-supplied, only fills a
+    /// blank field, never overwrites what the customer already has on file —
+    /// whether that's a value they typed themselves or one backfilled from an
+    /// earlier login) so a customer's own edit from the Birthday Club always
+    /// wins. Only Facebook supplies one today (see FacebookOAuth.swift); nil
+    /// from Google/Apple is a no-op here, same as `pictureURL` being nil.
     @discardableResult
-    func findOrCreateFromOAuth(provider: OAuthProvider, providerId: String, email: String, displayName: String, pictureURL: String? = nil) throws -> CustomerUserPublic {
+    func findOrCreateFromOAuth(
+        provider: OAuthProvider, providerId: String, email: String, displayName: String,
+        pictureURL: String? = nil, birthday: String? = nil
+    ) throws -> CustomerUserPublic {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
         let normalized = Self.normalizeEmail(email)
         let timestamp = nowString()
+        let validBirthday = birthday.flatMap { Self.isValidMonthDay($0) ? $0 : nil }
 
         if let idx = users.firstIndex(where: { provider.id(of: $0) == providerId }) {
             guard users[idx].active else {
                 throw CustomerUserError.accountDeactivated
             }
+            var changed = false
             if let pictureURL, users[idx].photoURL == nil {
                 users[idx].photoURL = pictureURL
+                changed = true
+            }
+            if let validBirthday, users[idx].birthday == nil {
+                users[idx].birthday = validBirthday
+                changed = true
+            }
+            if changed {
                 users[idx].updatedAt = timestamp
                 try persist()
             }
@@ -334,6 +352,9 @@ final class CustomerUserStore: @unchecked Sendable {
             if let pictureURL, users[idx].photoURL == nil {
                 users[idx].photoURL = pictureURL
             }
+            if let validBirthday, users[idx].birthday == nil {
+                users[idx].birthday = validBirthday
+            }
             users[idx].updatedAt = timestamp
             try persist()
             return CustomerUserPublic(users[idx])
@@ -347,6 +368,7 @@ final class CustomerUserStore: @unchecked Sendable {
             googleId: nil,
             appleId: nil,
             verified: true,
+            birthday: validBirthday,
             photoURL: pictureURL,
             verificationToken: nil,
             resetToken: nil,

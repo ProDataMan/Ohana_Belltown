@@ -18,7 +18,7 @@ enum FacebookOAuth {
             URLQueryItem(name: "client_id", value: appId),
             URLQueryItem(name: "redirect_uri", value: redirectURI),
             URLQueryItem(name: "response_type", value: "code"),
-            URLQueryItem(name: "scope", value: "email,public_profile"),
+            URLQueryItem(name: "scope", value: "email,public_profile,user_birthday"),
             URLQueryItem(name: "state", value: state),
         ]
         guard let url = components.url else {
@@ -43,6 +43,10 @@ enum FacebookOAuth {
         var id: String
         var name: String?
         var email: String?
+        /// "MM/DD/YYYY", "MM/DD", or just "YYYY" depending on what the user
+        /// has shared — Facebook's own format, not ISO 8601. See
+        /// parseBirthday(_:) for how this becomes "MM-DD".
+        var birthday: String?
     }
 
     static func exchangeCodeAndFetchUser(code: String, redirectURI: String, client: Client) async throws -> OAuthUserInfo {
@@ -70,7 +74,7 @@ enum FacebookOAuth {
 
         var userComponents = URLComponents(string: "https://graph.facebook.com/me")!
         userComponents.queryItems = [
-            URLQueryItem(name: "fields", value: "id,name,email"),
+            URLQueryItem(name: "fields", value: "id,name,email,birthday"),
             URLQueryItem(name: "access_token", value: token.access_token),
         ]
         guard let userURL = userComponents.url else {
@@ -92,7 +96,27 @@ enum FacebookOAuth {
         // fetch failure shouldn't block login.
         let pictureURL = try? await fetchPictureURL(userId: info.id, accessToken: token.access_token, client: client)
 
-        return OAuthUserInfo(providerId: info.id, email: email, displayName: info.name ?? email, pictureURL: pictureURL)
+        return OAuthUserInfo(
+            providerId: info.id, email: email, displayName: info.name ?? email, pictureURL: pictureURL,
+            birthday: info.birthday.flatMap(Self.parseBirthday)
+        )
+    }
+
+    /// Facebook returns the birthday in its own `MM/DD/YYYY` format (or just
+    /// `MM/DD`, or bare `YYYY` if the user only shared the year) depending on
+    /// what the user's chosen to share — never guaranteed to include a full
+    /// date. The year is discarded either way, same privacy stance as the
+    /// rest of the Birthday Club (see CustomerUser.birthday): only a
+    /// `MM/DD`-shaped value can produce a result, zero-padded to match the
+    /// "MM-DD" format the manual entry form already stores.
+    static func parseBirthday(_ raw: String) -> String? {
+        let parts = raw.split(separator: "/")
+        guard parts.count >= 2, let month = Int(parts[0]), let day = Int(parts[1]),
+              (1...12).contains(month), (1...31).contains(day) else {
+            return nil
+        }
+        func zeroPadded(_ value: Int) -> String { value < 10 ? "0\(value)" : "\(value)" }
+        return "\(zeroPadded(month))-\(zeroPadded(day))"
     }
 
     private static func fetchPictureURL(userId: String, accessToken: String, client: Client) async throws -> String? {

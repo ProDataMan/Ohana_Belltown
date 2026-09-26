@@ -185,6 +185,48 @@ final class CustomerUserStoreTests: XCTestCase {
         XCTAssertEqual(second.photoURL, "https://example.com/first.png")
     }
 
+    func testOAuthSignupCapturesBirthday() throws {
+        let customer = try CustomerUserStore.shared.findOrCreateFromOAuth(
+            provider: .facebook, providerId: "fb-1", email: "oauth@example.com", displayName: "OAuth User",
+            birthday: "07-26"
+        )
+        XCTAssertEqual(customer.birthday, "07-26")
+    }
+
+    func testOAuthBackfillsMissingBirthdayOnSubsequentLogin() throws {
+        let first = try CustomerUserStore.shared.findOrCreateFromOAuth(
+            provider: .facebook, providerId: "fb-1", email: "oauth@example.com", displayName: "OAuth User"
+        )
+        XCTAssertNil(first.birthday)
+
+        let second = try CustomerUserStore.shared.findOrCreateFromOAuth(
+            provider: .facebook, providerId: "fb-1", email: "oauth@example.com", displayName: "OAuth User",
+            birthday: "12-25"
+        )
+        XCTAssertEqual(second.birthday, "12-25")
+    }
+
+    // A customer's own edit from the Birthday Club (or an earlier backfill)
+    // must always win — an OAuth login should never silently overwrite it.
+    func testOAuthDoesNotOverwriteExistingBirthday() throws {
+        let (customer, _) = try CustomerUserStore.shared.register(email: "oauth@example.com", displayName: "OAuth User", password: "guestpass1")
+        try CustomerUserStore.shared.updateBirthday(id: customer.id, birthday: "01-15")
+
+        let linked = try CustomerUserStore.shared.findOrCreateFromOAuth(
+            provider: .facebook, providerId: "fb-1", email: "oauth@example.com", displayName: "OAuth User",
+            birthday: "12-25"
+        )
+        XCTAssertEqual(linked.birthday, "01-15")
+    }
+
+    func testOAuthIgnoresAnInvalidBirthdayFormat() throws {
+        let customer = try CustomerUserStore.shared.findOrCreateFromOAuth(
+            provider: .facebook, providerId: "fb-1", email: "oauth@example.com", displayName: "OAuth User",
+            birthday: "not-a-date"
+        )
+        XCTAssertNil(customer.birthday)
+    }
+
     func testLoyaltyPhoneCanBeLinkedAndNormalized() throws {
         let (customer, _) = try CustomerUserStore.shared.register(email: "guest@example.com", displayName: "Guest", password: "guestpass1")
         let linked = try CustomerUserStore.shared.updateLoyaltyPhone(id: customer.id, phone: "(206) 555-0100")
