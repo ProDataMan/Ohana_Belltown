@@ -107,6 +107,58 @@ These became:
 - `FACEBOOK_OAUTH_APP_ID`
 - `FACEBOOK_OAUTH_APP_SECRET`
 
+### Going Live — App Review / Data Handling questionnaire
+
+Before Facebook lets the app leave Development Mode, its dashboard asks for
+a description (sometimes phrased as a "data flow diagram") of how each
+requested permission is used. Ready-to-paste answers, generated from what
+`FacebookOAuth.swift`/`CustomerUsers.swift` actually do:
+
+**`public_profile`** — "Ohana Belltown (www.ohanasushigrill.com) uses
+public_profile solely to let guests and staff sign in and create an account
+with one tap, instead of a separate username/password. We read the user's
+Facebook id and name via `graph.facebook.com/me`: the id links their
+Facebook login to their own account in our system so a returning user is
+recognized, and the name pre-fills their display name, which they can edit
+any time from their account page. We also fetch their public profile
+picture (via the `/{user-id}/picture` edge) to show as their avatar. None
+of this data is sold, shared with third parties, or used for advertising —
+it's stored only in this application's own database to support login and
+account display."
+
+**`email`** — "Ohana Belltown uses the email permission to create the
+account itself, since our sign-in system is email-based — we require an
+email address to open a session and identify the account uniquely. The
+email Facebook returns is stored as the account's email address, exactly
+the same field a user gets from signing up with a plain email/password.
+It's never shared with third parties or used for marketing without a
+separate opt-in."
+
+**Data deletion** — "If a user removes Ohana Belltown from their Facebook
+account, or requests deletion via Facebook's own settings, Facebook sends a
+signed server-to-server request to our Data Deletion Request URL
+(`https://www.ohanasushigrill.com/auth/facebook/data-deletion`). We verify
+the request's signature with our App Secret, then permanently delete the
+matching customer account and all associated data (email, name, profile
+photo reference, loyalty/rewards records) from our database. If the
+Facebook-linked account belongs to restaurant staff rather than a customer,
+we only remove the Facebook connection itself — the underlying employment
+account isn't something Facebook created, so the staff member keeps normal
+username/password login. We return a confirmation URL
+(`https://www.ohanasushigrill.com/data-deletion-status`) that Facebook
+shows the user. Customers can also delete their account directly, any
+time, from `https://www.ohanasushigrill.com/my-account.html`, independent
+of Facebook."
+
+A diagram matching the same flow (guest → Facebook OAuth → Graph API →
+this app's own `CustomerUser` record → what it's used for → the two
+independent deletion paths) is at
+[`docs/images/facebook-data-flow.png`](images/facebook-data-flow.png) —
+upload it directly if the dashboard specifically asks for an image/diagram
+rather than free text. If Facebook also asks for a screen recording of the
+login flow, the real one on `/account-login` or `/signup` is enough — no
+separate demo needed, since it's live and working end to end already.
+
 ## Applying the values
 
 Easiest: paste the values into the chat and they'll get set on the Container App directly.
