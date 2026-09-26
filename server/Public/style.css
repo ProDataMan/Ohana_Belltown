@@ -428,6 +428,35 @@ h1 {
   }
 }
 
+/* Stacked directly above .feedback-tab-btn, same right edge, so the two
+   never overlap at any width — see that rule's own bottom offsets above. */
+.last-updated-badge {
+  position: fixed;
+  bottom: 4.6rem;
+  right: 1rem;
+  z-index: 140;
+  background: var(--panel);
+  color: var(--text-muted);
+  border: 1px solid var(--panel-border);
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-family: var(--font-ui);
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.last-updated-badge:hover {
+  color: var(--pink-text);
+  border-color: var(--pink);
+}
+
+@media (max-width: 860px) {
+  .last-updated-badge {
+    bottom: 122px;
+  }
+}
+
 .feedback-stars {
   display: flex;
   gap: 0.25rem;
