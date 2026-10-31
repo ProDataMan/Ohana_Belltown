@@ -56,6 +56,23 @@
       .quick-upload-row-status.status-error {
         color: #b91c1c;
       }
+      .gps-candidate-btn {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        text-align: left;
+        padding: 0.6rem 0.75rem;
+      }
+      .gps-candidate-btn .hint {
+        display: block;
+        margin-top: 0.1rem;
+      }
+      #selected-restaurant-status.status-ok {
+        color: #15803d;
+      }
+      #selected-restaurant-status.status-error {
+        color: #b91c1c;
+      }
     </style>
   </head>
   <body>
@@ -64,13 +81,23 @@
         <p class="eyebrow">Ohana Belltown — Staff</p>
         <h1>Quick Menu Upload</h1>
         <p>
-          Out at another restaurant? Snap their menu right here — no need to pick which restaurant
-          it is or type in any prices now. Every photo lands in a review inbox; figuring out the
-          restaurant and prices happens later, during a review pass (by a staff member, or by asking
-          a Claude Code session to "go through the competitor photo inbox").
+          Out at another restaurant? Snap their menu right here. Use your location to pick which
+          restaurant it is in one tap, or skip that and just upload — either way there's no typing
+          prices now. Anything uploaded without a restaurant picked lands in a review inbox instead;
+          figuring it out happens later (by a staff member, or by asking a Claude Code session to
+          "go through the competitor photo inbox").
         </p>
         <p class="admin-link"><a href="/competitor-pricing-admin.html">&larr; Full Competitor Pricing tool</a></p>
       </header>
+
+      <section class="panel">
+        <h2>Which Restaurant? <span class="hint">(optional)</span></h2>
+        <button type="button" id="find-nearby-gps-btn" class="secondary">
+          <span aria-hidden="true">&#128205;</span> Use My Location
+        </button>
+        <div id="gps-nearby-list" class="quick-upload-list"></div>
+        <p id="selected-restaurant-status" class="hint" style="margin-top: 0.5rem;"></p>
+      </section>
 
       <section class="panel">
         <label class="cta-button quick-upload-btn">

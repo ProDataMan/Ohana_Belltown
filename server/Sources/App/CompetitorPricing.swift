@@ -200,17 +200,47 @@ final class CompetitorPricingStore: @unchecked Sendable {
             return []
         }
 
+        let candidates = try await Self.searchNearby(
+            client: client, apiKey: apiKey, latitude: ourLocation.lat, longitude: ourLocation.lng,
+            radiusMiles: radiusMiles, excludingPlaceId: placeId
+        )
+
+        lock.lock()
+        nearbyCache = candidates
+        nearbyCacheFetchedAt = Date()
+        lock.unlock()
+
+        return candidates
+    }
+
+    /// Same Nearby Search, anchored to an arbitrary lat/lng instead of
+    /// Ohana's own location — the Quick Upload page's "which restaurant am I
+    /// at right now" picker, built from the staff member's actual GPS
+    /// position while standing at the competitor's table, not back at Ohana.
+    /// Deliberately not cached like the method above: this is a one-off ad
+    /// hoc search from wherever staff happen to be, not a repeatedly-hit
+    /// page load from the same fixed spot.
+    func nearbyRestaurants(client: Client, apiKey: String, latitude: Double, longitude: Double, radiusMiles: Double) async throws -> [NearbyRestaurantCandidate] {
+        try await Self.searchNearby(
+            client: client, apiKey: apiKey, latitude: latitude, longitude: longitude,
+            radiusMiles: radiusMiles, excludingPlaceId: Environment.get("GOOGLE_PLACE_ID")
+        )
+    }
+
+    private static func searchNearby(
+        client: Client, apiKey: String, latitude: Double, longitude: Double, radiusMiles: Double, excludingPlaceId: String?
+    ) async throws -> [NearbyRestaurantCandidate] {
         let radiusMeters = Int(radiusMiles * 1609.34)
-        let uri = URI(string: "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=\(ourLocation.lat),\(ourLocation.lng)&radius=\(radiusMeters)&type=restaurant&key=\(apiKey)")
+        let uri = URI(string: "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=\(latitude),\(longitude)&radius=\(radiusMeters)&type=restaurant&key=\(apiKey)")
         let response = try await client.get(uri).get()
         let decoded = try response.content.decode(GoogleNearbySearchResponse.self)
 
-        let candidates = decoded.results
+        return decoded.results
             .compactMap { result -> NearbyRestaurantCandidate? in
-                guard result.place_id != placeId else { return nil }
+                guard result.place_id != excludingPlaceId else { return nil }
                 guard result.business_status == nil || result.business_status == "OPERATIONAL" else { return nil }
                 guard let location = result.geometry?.location else { return nil }
-                let distance = Self.haversineMiles(lat1: ourLocation.lat, lng1: ourLocation.lng, lat2: location.lat, lng2: location.lng)
+                let distance = haversineMiles(lat1: latitude, lng1: longitude, lat2: location.lat, lng2: location.lng)
                 guard distance <= radiusMiles else { return nil }
                 return NearbyRestaurantCandidate(
                     placeId: result.place_id,
@@ -221,13 +251,6 @@ final class CompetitorPricingStore: @unchecked Sendable {
                 )
             }
             .sorted { $0.distanceMiles < $1.distanceMiles }
-
-        lock.lock()
-        nearbyCache = candidates
-        nearbyCacheFetchedAt = Date()
-        lock.unlock()
-
-        return candidates
     }
 
     private static func haversineMiles(lat1: Double, lng1: Double, lat2: Double, lng2: Double) -> Double {

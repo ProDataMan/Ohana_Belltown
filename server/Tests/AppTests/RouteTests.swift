@@ -643,6 +643,37 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    /// The Quick Upload page's GPS-anchored variant — same admin gate and
+    /// same graceful empty-list fallback without an API key configured, plus
+    /// its own `lat`/`lng` requirement (there's no Ohana place id to fall
+    /// back on here, unlike the Ohana-anchored lookup above).
+    func testNearbyRestaurantsByLocationRequiresAdminCoordinatesAndAPIKey() throws {
+        try app.test(.GET, "api/competitor-pricing/nearby-restaurants-by-location?lat=47.6&lng=-122.3") { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+
+        let bootstrapBody = ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"], body: bootstrapBody) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        try app.test(.GET, "api/competitor-pricing/nearby-restaurants-by-location", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .badRequest, "lat/lng are required — there's no fixed location to fall back on here")
+        }
+
+        // No GOOGLE_PLACES_API_KEY in the test environment — same graceful
+        // empty-list fallback as the Ohana-anchored lookup.
+        try app.test(.GET, "api/competitor-pricing/nearby-restaurants-by-location?lat=47.6&lng=-122.3", headers: ["Cookie": cookie]) { res in
+            XCTAssertEqual(res.status, .ok)
+            let candidates = try res.content.decode([NearbyRestaurantCandidate].self)
+            XCTAssertTrue(candidates.isEmpty)
+        }
+    }
+
     func testAIExtractionStatusAndExtractReflectNoAPIKeyConfigured() throws {
         let bootstrapBody = ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)
         var sessionCookie: String?

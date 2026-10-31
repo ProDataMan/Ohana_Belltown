@@ -573,6 +573,25 @@ func routes(_ app: Application) throws {
         return try await CompetitorPricingStore.shared.nearbyRestaurants(client: req.client, apiKey: apiKey, placeId: placeId, radiusMiles: radiusMiles)
     }
 
+    // The Quick Upload page's own "which restaurant am I at" picker —
+    // anchored to the staff member's actual GPS position (sent by the
+    // browser's geolocation API), not Ohana's fixed location like the
+    // lookup above. A tight default radius since they're standing at the
+    // table, not scanning the neighborhood.
+    app.get("api", "competitor-pricing", "nearby-restaurants-by-location") { req async throws -> [NearbyRestaurantCandidate] in
+        try requireAdmin(req)
+        guard let latitude = req.query[Double.self, at: "lat"], let longitude = req.query[Double.self, at: "lng"] else {
+            throw Abort(.badRequest, reason: "lat and lng are required.")
+        }
+        guard let apiKey = Environment.get("GOOGLE_PLACES_API_KEY") else {
+            return []
+        }
+        let radiusMiles = req.query[Double.self, at: "radiusMiles"] ?? 0.5
+        return try await CompetitorPricingStore.shared.nearbyRestaurants(
+            client: req.client, apiKey: apiKey, latitude: latitude, longitude: longitude, radiusMiles: radiusMiles
+        )
+    }
+
     app.get("api", "competitor-pricing", "restaurants") { req throws -> [CompetitorRestaurant] in
         try requireAdmin(req)
         return try CompetitorPricingStore.shared.restaurants()
