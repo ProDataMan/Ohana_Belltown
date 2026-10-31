@@ -8,12 +8,20 @@ import Vapor
 /// `CompetitorPricingStore.saveRestaurants`, not by the generic
 /// `POST /api/upload` route, since that route is shared site-wide and
 /// must not tag unrelated uploads (menu items, loyalty photos, etc.).
+///
+/// `restaurantId` is nil for a photo that came in through the quick-upload
+/// inbox (`recordInboxUpload`) — snapped on the spot at some other
+/// restaurant's table with no "which restaurant is this" step at all, left
+/// for whoever reviews it (a human or a future Claude session reading the
+/// photo) to identify and either match to an existing `CompetitorRestaurant`
+/// or create a new one.
 struct CompetitorPhotoReviewEntry: Codable, Content {
-    var restaurantId: String
+    var restaurantId: String?
     var addedAt: String
     var reviewed: Bool
     var reviewedAt: String?
     var reviewedByName: String?
+    var uploadedByName: String?
 }
 
 final class CompetitorPhotoReviewStore: @unchecked Sendable {
@@ -34,7 +42,16 @@ final class CompetitorPhotoReviewStore: @unchecked Sendable {
     private func loadIfNeeded() {
         guard !loaded else { return }
         loaded = true
-        guard let raw = try? Data(contentsOf: fileURL) else { return }
+        // A missing file (first run, or a freshly `configure`d data
+        // directory — as every test does) means "nothing tracked yet," not
+        // "keep whatever's already in memory" — without this reset, this
+        // singleton's leftover data from a previous `configure` call (e.g.
+        // another test's temp directory) would silently bleed into whichever
+        // run reads here next.
+        guard let raw = try? Data(contentsOf: fileURL) else {
+            data = [:]
+            return
+        }
         data = (try? JSONDecoder().decode([String: CompetitorPhotoReviewEntry].self, from: raw)) ?? [:]
     }
 
@@ -47,11 +64,41 @@ final class CompetitorPhotoReviewStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         loadIfNeeded()
-        guard data[url] == nil else { return }
+        if var existing = data[url] {
+            // An inbox upload (no restaurant chosen at upload time) just got
+            // attached to one — fill that in rather than silently leaving it
+            // stuck showing as unassigned forever. Leaves `reviewed` as-is
+            // either way: attaching a photo to a restaurant isn't the same
+            // as having actually read prices off it yet.
+            guard existing.restaurantId == nil else { return }
+            existing.restaurantId = restaurantId
+            data[url] = existing
+            persist()
+            return
+        }
         data[url] = CompetitorPhotoReviewEntry(
             restaurantId: restaurantId,
             addedAt: ISO8601DateFormatter().string(from: now),
             reviewed: false
+        )
+        persist()
+    }
+
+    /// The quick-upload path (`POST /api/competitor-pricing/photos/inbox`) —
+    /// a photo snapped on the spot with no restaurant chosen at all.
+    /// `uploadedByName` is who actually took it, separate from
+    /// `reviewedByName` (who, likely a different staff member or a Claude
+    /// session, later reads prices off it).
+    func recordInboxUpload(url: String, uploadedByName: String?, now: Date = Date()) {
+        lock.lock()
+        defer { lock.unlock() }
+        loadIfNeeded()
+        guard data[url] == nil else { return }
+        data[url] = CompetitorPhotoReviewEntry(
+            restaurantId: nil,
+            addedAt: ISO8601DateFormatter().string(from: now),
+            reviewed: false,
+            uploadedByName: uploadedByName
         )
         persist()
     }
@@ -80,6 +127,21 @@ final class CompetitorPhotoReviewStore: @unchecked Sendable {
         defer { lock.unlock() }
         loadIfNeeded()
         return data.filter { !$0.value.reviewed }.map(\.key).sorted()
+    }
+
+    /// Photos still waiting on the first step — nobody's identified which
+    /// restaurant they're even from yet. Whoever reviews these (staff, or a
+    /// Claude session asked to "go through the competitor photo inbox")
+    /// needs to look at each image, figure out the restaurant, and add it
+    /// (new or matched to an existing one) before prices can go anywhere.
+    func unassignedEntries() -> [(url: String, entry: CompetitorPhotoReviewEntry)] {
+        lock.lock()
+        defer { lock.unlock() }
+        loadIfNeeded()
+        return data
+            .filter { !$0.value.reviewed && $0.value.restaurantId == nil }
+            .map { ($0.key, $0.value) }
+            .sorted { $0.entry.addedAt < $1.entry.addedAt }
     }
 
     /// Drops any tracked photo whose URL is no longer referenced by any

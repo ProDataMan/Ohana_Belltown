@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quick Menu Upload — Ohana Belltown</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="stylesheet" href="../style.css" />
+    <style>
+      .quick-upload-page {
+        max-width: 560px;
+      }
+      .quick-upload-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.6rem;
+        width: 100%;
+        box-sizing: border-box;
+        font-size: 1.15rem;
+        padding: 1.4rem;
+        text-align: center;
+        cursor: pointer;
+      }
+      .quick-upload-icon {
+        font-size: 1.5rem;
+      }
+      .quick-upload-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+        margin-top: 1.1rem;
+      }
+      .quick-upload-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem;
+        border: 1px solid var(--panel-border);
+        border-radius: 10px;
+      }
+      .quick-upload-row img {
+        width: 56px;
+        height: 56px;
+        object-fit: cover;
+        border-radius: 8px;
+        flex-shrink: 0;
+      }
+      .quick-upload-row-status {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+      }
+      .quick-upload-row-status.status-ok {
+        color: #15803d;
+      }
+      .quick-upload-row-status.status-error {
+        color: #b91c1c;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page quick-upload-page">
+      <header class="hero">
+        <p class="eyebrow">Ohana Belltown — Staff</p>
+        <h1>Quick Menu Upload</h1>
+        <p>
+          Out at another restaurant? Snap their menu right here — no need to pick which restaurant
+          it is or type in any prices now. Every photo lands in a review inbox; figuring out the
+          restaurant and prices happens later, during a review pass (by a staff member, or by asking
+          a Claude Code session to "go through the competitor photo inbox").
+        </p>
+        <p class="admin-link"><a href="/competitor-pricing-admin.html">&larr; Full Competitor Pricing tool</a></p>
+      </header>
+
+      <section class="panel">
+        <label class="cta-button quick-upload-btn">
+          <span class="quick-upload-icon" aria-hidden="true">&#128247;</span>
+          Add Menu Photos
+          <input type="file" accept="image/*" multiple id="photo-input" hidden />
+        </label>
+        <p class="hint" style="text-align: center; margin-top: 0.5rem;">
+          Pick as many as you need — a whole menu, both sides, even photos from more than one visit.
+        </p>
+
+        <div id="upload-list" class="quick-upload-list"></div>
+
+        <p id="inbox-count" class="hint" style="margin-top: 1.1rem; text-align: center;">Loading…</p>
+      </section>
+    </main>
+
+    <script src="/nav.js"></script>
+    <script src="../staff-auth.js"></script>
+    <script src="../competitor-pricing-upload.js"></script>
+  </body>
+</html>

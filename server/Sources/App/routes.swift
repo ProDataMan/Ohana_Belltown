@@ -99,6 +99,16 @@ struct MarkPhotoReviewedRequest: Content {
     var url: String
 }
 
+struct CompetitorPhotoInboxRequest: Content {
+    var url: String
+}
+
+struct CompetitorPhotoInboxEntry: Content {
+    var url: String
+    var addedAt: String
+    var uploadedByName: String?
+}
+
 struct WaitlistJoinRequest: Content {
     var name: String
     var phone: String
@@ -619,6 +629,29 @@ func routes(_ app: Application) throws {
         let body = try req.content.decode(MarkPhotoReviewedRequest.self)
         CompetitorPhotoReviewStore.shared.markReviewed(url: body.url, reviewedByName: user.displayName)
         return .noContent
+    }
+
+    // The quick-capture flow: a photo taken on the spot at another
+    // restaurant, uploaded (via the shared /api/upload) with no restaurant
+    // chosen at all. This just registers that URL as "needs triage" — a
+    // human or a future Claude session identifies the restaurant and prices
+    // later, from /competitor-pricing-upload.html's inbox list or by being
+    // asked directly to go through it.
+    app.post("api", "competitor-pricing", "photos", "inbox") { req throws -> HTTPStatus in
+        let user = try requireAdmin(req)
+        let body = try req.content.decode(CompetitorPhotoInboxRequest.self)
+        guard body.url.hasPrefix("/uploads/"), !body.url.contains("..") else {
+            throw Abort(.badRequest)
+        }
+        CompetitorPhotoReviewStore.shared.recordInboxUpload(url: body.url, uploadedByName: user.displayName)
+        return .noContent
+    }
+
+    app.get("api", "competitor-pricing", "photos", "inbox") { req throws -> [CompetitorPhotoInboxEntry] in
+        try requireAdmin(req)
+        return CompetitorPhotoReviewStore.shared.unassignedEntries().map {
+            CompetitorPhotoInboxEntry(url: $0.url, addedAt: $0.entry.addedAt, uploadedByName: $0.entry.uploadedByName)
+        }
     }
 
     // Whether ANTHROPIC_API_KEY is set — a separate credential from any
@@ -1175,6 +1208,7 @@ func routes(_ app: Application) throws {
         ("analytics.html", "staff/analytics.html", true),
         ("staff-rewards-admin.html", "staff/staff-rewards-admin.html", true),
         ("competitor-pricing-admin.html", "staff/competitor-pricing-admin.html", true),
+        ("competitor-pricing-upload.html", "staff/competitor-pricing-upload.html", true),
         ("competitor-pricing-findings.html", "staff/competitor-pricing-findings.html", true),
         ("swag-admin.html", "staff/swag-admin.html", false),
         ("gift-cards-admin.html", "staff/gift-cards-admin.html", false),

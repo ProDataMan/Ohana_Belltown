@@ -730,6 +730,72 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    /// The quick-capture flow: a photo uploaded with no restaurant chosen at
+    /// all should land in the inbox, count toward the site-wide unreviewed
+    /// badge, and disappear from the inbox (but stay in the general
+    /// unreviewed list) once it's matched to a restaurant and reviewed.
+    func testCompetitorPhotoInboxTracksUnassignedUploadsSeparatelyFromPerRestaurantOnes() throws {
+        try app.test(.POST, "api/competitor-pricing/photos/inbox") { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+
+        let bootstrapBody = ByteBuffer(string: #"{"username":"admin1","displayName":"Admin","password":"adminpass"}"#)
+        var sessionCookie: String?
+        try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"], body: bootstrapBody) { res in
+            if let cookies = res.headers.setCookie?.all, let (name, value) = cookies.first {
+                sessionCookie = "\(name)=\(value.string)"
+            }
+        }
+        guard let cookie = sessionCookie else { return XCTFail("expected a session cookie from bootstrap") }
+
+        let inboxBody = ByteBuffer(string: #"{"url":"/uploads/inbox-photo.jpg"}"#)
+        try app.test(.POST, "api/competitor-pricing/photos/inbox", headers: ["Cookie": cookie, "Content-Type": "application/json"], body: inboxBody) { res in
+            XCTAssertEqual(res.status, .noContent)
+        }
+
+        // Counts toward the general unreviewed badge, same as any other photo.
+        try app.test(.GET, "api/competitor-pricing/unreviewed-photo-count", headers: ["Cookie": cookie]) { res in
+            let count = try res.content.decode(CompetitorUnreviewedPhotoCount.self)
+            XCTAssertEqual(count.count, 1)
+        }
+
+        // And shows up in the dedicated inbox list, with who uploaded it.
+        try app.test(.GET, "api/competitor-pricing/photos/inbox", headers: ["Cookie": cookie]) { res in
+            let entries = try res.content.decode([CompetitorPhotoInboxEntry].self)
+            XCTAssertEqual(entries.count, 1)
+            XCTAssertEqual(entries[0].url, "/uploads/inbox-photo.jpg")
+            XCTAssertEqual(entries[0].uploadedByName, "Admin")
+        }
+
+        // A second inbox upload for the same URL is a no-op, not a duplicate.
+        try app.test(.POST, "api/competitor-pricing/photos/inbox", headers: ["Cookie": cookie, "Content-Type": "application/json"], body: inboxBody) { res in
+            XCTAssertEqual(res.status, .noContent)
+        }
+        try app.test(.GET, "api/competitor-pricing/photos/inbox", headers: ["Cookie": cookie]) { res in
+            let entries = try res.content.decode([CompetitorPhotoInboxEntry].self)
+            XCTAssertEqual(entries.count, 1)
+        }
+
+        // Once it's been matched to a restaurant (same photo URL, now
+        // attached) and marked reviewed, it drops out of the inbox entirely.
+        let restaurantsBody = ByteBuffer(string: #"[{"id":"r1","name":"Matched Later","menuPhotoUrls":["/uploads/inbox-photo.jpg"]}]"#)
+        try app.test(.PUT, "api/competitor-pricing/restaurants", headers: ["Cookie": cookie, "Content-Type": "application/json"], body: restaurantsBody) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+        let markReviewedBody = ByteBuffer(string: #"{"url":"/uploads/inbox-photo.jpg"}"#)
+        try app.test(.POST, "api/competitor-pricing/photos/mark-reviewed", headers: ["Cookie": cookie, "Content-Type": "application/json"], body: markReviewedBody) { res in
+            XCTAssertEqual(res.status, .noContent)
+        }
+        try app.test(.GET, "api/competitor-pricing/photos/inbox", headers: ["Cookie": cookie]) { res in
+            let entries = try res.content.decode([CompetitorPhotoInboxEntry].self)
+            XCTAssertTrue(entries.isEmpty)
+        }
+        try app.test(.GET, "api/competitor-pricing/unreviewed-photo-count", headers: ["Cookie": cookie]) { res in
+            let count = try res.content.decode(CompetitorUnreviewedPhotoCount.self)
+            XCTAssertEqual(count.count, 0)
+        }
+    }
+
     func testMenuAPIReturnsSeedMenuWithoutAuth() throws {
         try app.test(.GET, "api/menu") { res in
             XCTAssertEqual(res.status, .ok)
