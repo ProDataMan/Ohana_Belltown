@@ -15,11 +15,52 @@
       }
 
       .card-sheet {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 1.5rem;
-        justify-content: center;
         padding: 0 1.25rem 3rem;
+      }
+
+      /* One 8.5x11 sheet, printed landscape so two 4x6 cards fit side by
+         side with real margin to spare (8in of cards + 0.5in gap = 8.5in,
+         comfortably inside an 11in-wide landscape page) — the only
+         arrangement that actually fits 2 full-size cards on Letter paper;
+         a 2x2 grid would need 12in of height. Sized in real inches even on
+         screen so the preview is literally what will print, not a scaled
+         stand-in.
+
+         Deliberately 0.1in short of the real 11x8.5in @page size below, not
+         an exact match — a box sized to exactly match the page triggers a
+         genuine Chrome/Skia print bug where it decides the content is a
+         hair taller than the page and silently appends one extra blank
+         page per print run (confirmed with a 2-page minimal repro: exact
+         11x8.5in → 3 PDF pages, 10.9x8.4in → the correct 2). Invisible at
+         this scale, so there's no real tradeoff to shaving it. */
+      .print-page {
+        width: 10.9in;
+        height: 8.4in;
+        box-sizing: border-box;
+        margin: 0 auto 2rem;
+        padding: 0.4in;
+        background: #fff;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5in;
+        position: relative;
+      }
+
+      /* Marks the one cut a pair actually needs — the outer edges of each
+         card are already obvious against the white page, this is the only
+         boundary with nothing to see otherwise. Extends slightly past the
+         card's own top/bottom edge, like a real print shop's crop marks.
+         (8.4in page, 6in card, centered: (8.4-6)/2 = 1.2in margin — 1.05in
+         starts the line just past the card's actual top/bottom edge.) */
+      .print-page-cut-line {
+        position: absolute;
+        left: 50%;
+        top: 1.05in;
+        bottom: 1.05in;
+        border-left: 1px dashed #bbb;
+        pointer-events: none;
       }
 
       .table-card {
@@ -91,6 +132,16 @@
       }
 
       @media print {
+        /* Sets the printer/print-to-PDF page itself to landscape Letter, so
+           browsers that honor @page (Chrome and its print-to-PDF engine,
+           notably — the most reliable way to carry this to an actual print
+           shop) switch orientation automatically instead of needing someone
+           to remember to flip it by hand in the print dialog. */
+        @page {
+          size: letter landscape;
+          margin: 0;
+        }
+
         .site-header,
         .site-footer,
         .print-instructions {
@@ -115,6 +166,18 @@
           color-adjust: exact;
         }
 
+        .print-page {
+          margin: 0;
+          box-shadow: none;
+          break-inside: avoid;
+        }
+
+        /* One pair per physical sheet — skipped on the last page so a
+           trailing forced break doesn't print a stray blank page after it. */
+        .print-page:not(:last-child) {
+          page-break-after: always;
+        }
+
         .table-card {
           box-shadow: none;
           break-inside: avoid;
@@ -123,10 +186,25 @@
           color-adjust: exact;
         }
 
+        /* Chrome's print/PDF engine (both the CLI --print-to-pdf path and,
+           confirmed against a live production render, its own "Save as
+           PDF" print destination) doesn't clip this gradient to the glyph
+           shapes reliably — the un-clipped gradient rectangle prints as a
+           visible box around the heading instead of colored text. Falls
+           back to a flat, solid brand color for print only; the gradient
+           stays exactly as-is on screen. */
         .table-card h2 {
+          background: none;
+          -webkit-background-clip: initial;
+          background-clip: initial;
+          color: #ff8fb8;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
           color-adjust: exact;
+        }
+
+        .table-card.happy-hour h2 {
+          color: var(--gold-bright);
         }
       }
     </style>
@@ -155,11 +233,26 @@
         the kitchen until a real person has actually looked at it.
       </p>
       <p>
-        Each table also gets a <strong>gold-accented "Scan for Happy Hour" card</strong> — print it,
-        cut it, and glue it to the back of that same table's card so a guest can flip it over and
+        <strong>Laid out 2-up automatically</strong> — each printed sheet is one 8.5&times;11" page,
+        landscape, with two full-size 4&times;6" cards side by side and a dashed line down the middle
+        showing where to cut. The print dialog should switch to landscape on its own; double-check it
+        did before printing if your browser/printer ever ignores that. A sharp paper cutter (most
+        copy shops, FedEx Office included, have a self-service one) gets a cleaner edge than scissors.
+      </p>
+      <p id="page-count-note" class="hint"></p>
+      <p>
+        <strong>Taking this to a print shop?</strong> Rather than printing straight from a shop's own
+        kiosk browser, it's more reliable to make a PDF here first — <code>Cmd/Ctrl+P</code>, then
+        choose "Save as PDF" as the destination — and bring <em>that</em> file in (on a USB drive, or
+        uploaded through FedEx Office's own print-online portal). It carries the exact sizing with it
+        instead of depending on whatever that particular machine has installed.
+      </p>
+      <p>
+        Each table also gets a <strong>gold-accented "Scan for Happy Hour" card</strong> — cut it off
+        its sheet and glue it to the back of that same table's card so a guest can flip it over and
         jump straight to Happy Hour any time, instead of waiting for the automatic time-based switch
-        above. It's paired right after its matching front card below, in the same table order, to
-        make cutting and gluing them back-to-back easy.
+        above. It always shares a sheet with its own matching front card (never split across two
+        different pages), specifically so the two halves to glue together come from the same cut.
       </p>
       <p>
         The three cards at the top aren't tied to a table — <strong>"While You Wait"</strong> is meant
@@ -185,30 +278,73 @@
       }
 
       // Not tied to any table/seat, so not part of the /api/table-map loop
-      // below — printed once, at the top of the sheet.
-      const specialCardsHtml = `
+      // below — printed first, as their own page(s). A plain array (one
+      // card per entry), not a single HTML blob, so these can be paired up
+      // two-at-a-time onto sheets the same way the special-vs-table split
+      // below needs — see buildPrintPages.
+      const specialCards = [
+        `
         <div class="table-card">
           <img class="logo" src="/images/logo.png" alt="" />
           <span class="table-number">While You Wait</span>
           <h2>Scan for Menu</h2>
           <img class="qr" src="/images/qr-view-menu.png" alt="QR code linking to the Ohana Belltown menu with prices" />
           <p>Food &middot; Sushi &middot; Drinks &middot; Happy Hour</p>
-        </div>
+        </div>`,
+        `
         <div class="table-card">
           <img class="logo" src="/images/logo.png" alt="" />
           <span class="table-number">Take Home Some Aloha</span>
           <h2>Shop Ohana Swag</h2>
           <img class="qr" src="/images/qr-shop.png" alt="QR code linking to the Ohana Belltown shop" />
           <p>Bandanas &middot; Hats &middot; T-Shirts</p>
-        </div>
+        </div>`,
+        `
         <div class="table-card">
           <img class="logo" src="/images/logo.png" alt="" />
           <span class="table-number">Order Sushi, Earn a Punch</span>
           <h2>Join the Sushi Punch Card</h2>
           <img class="qr" src="/images/qr-rewards.png" alt="QR code linking to the Ohana Belltown sushi punch card" />
           <p>10 punches = 1 free roll</p>
-        </div>
-      `;
+        </div>`,
+      ];
+
+      // Wraps up to 2 card HTML strings as one 8.5x11 landscape sheet, with
+      // the dashed cut guide only when there are actually two cards to
+      // divide (a lone card — e.g. an odd one left over — just prints alone
+      // on its sheet with nothing to cut down the middle).
+      function printPage(cards) {
+        return `
+          <div class="print-page">
+            ${cards.length === 2 ? '<div class="print-page-cut-line" aria-hidden="true"></div>' : ''}
+            ${cards.join('')}
+          </div>
+        `;
+      }
+
+      // Packs cards two-per-sheet, but never splits a `pair` (a table's
+      // front card + its own Happy Hour back) across two different sheets —
+      // that would break the "cut this sheet, glue the two halves back to
+      // back" instructions above, since the back wouldn't be on the same
+      // paper as its matching front anymore. Only ever-reorderable singles
+      // (the 3 special cards) get paired up with each other to fill sheets;
+      // a `pair` always gets a whole sheet to itself.
+      // Returns both the HTML and the real sheet count — surfaced on screen
+      // (see loadTableCards below) so if a print preview or PDF ever shows
+      // one extra blank page at the end (a Chrome/print-to-PDF pagination
+      // quirk some setups hit on long documents, independent of anything on
+      // this particular page), there's a known-correct number to set as the
+      // page range instead of printing "All" and wasting a sheet.
+      function buildPrintPages(singles, pairs) {
+        const pages = [];
+        for (let i = 0; i < singles.length; i += 2) {
+          pages.push(printPage(singles.slice(i, i + 2)));
+        }
+        for (const pair of pairs) {
+          pages.push(printPage(pair));
+        }
+        return { html: pages.join(''), count: pages.length };
+      }
 
       async function loadTableCards() {
         const sheet = document.getElementById('card-sheet');
@@ -219,29 +355,34 @@
           const sectionOrder = ['dining', 'bar', 'sushi', 'deck'];
           entries.sort((a, b) => sectionOrder.indexOf(a.section) - sectionOrder.indexOf(b.section) || a.id.localeCompare(b.id, undefined, { numeric: true }));
 
-          sheet.innerHTML =
-            specialCardsHtml +
-            entries
-              .map((entry) => {
-                const label = labelFor(entry);
-                return `
-                  <div class="table-card">
-                    <img class="logo" src="/images/logo.png" alt="" />
-                    <span class="table-number">${label} — ${sectionLabels[entry.section] || entry.section}</span>
-                    <h2>Scan for Menu</h2>
-                    <img class="qr" src="/images/table-qr-${entry.id}.png" alt="QR code for ${label}, linking to the Ohana Belltown menu" />
-                    <p>Food &middot; Sushi &middot; Drinks &middot; Happy Hour</p>
-                  </div>
-                  <div class="table-card happy-hour">
-                    <img class="logo" src="/images/logo.png" alt="" />
-                    <span class="table-number">${label} — ${sectionLabels[entry.section] || entry.section} (back)</span>
-                    <h2>Scan for Happy Hour</h2>
-                    <img class="qr" src="/images/table-qr-hh-${entry.id}.png" alt="QR code for ${label}, linking straight to the Ohana Belltown Happy Hour menu" />
-                    <p>Always Happy Hour pricing, any time you scan it</p>
-                  </div>
-                `;
-              })
-              .join('');
+          const tablePairs = entries.map((entry) => {
+            const label = labelFor(entry);
+            return [
+              `
+                <div class="table-card">
+                  <img class="logo" src="/images/logo.png" alt="" />
+                  <span class="table-number">${label} — ${sectionLabels[entry.section] || entry.section}</span>
+                  <h2>Scan for Menu</h2>
+                  <img class="qr" src="/images/table-qr-${entry.id}.png" alt="QR code for ${label}, linking to the Ohana Belltown menu" />
+                  <p>Food &middot; Sushi &middot; Drinks &middot; Happy Hour</p>
+                </div>`,
+              `
+                <div class="table-card happy-hour">
+                  <img class="logo" src="/images/logo.png" alt="" />
+                  <span class="table-number">${label} — ${sectionLabels[entry.section] || entry.section} (back)</span>
+                  <h2>Scan for Happy Hour</h2>
+                  <img class="qr" src="/images/table-qr-hh-${entry.id}.png" alt="QR code for ${label}, linking straight to the Ohana Belltown Happy Hour menu" />
+                  <p>Always Happy Hour pricing, any time you scan it</p>
+                </div>`,
+            ];
+          });
+
+          const built = buildPrintPages(specialCards, tablePairs);
+          sheet.innerHTML = built.html;
+          document.getElementById('page-count-note').textContent =
+            `This prints as ${built.count} sheet${built.count === 1 ? '' : 's'} total. If your print ` +
+            `preview or PDF shows one extra blank page at the end, set the page range to 1–${built.count} ` +
+            `instead of "All" — known Chrome/print-to-PDF quirk on long documents, nothing missing.`;
         } catch (error) {
           sheet.textContent = error.message;
         }
