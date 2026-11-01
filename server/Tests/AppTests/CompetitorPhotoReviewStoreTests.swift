@@ -61,11 +61,12 @@ final class CompetitorPhotoReviewStoreTests: XCTestCase {
         XCTAssertEqual(CompetitorPhotoReviewStore.shared.unreviewedCount(), 0)
     }
 
-    func testRemoveEntriesPrunesInboxPhotosTooWhenNoLongerKept() {
+    func testPruningPreservesInboxButRemovesDetachedRestaurantPhotos() {
         CompetitorPhotoReviewStore.shared.recordInboxUpload(url: "/uploads/a.jpg", uploadedByName: "Yosh")
+        CompetitorPhotoReviewStore.shared.recordUnreviewed(url: "/uploads/removed.jpg", restaurantId: "r1")
         CompetitorPhotoReviewStore.shared.removeEntries(notIn: [])
 
-        XCTAssertTrue(CompetitorPhotoReviewStore.shared.unassignedEntries().isEmpty)
-        XCTAssertEqual(CompetitorPhotoReviewStore.shared.unreviewedCount(), 0)
+        XCTAssertEqual(CompetitorPhotoReviewStore.shared.unassignedEntries().map(\.url), ["/uploads/a.jpg"])
+        XCTAssertEqual(CompetitorPhotoReviewStore.shared.unreviewedCount(), 1)
     }
 }

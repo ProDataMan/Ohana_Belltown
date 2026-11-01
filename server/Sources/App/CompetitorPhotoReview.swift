@@ -144,15 +144,15 @@ final class CompetitorPhotoReviewStore: @unchecked Sendable {
             .sorted { $0.entry.addedAt < $1.entry.addedAt }
     }
 
-    /// Drops any tracked photo whose URL is no longer referenced by any
-    /// restaurant — called after every restaurant-list save so a removed
+    /// Preserves unassigned inbox photos; drops attached photos no longer
+    /// referenced by any restaurant — called after every restaurant-list save so a removed
     /// photo (or a whole deleted restaurant) stops counting.
     func removeEntries(notIn keptUrls: Set<String>) {
         lock.lock()
         defer { lock.unlock() }
         loadIfNeeded()
         let before = data.count
-        data = data.filter { keptUrls.contains($0.key) }
+        data = data.filter { $0.value.restaurantId == nil || keptUrls.contains($0.key) }
         if data.count != before {
             persist()
         }

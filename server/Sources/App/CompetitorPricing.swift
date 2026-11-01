@@ -1,4 +1,5 @@
 import Foundation
+import Crypto
 import Vapor
 
 /// A nearby restaurant staff are comparing prices against. The restaurant
@@ -269,11 +270,29 @@ final class CompetitorPricingStore: @unchecked Sendable {
         return data.restaurants.sorted { ($0.distanceMiles ?? .greatestFiniteMagnitude) < ($1.distanceMiles ?? .greatestFiniteMagnitude) }
     }
 
-    @discardableResult
-    func saveRestaurants(_ items: [CompetitorRestaurant]) throws -> [CompetitorRestaurant] {
+    private func restaurantRevision() throws -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let bytes = try encoder.encode(data.restaurants.sorted { $0.id < $1.id })
+        return "\"" + SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined() + "\""
+    }
+
+    func restaurantsResponse() throws -> Response {
         lock.lock()
         defer { lock.unlock() }
         try loadIfNeeded()
+        let items = data.restaurants.sorted { ($0.distanceMiles ?? .greatestFiniteMagnitude) < ($1.distanceMiles ?? .greatestFiniteMagnitude) }
+        return Response(status: .ok, headers: ["Content-Type": "application/json", "ETag": try restaurantRevision(), "Cache-Control": "no-store"], body: .init(data: try JSONEncoder().encode(items)))
+    }
+
+    @discardableResult
+    func saveRestaurants(_ items: [CompetitorRestaurant], expectedRevision: String? = nil) throws -> [CompetitorRestaurant] {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        if let expectedRevision, expectedRevision != (try restaurantRevision()) {
+            throw Abort(.conflict, reason: "Restaurants changed in another session. Reload the restaurant list before saving again.")
+        }
         let oldPhotosByRestaurant = Dictionary(
             uniqueKeysWithValues: data.restaurants.map { ($0.id, Set($0.menuPhotoUrls ?? [])) }
         )
@@ -295,6 +314,55 @@ final class CompetitorPricingStore: @unchecked Sendable {
         CompetitorPhotoReviewStore.shared.removeEntries(notIn: allCurrentPhotoUrls)
 
         return data.restaurants
+    }
+
+    /// Quick Upload mutations hold the lock across lookup and persistence, so
+    /// separate phones cannot overwrite each other's restaurant/photo additions.
+    func findOrCreateRestaurant(name: String, placeId: String, address: String?) throws -> CompetitorRestaurant {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !placeId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw Abort(.badRequest, reason: "Restaurant name and placeId are required.")
+        }
+        if let existing = data.restaurants.first(where: { $0.placeId == placeId }) {
+            return existing
+        }
+        // GPS distance is from the photographer, not from Ohana. Do not save it
+        // as the comparison report's distance from the restaurant.
+        let restaurant = CompetitorRestaurant(name: name, address: address, placeId: placeId, menuPhotoUrls: [])
+        data.restaurants.append(restaurant)
+        do { try persist() } catch {
+            data.restaurants.removeLast()
+            throw error
+        }
+        return restaurant
+    }
+
+    @discardableResult
+    func attachPhoto(url: String, restaurantId: String) throws -> CompetitorRestaurant {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard url.hasPrefix("/uploads/"), !url.contains("..") else {
+            throw Abort(.badRequest, reason: "Invalid photo URL.")
+        }
+        guard let index = data.restaurants.firstIndex(where: { $0.id == restaurantId }) else {
+            throw Abort(.notFound, reason: "Restaurant no longer exists. Pick it again.")
+        }
+        let original = data.restaurants[index]
+        var urls = original.menuPhotoUrls ?? []
+        if !urls.contains(url) {
+            urls.append(url)
+            data.restaurants[index].menuPhotoUrls = urls
+            do { try persist() } catch {
+                data.restaurants[index] = original
+                throw error
+            }
+        }
+        CompetitorPhotoReviewStore.shared.recordUnreviewed(url: url, restaurantId: restaurantId)
+        return data.restaurants[index]
     }
 
     func groups() throws -> [MenuPriceComparisonGroup] {

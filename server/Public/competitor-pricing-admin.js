@@ -14,6 +14,23 @@ function todayDateInputValue() {
 let menuItems = [];
 let groups = [];
 let restaurants = [];
+let restaurantsRevision = null;
+
+async function saveRestaurantList(items) {
+  if (!restaurantsRevision) throw new Error('Load the restaurant list before saving.');
+  const response = await staffFetch('/api/competitor-pricing/restaurants', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'If-Match': restaurantsRevision },
+    body: JSON.stringify(items),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.reason || `Failed to save restaurants (${response.status}).`);
+  }
+  const saved = await response.json();
+  restaurantsRevision = response.headers.get('ETag');
+  return saved;
+}
 let entries = [];
 let aiExtractionAvailable = false;
 let unreviewedPhotoUrls = new Set();
@@ -396,12 +413,7 @@ async function uploadMenuPhoto(event, restaurantIndex) {
     // Save immediately — the whole point is a phone-camera-in-hand photo
     // upload shouldn't require a separate "remember to click Save" step,
     // and saving is also what registers the photo as unreviewed server-side.
-    const response2 = await staffFetch('/api/competitor-pricing/restaurants', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(currentRestaurantsFromDOM()),
-    });
-    if (response2.ok) restaurants = await response2.json();
+    restaurants = await saveRestaurantList(currentRestaurantsFromDOM());
     await loadUnreviewedPhotoURLs();
     renderRestaurantsList();
     document.getElementById('restaurants-status').textContent = 'Photo added!';
@@ -509,13 +521,7 @@ async function addExtractedItemAsEntry(btn, restaurantIndex, photoUrl) {
     // server-side before pointing an entry at it — it may have only been
     // added via the Nearby Search picker moments ago and never explicitly
     // saved.
-    const restaurantsResponse = await staffFetch('/api/competitor-pricing/restaurants', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(currentRestaurantsFromDOM()),
-    });
-    if (!restaurantsResponse.ok) throw new Error(`Failed to save the restaurant (${restaurantsResponse.status}).`);
-    restaurants = await restaurantsResponse.json();
+    restaurants = await saveRestaurantList(currentRestaurantsFromDOM());
     renderRestaurantsList();
 
     let groupId = groupSelect.value;
@@ -567,6 +573,7 @@ async function loadRestaurants() {
     const response = await staffFetch('/api/competitor-pricing/restaurants');
     if (!response.ok) throw new Error(`Unable to load competitor restaurants (${response.status}).`);
     restaurants = await response.json();
+    restaurantsRevision = response.headers.get('ETag');
     renderRestaurantsList();
     refreshEntryFormSelects();
   } catch (error) {
@@ -672,13 +679,7 @@ document.getElementById('save-restaurants-btn').addEventListener('click', async 
   statusEl.textContent = 'Saving...';
   statusEl.classList.remove('status-error', 'status-ok');
   try {
-    const response = await staffFetch('/api/competitor-pricing/restaurants', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updated),
-    });
-    if (!response.ok) throw new Error(`Failed (${response.status}).`);
-    restaurants = await response.json();
+    restaurants = await saveRestaurantList(updated);
     renderRestaurantsList();
     refreshEntryFormSelects();
     statusEl.textContent = 'Restaurants saved!';

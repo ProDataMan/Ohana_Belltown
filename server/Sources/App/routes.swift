@@ -99,6 +99,12 @@ struct MarkPhotoReviewedRequest: Content {
     var url: String
 }
 
+struct CompetitorRestaurantSelectionRequest: Content {
+    var name: String
+    var placeId: String
+    var address: String?
+}
+
 struct CompetitorPhotoInboxRequest: Content {
     var url: String
 }
@@ -592,15 +598,32 @@ func routes(_ app: Application) throws {
         )
     }
 
-    app.get("api", "competitor-pricing", "restaurants") { req throws -> [CompetitorRestaurant] in
+    app.get("api", "competitor-pricing", "restaurants") { req throws -> Response in
         try requireAdmin(req)
-        return try CompetitorPricingStore.shared.restaurants()
+        return try CompetitorPricingStore.shared.restaurantsResponse()
     }
 
-    app.put("api", "competitor-pricing", "restaurants") { req throws -> [CompetitorRestaurant] in
+    app.post("api", "competitor-pricing", "restaurants", "select") { req throws -> CompetitorRestaurant in
         try requireAdmin(req)
+        let body = try req.content.decode(CompetitorRestaurantSelectionRequest.self)
+        return try CompetitorPricingStore.shared.findOrCreateRestaurant(name: body.name, placeId: body.placeId, address: body.address)
+    }
+
+    app.post("api", "competitor-pricing", "restaurants", ":restaurantId", "photos") { req throws -> CompetitorRestaurant in
+        try requireAdmin(req)
+        let body = try req.content.decode(CompetitorPhotoInboxRequest.self)
+        guard let id = req.parameters.get("restaurantId") else { throw Abort(.badRequest) }
+        return try CompetitorPricingStore.shared.attachPhoto(url: body.url, restaurantId: id)
+    }
+
+    app.put("api", "competitor-pricing", "restaurants") { req throws -> Response in
+        try requireAdmin(req)
+        guard let revision = req.headers.first(name: "If-Match") else {
+            throw Abort(.preconditionRequired, reason: "Load the restaurant list first and send its ETag in If-Match.")
+        }
         let items = try req.content.decode([CompetitorRestaurant].self)
-        return try CompetitorPricingStore.shared.saveRestaurants(items)
+        try CompetitorPricingStore.shared.saveRestaurants(items, expectedRevision: revision)
+        return try CompetitorPricingStore.shared.restaurantsResponse()
     }
 
     app.get("api", "competitor-pricing", "groups") { req throws -> [MenuPriceComparisonGroup] in

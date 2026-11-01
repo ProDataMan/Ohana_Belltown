@@ -44,6 +44,41 @@ final class RouteTests: XCTestCase {
         try? FileManager.default.removeItem(at: tempDir)
     }
 
+    func testQuickUploadMutationsAndBulkConflictProtection() throws {
+        let (admin, employee) = try makeAdminAndSecondAccount(username: "uploader", password: "password123", role: "employee")
+        let selection = ByteBuffer(string: #"{"name":"Nearby","placeId":"p1"}"#)
+        for path in ["api/competitor-pricing/restaurants/select", "api/competitor-pricing/restaurants/missing/photos"] {
+            try app.test(.POST, path, headers: ["Content-Type": "application/json"], body: selection) { XCTAssertEqual($0.status, .unauthorized) }
+            try app.test(.POST, path, headers: ["Content-Type": "application/json", "Cookie": employee], body: selection) { XCTAssertEqual($0.status, .forbidden) }
+        }
+        let headers: HTTPHeaders = ["Content-Type": "application/json", "Cookie": admin]
+        var id = ""
+        try app.test(.POST, "api/competitor-pricing/restaurants/select", headers: headers, body: selection) { res in
+            XCTAssertEqual(res.status, .ok)
+            id = try res.content.decode(CompetitorRestaurant.self).id
+        }
+        var revision = ""
+        var oldBody = ByteBuffer()
+        try app.test(.GET, "api/competitor-pricing/restaurants", headers: headers) { res in
+            revision = try XCTUnwrap(res.headers.first(name: "ETag"))
+            oldBody = res.body
+        }
+        try app.test(.POST, "api/competitor-pricing/restaurants/\(id)/photos", headers: headers, body: ByteBuffer(string: #"{"url":"/uploads/new.jpg"}"#)) {
+            XCTAssertEqual($0.status, .ok)
+        }
+        try app.test(.POST, "api/competitor-pricing/restaurants/\(id)/photos", headers: headers, body: ByteBuffer(string: #"{"url":"/uploads/../bad.jpg"}"#)) {
+            XCTAssertEqual($0.status, .badRequest)
+        }
+        try app.test(.POST, "api/competitor-pricing/restaurants/missing/photos", headers: headers, body: ByteBuffer(string: #"{"url":"/uploads/new.jpg"}"#)) {
+            XCTAssertEqual($0.status, .notFound)
+        }
+        try app.test(.PUT, "api/competitor-pricing/restaurants", headers: headers, body: oldBody) { XCTAssertEqual($0.status, .preconditionRequired) }
+        var staleHeaders = headers
+        staleHeaders.add(name: "If-Match", value: revision)
+        try app.test(.PUT, "api/competitor-pricing/restaurants", headers: staleHeaders, body: oldBody) { XCTAssertEqual($0.status, .conflict) }
+        XCTAssertEqual(try CompetitorPricingStore.shared.restaurants()[0].menuPhotoUrls, ["/uploads/new.jpg"])
+    }
+
     func testHealthz() throws {
         try app.test(.GET, "healthz") { res in
             XCTAssertEqual(res.status, .ok)
@@ -716,7 +751,7 @@ final class RouteTests: XCTestCase {
 
         // Saving a restaurant with a new photo registers it as unreviewed.
         let restaurantsBody = ByteBuffer(string: #"[{"id":"r1","name":"Test Place","menuPhotoUrls":["/uploads/photo1.jpg"]}]"#)
-        try app.test(.PUT, "api/competitor-pricing/restaurants", headers: ["Cookie": cookie, "Content-Type": "application/json"], body: restaurantsBody) { res in
+        try app.test(.PUT, "api/competitor-pricing/restaurants", headers: ["Cookie": cookie, "Content-Type": "application/json", "If-Match": try XCTUnwrap(CompetitorPricingStore.shared.restaurantsResponse().headers.first(name: "ETag"))], body: restaurantsBody) { res in
             XCTAssertEqual(res.status, .ok)
         }
         try app.test(.GET, "api/competitor-pricing/unreviewed-photo-count", headers: ["Cookie": cookie]) { res in
@@ -741,7 +776,7 @@ final class RouteTests: XCTestCase {
         // Adding a second photo registers only the new one as unreviewed —
         // the already-reviewed first photo doesn't get re-flagged.
         let restaurantsBody2 = ByteBuffer(string: #"[{"id":"r1","name":"Test Place","menuPhotoUrls":["/uploads/photo1.jpg","/uploads/photo2.jpg"]}]"#)
-        try app.test(.PUT, "api/competitor-pricing/restaurants", headers: ["Cookie": cookie, "Content-Type": "application/json"], body: restaurantsBody2) { res in
+        try app.test(.PUT, "api/competitor-pricing/restaurants", headers: ["Cookie": cookie, "Content-Type": "application/json", "If-Match": try XCTUnwrap(CompetitorPricingStore.shared.restaurantsResponse().headers.first(name: "ETag"))], body: restaurantsBody2) { res in
             XCTAssertEqual(res.status, .ok)
         }
         try app.test(.GET, "api/competitor-pricing/unreviewed-photo-count", headers: ["Cookie": cookie]) { res in
@@ -752,7 +787,7 @@ final class RouteTests: XCTestCase {
         // Removing the restaurant entirely prunes all its photos from the
         // review store, including the already-reviewed one.
         let emptyBody = ByteBuffer(string: "[]")
-        try app.test(.PUT, "api/competitor-pricing/restaurants", headers: ["Cookie": cookie, "Content-Type": "application/json"], body: emptyBody) { res in
+        try app.test(.PUT, "api/competitor-pricing/restaurants", headers: ["Cookie": cookie, "Content-Type": "application/json", "If-Match": try XCTUnwrap(CompetitorPricingStore.shared.restaurantsResponse().headers.first(name: "ETag"))], body: emptyBody) { res in
             XCTAssertEqual(res.status, .ok)
         }
         try app.test(.GET, "api/competitor-pricing/unreviewed-photo-count", headers: ["Cookie": cookie]) { res in
@@ -810,7 +845,7 @@ final class RouteTests: XCTestCase {
         // Once it's been matched to a restaurant (same photo URL, now
         // attached) and marked reviewed, it drops out of the inbox entirely.
         let restaurantsBody = ByteBuffer(string: #"[{"id":"r1","name":"Matched Later","menuPhotoUrls":["/uploads/inbox-photo.jpg"]}]"#)
-        try app.test(.PUT, "api/competitor-pricing/restaurants", headers: ["Cookie": cookie, "Content-Type": "application/json"], body: restaurantsBody) { res in
+        try app.test(.PUT, "api/competitor-pricing/restaurants", headers: ["Cookie": cookie, "Content-Type": "application/json", "If-Match": try XCTUnwrap(CompetitorPricingStore.shared.restaurantsResponse().headers.first(name: "ETag"))], body: restaurantsBody) { res in
             XCTAssertEqual(res.status, .ok)
         }
         let markReviewedBody = ByteBuffer(string: #"{"url":"/uploads/inbox-photo.jpg"}"#)

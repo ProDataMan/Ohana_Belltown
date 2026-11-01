@@ -8,11 +8,44 @@ final class CompetitorPricingStoreTests: XCTestCase {
         tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         CompetitorPricingStore.shared.configure(dataDirectory: tempDir.path)
+        CompetitorPhotoReviewStore.shared.configure(dataDirectory: tempDir.path)
         MenuStore.shared.configure(dataDirectory: tempDir.path, resourcesDirectory: tempDir.path)
     }
 
     override func tearDownWithError() throws {
         try? FileManager.default.removeItem(at: tempDir)
+    }
+
+    func testRestaurantSavePreservesInboxAcrossReload() throws {
+        CompetitorPhotoReviewStore.shared.recordInboxUpload(url: "/uploads/inbox.jpg", uploadedByName: "Staff")
+        try CompetitorPricingStore.shared.saveRestaurants([CompetitorRestaurant(name: "Other restaurant")])
+        CompetitorPhotoReviewStore.shared.configure(dataDirectory: tempDir.path)
+        XCTAssertEqual(CompetitorPhotoReviewStore.shared.unassignedEntries().map(\.url), ["/uploads/inbox.jpg"])
+    }
+
+    func testConcurrentSelectionAndAttachmentsPreserveAllPhotos() throws {
+        DispatchQueue.concurrentPerform(iterations: 20) { index in
+            do {
+                let restaurant = try CompetitorPricingStore.shared.findOrCreateRestaurant(name: "Same place", placeId: "place-1", address: nil)
+                try CompetitorPricingStore.shared.attachPhoto(url: "/uploads/\(index).jpg", restaurantId: restaurant.id)
+            } catch { XCTFail("Concurrent write failed: \(error)") }
+        }
+        CompetitorPricingStore.shared.configure(dataDirectory: tempDir.path)
+        let restaurants = try CompetitorPricingStore.shared.restaurants()
+        XCTAssertEqual(restaurants.count, 1)
+        XCTAssertEqual(Set(restaurants[0].menuPhotoUrls ?? []).count, 20)
+        XCTAssertNil(restaurants[0].distanceMiles)
+        try CompetitorPricingStore.shared.attachPhoto(url: "/uploads/0.jpg", restaurantId: restaurants[0].id)
+        XCTAssertEqual(try CompetitorPricingStore.shared.restaurants()[0].menuPhotoUrls?.count, 20)
+    }
+
+    func testStaleBulkSaveCannotEraseNewUpload() throws {
+        let restaurant = try CompetitorPricingStore.shared.findOrCreateRestaurant(name: "One", placeId: "p1", address: nil)
+        let snapshot = try CompetitorPricingStore.shared.restaurants()
+        let revision = try XCTUnwrap(CompetitorPricingStore.shared.restaurantsResponse().headers.first(name: "ETag"))
+        try CompetitorPricingStore.shared.attachPhoto(url: "/uploads/new.jpg", restaurantId: restaurant.id)
+        XCTAssertThrowsError(try CompetitorPricingStore.shared.saveRestaurants(snapshot, expectedRevision: revision))
+        XCTAssertEqual(try CompetitorPricingStore.shared.restaurants()[0].menuPhotoUrls, ["/uploads/new.jpg"])
     }
 
     private func seedMenuItem(id: String, name: String, price: Double?) throws {

@@ -13,18 +13,6 @@ function escapeHtmlQuickUpload(value) {
 // the plain review inbox, same as before this feature existed.
 let selectedRestaurant = null; // { id, name }
 
-// Every read-modify-write of the restaurants array (picking a restaurant,
-// attaching a photo to one) goes through this chain so two uploads firing
-// at once can't race each other's PUT and silently drop one photo's URL —
-// each waits for the previous write to finish before reading its own copy.
-let restaurantsWriteQueue = Promise.resolve();
-function queueRestaurantsWrite(run) {
-  const result = restaurantsWriteQueue.then(run);
-  // Swallow so one failed write doesn't poison the queue for what comes after.
-  restaurantsWriteQueue = result.catch(() => {});
-  return result;
-}
-
 async function refreshInboxCount() {
   const el = document.getElementById('inbox-count');
   try {
@@ -78,31 +66,13 @@ async function selectCandidate(candidate) {
   statusEl.classList.remove('status-error', 'status-ok');
   statusEl.textContent = 'Saving…';
   try {
-    const match = await queueRestaurantsWrite(async () => {
-      const response = await staffFetch('/api/competitor-pricing/restaurants');
-      const restaurants = response.ok ? await response.json() : [];
-      const existing = restaurants.find((r) => r.placeId === candidate.placeId);
-      if (existing) return existing;
-
-      const created = {
-        id: `restaurant-${Date.now()}`,
-        name: candidate.name,
-        distanceMiles: candidate.distanceMiles,
-        address: candidate.address || null,
-        website: null,
-        notes: null,
-        placeId: candidate.placeId,
-        menuPhotoUrls: [],
-      };
-      restaurants.push(created);
-      const saveResponse = await staffFetch('/api/competitor-pricing/restaurants', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(restaurants),
-      });
-      if (!saveResponse.ok) throw new Error(`Failed to save restaurant (${saveResponse.status}).`);
-      return created;
+    const response = await staffFetch('/api/competitor-pricing/restaurants/select', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: candidate.name, placeId: candidate.placeId, address: candidate.address || null }),
     });
+    if (!response.ok) throw new Error(`Failed to select restaurant (${response.status}).`);
+    const match = await response.json();
 
     selectedRestaurant = { id: match.id, name: match.name };
     statusEl.textContent = `Photos below will attach to: ${match.name} ✓`;
@@ -143,20 +113,15 @@ document.getElementById('find-nearby-gps-btn').addEventListener('click', () => {
 });
 
 async function attachPhotoToSelectedRestaurant(url, restaurantId, restaurantName) {
-  await queueRestaurantsWrite(async () => {
-    const response = await staffFetch('/api/competitor-pricing/restaurants');
-    const restaurants = response.ok ? await response.json() : [];
-    const idx = restaurants.findIndex((r) => r.id === restaurantId);
-    if (idx === -1) throw new Error(`${restaurantName} no longer exists — try picking it again.`);
-    if (!restaurants[idx].menuPhotoUrls) restaurants[idx].menuPhotoUrls = [];
-    restaurants[idx].menuPhotoUrls.push(url);
-    const saveResponse = await staffFetch('/api/competitor-pricing/restaurants', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(restaurants),
-    });
-    if (!saveResponse.ok) throw new Error(`Failed to attach photo (${saveResponse.status}).`);
+  const response = await staffFetch(`/api/competitor-pricing/restaurants/${encodeURIComponent(restaurantId)}/photos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
   });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.reason || `Failed to attach photo to ${restaurantName} (${response.status}).`);
+  }
 }
 
 async function uploadOnePhoto(file, row) {
