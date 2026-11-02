@@ -16,16 +16,47 @@ struct DailyPageviews: Codable {
     var browserCounts: [String: Int]
     var deviceModelCounts: [String: Int]
     var qrScanCounts: [String: Int]
+    /// Which page a `/scan` hit actually redirected to — "menu" or
+    /// "happy-hour" — so a busy host-stand QR vs. a table-flip "Happy Hour"
+    /// QR can be told apart from the raw scan count alone.
+    var qrScanDestinationCounts: [String: Int]
+    /// Item detail-view opens, bucketed by the table id that was active when
+    /// the tap happened (same ids as `qrScanCounts`) — the other half of
+    /// "per-table engagement rate" (views ÷ scans for that table).
+    var tableItemViewCounts: [String: Int]
+    /// Seconds from a fresh `/scan` redirect landing to the first tap on any
+    /// item card in that same session — how long it takes a guest to
+    /// actually start engaging with the menu once they scan.
+    var scanToFirstTapSeconds: DwellStat
+    /// Seconds from a fresh `/scan` landing to the tab being hidden/closed,
+    /// across however many pages were browsed in that session — a rough
+    /// "how long did this scan hold someone's attention" figure.
+    var scanSessionSeconds: DwellStat
+    /// Free-text menu search queries, lowercased/trimmed — anonymous, same
+    /// footing as the rest of this store; short/noise queries are filtered
+    /// client- and server-side before they ever reach here.
+    var searchQueryCounts: [String: Int]
+    /// How far down a page someone actually scrolled, bucketed by
+    /// `"<section>:<25|50|75|100>"` — one entry per threshold reached per
+    /// page view (not continuous), so this counts visits-that-reached-X%,
+    /// not scroll events.
+    var scrollDepthCounts: [String: Int]
 
     enum CodingKeys: String, CodingKey {
         case date, counts, deviceCounts, itemViewCounts, dwell, osCounts, browserCounts, deviceModelCounts, qrScanCounts
+        case qrScanDestinationCounts, tableItemViewCounts, scanToFirstTapSeconds, scanSessionSeconds
+        case searchQueryCounts, scrollDepthCounts
     }
 
     init(
         date: String, counts: [String: Int], deviceCounts: [String: Int] = [:],
         itemViewCounts: [String: Int] = [:], dwell: [String: DwellStat] = [:],
         osCounts: [String: Int] = [:], browserCounts: [String: Int] = [:], deviceModelCounts: [String: Int] = [:],
-        qrScanCounts: [String: Int] = [:]
+        qrScanCounts: [String: Int] = [:], qrScanDestinationCounts: [String: Int] = [:],
+        tableItemViewCounts: [String: Int] = [:],
+        scanToFirstTapSeconds: DwellStat = DwellStat(totalSeconds: 0, samples: 0),
+        scanSessionSeconds: DwellStat = DwellStat(totalSeconds: 0, samples: 0),
+        searchQueryCounts: [String: Int] = [:], scrollDepthCounts: [String: Int] = [:]
     ) {
         self.date = date
         self.counts = counts
@@ -36,6 +67,12 @@ struct DailyPageviews: Codable {
         self.browserCounts = browserCounts
         self.deviceModelCounts = deviceModelCounts
         self.qrScanCounts = qrScanCounts
+        self.qrScanDestinationCounts = qrScanDestinationCounts
+        self.tableItemViewCounts = tableItemViewCounts
+        self.scanToFirstTapSeconds = scanToFirstTapSeconds
+        self.scanSessionSeconds = scanSessionSeconds
+        self.searchQueryCounts = searchQueryCounts
+        self.scrollDepthCounts = scrollDepthCounts
     }
 
     init(from decoder: Decoder) throws {
@@ -49,6 +86,14 @@ struct DailyPageviews: Codable {
         browserCounts = try container.decodeIfPresent([String: Int].self, forKey: .browserCounts) ?? [:]
         deviceModelCounts = try container.decodeIfPresent([String: Int].self, forKey: .deviceModelCounts) ?? [:]
         qrScanCounts = try container.decodeIfPresent([String: Int].self, forKey: .qrScanCounts) ?? [:]
+        qrScanDestinationCounts = try container.decodeIfPresent([String: Int].self, forKey: .qrScanDestinationCounts) ?? [:]
+        tableItemViewCounts = try container.decodeIfPresent([String: Int].self, forKey: .tableItemViewCounts) ?? [:]
+        scanToFirstTapSeconds = try container.decodeIfPresent(DwellStat.self, forKey: .scanToFirstTapSeconds)
+            ?? DwellStat(totalSeconds: 0, samples: 0)
+        scanSessionSeconds = try container.decodeIfPresent(DwellStat.self, forKey: .scanSessionSeconds)
+            ?? DwellStat(totalSeconds: 0, samples: 0)
+        searchQueryCounts = try container.decodeIfPresent([String: Int].self, forKey: .searchQueryCounts) ?? [:]
+        scrollDepthCounts = try container.decodeIfPresent([String: Int].self, forKey: .scrollDepthCounts) ?? [:]
     }
 }
 
@@ -63,10 +108,46 @@ struct AnalyticsSummary: Content {
     var browserBreakdown: [BrowserCount]
     var deviceModelBreakdown: [DeviceModelCount]
     var qrScans: [QRScanCount]
+    var scanDestinations: [ScanDestinationCount]
+    var tableEngagement: [TableEngagementCount]
+    var neverScannedTables: [String]
+    var scanToFirstTapSeconds: Double?
+    var scanToFirstTapSamples: Int
+    var scanSessionSeconds: Double?
+    var scanSessionSamples: Int
+    var searchQueries: [SearchQueryCount]
+    var scrollDepth: [ScrollDepthCount]
 }
 
 struct QRScanCount: Content {
     var table: String
+    var count: Int
+}
+
+struct ScanDestinationCount: Content {
+    var destination: String
+    var count: Int
+}
+
+/// Per-table "views ÷ scans" — the already-tracked scan count for a table
+/// cross-referenced against item detail-view opens recorded while that same
+/// table id was active, giving a rough sense of which scans turn into actual
+/// menu browsing vs. a scan that never goes anywhere.
+struct TableEngagementCount: Content {
+    var table: String
+    var scans: Int
+    var itemViews: Int
+    var engagementRate: Double
+}
+
+struct SearchQueryCount: Content {
+    var query: String
+    var count: Int
+}
+
+struct ScrollDepthCount: Content {
+    var section: String
+    var bucket: Int
     var count: Int
 }
 
@@ -230,12 +311,18 @@ final class AnalyticsStore: @unchecked Sendable {
         try? persist()
     }
 
-    func recordItemView(name: String) {
+    /// `table`, when present, is the table id active when the item's detail
+    /// view was opened — threaded through so per-table engagement rate can
+    /// be computed without a separate, session-keyed event log.
+    func recordItemView(name: String, table: String? = nil) {
         lock.lock()
         defer { lock.unlock() }
         try? loadIfNeeded()
         let idx = todayIndex()
         days[idx].itemViewCounts[name, default: 0] += 1
+        if let table, !table.isEmpty {
+            days[idx].tableItemViewCounts[table, default: 0] += 1
+        }
         try? persist()
     }
 
@@ -246,13 +333,74 @@ final class AnalyticsStore: @unchecked Sendable {
     /// the guest does next (browse only, or actually place an order) — the
     /// only way to see "which tables are using the QR menu" at all, since an
     /// order-based report misses everyone who scanned and just browsed.
-    func recordQRScan(table: String) {
+    /// `destination` is which page the scan actually redirected to ("menu"
+    /// or "happy-hour").
+    func recordQRScan(table: String, destination: String) {
         lock.lock()
         defer { lock.unlock() }
         try? loadIfNeeded()
         let idx = todayIndex()
         days[idx].qrScanCounts[table, default: 0] += 1
+        days[idx].qrScanDestinationCounts[destination, default: 0] += 1
         try? persist()
+    }
+
+    func recordScanToFirstTap(seconds: Double) {
+        guard seconds >= 0, seconds <= Self.maxDwellSeconds else { return }
+        lock.lock()
+        defer { lock.unlock() }
+        try? loadIfNeeded()
+        let idx = todayIndex()
+        days[idx].scanToFirstTapSeconds.totalSeconds += seconds
+        days[idx].scanToFirstTapSeconds.samples += 1
+        try? persist()
+    }
+
+    func recordScanSession(seconds: Double) {
+        guard seconds >= 0, seconds <= Self.maxDwellSeconds else { return }
+        lock.lock()
+        defer { lock.unlock() }
+        try? loadIfNeeded()
+        let idx = todayIndex()
+        days[idx].scanSessionSeconds.totalSeconds += seconds
+        days[idx].scanSessionSeconds.samples += 1
+        try? persist()
+    }
+
+    /// Lowercased/trimmed search text only — queries under 2 characters are
+    /// dropped before they ever get here (both client- and server-side) since
+    /// a single keystroke mid-typing isn't a meaningful search term.
+    func recordSearchQuery(_ query: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        try? loadIfNeeded()
+        let idx = todayIndex()
+        days[idx].searchQueryCounts[query, default: 0] += 1
+        try? persist()
+    }
+
+    func recordScrollDepth(section: String, bucket: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        try? loadIfNeeded()
+        let idx = todayIndex()
+        days[idx].scrollDepthCounts["\(section):\(bucket)", default: 0] += 1
+        try? persist()
+    }
+
+    /// Every table on the floor map that hasn't had a single `/scan` hit in
+    /// any stored day — not just the summary's windowed range, since a table
+    /// that was scanned once three months ago shouldn't show up as "never
+    /// scanned" just because the report window is 30 days.
+    func neverScannedTables() throws -> [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        var scanned = Set<String>()
+        for day in days {
+            scanned.formUnion(day.qrScanCounts.keys)
+        }
+        return TableMap.allIds.subtracting(scanned).sorted()
     }
 
     func recordDwell(path: String, seconds: Double) {
@@ -282,6 +430,12 @@ final class AnalyticsStore: @unchecked Sendable {
         var browserTotals: [String: Int] = [:]
         var deviceModelTotals: [String: Int] = [:]
         var qrScanTotals: [String: Int] = [:]
+        var qrScanDestinationTotals: [String: Int] = [:]
+        var tableItemViewTotals: [String: Int] = [:]
+        var scanToFirstTapTotal = DwellStat(totalSeconds: 0, samples: 0)
+        var scanSessionTotal = DwellStat(totalSeconds: 0, samples: 0)
+        var searchQueryTotals: [String: Int] = [:]
+        var scrollDepthTotals: [String: Int] = [:]
         for day in recent {
             for (path, count) in day.counts {
                 totals[path, default: 0] += count
@@ -309,6 +463,22 @@ final class AnalyticsStore: @unchecked Sendable {
             }
             for (table, count) in day.qrScanCounts {
                 qrScanTotals[table, default: 0] += count
+            }
+            for (destination, count) in day.qrScanDestinationCounts {
+                qrScanDestinationTotals[destination, default: 0] += count
+            }
+            for (table, count) in day.tableItemViewCounts {
+                tableItemViewTotals[table, default: 0] += count
+            }
+            scanToFirstTapTotal.totalSeconds += day.scanToFirstTapSeconds.totalSeconds
+            scanToFirstTapTotal.samples += day.scanToFirstTapSeconds.samples
+            scanSessionTotal.totalSeconds += day.scanSessionSeconds.totalSeconds
+            scanSessionTotal.samples += day.scanSessionSeconds.samples
+            for (query, count) in day.searchQueryCounts {
+                searchQueryTotals[query, default: 0] += count
+            }
+            for (key, count) in day.scrollDepthCounts {
+                scrollDepthTotals[key, default: 0] += count
             }
         }
 
@@ -357,6 +527,42 @@ final class AnalyticsStore: @unchecked Sendable {
             }
             .map { QRScanCount(table: $0.key, count: $0.value) }
 
+        let scanDestinations = qrScanDestinationTotals
+            .sorted { $0.value > $1.value }
+            .map { ScanDestinationCount(destination: $0.key, count: $0.value) }
+
+        // Every table that showed up as a scan or an attributed item view in
+        // this window, most-scanned first (generic/no-table last, same as
+        // qrScans — it isn't a table, so it shouldn't win "most engaged").
+        let engagedTableIds = Set(qrScanTotals.keys).union(tableItemViewTotals.keys)
+        let tableEngagement = engagedTableIds
+            .map { table -> TableEngagementCount in
+                let scans = qrScanTotals[table] ?? 0
+                let views = tableItemViewTotals[table] ?? 0
+                let rate = scans > 0 ? Double(views) / Double(scans) : 0
+                return TableEngagementCount(table: table, scans: scans, itemViews: views, engagementRate: rate)
+            }
+            .sorted { lhs, rhs in
+                if lhs.table == Self.genericScanLabel { return false }
+                if rhs.table == Self.genericScanLabel { return true }
+                return lhs.scans > rhs.scans
+            }
+
+        let searchQueries = searchQueryTotals
+            .sorted { $0.value > $1.value }
+            .prefix(30)
+            .map { SearchQueryCount(query: $0.key, count: $0.value) }
+
+        let scrollDepth = scrollDepthTotals
+            .compactMap { key, count -> ScrollDepthCount? in
+                let parts = key.split(separator: ":")
+                guard parts.count == 2, let bucket = Int(parts[1]) else { return nil }
+                return ScrollDepthCount(section: String(parts[0]), bucket: bucket, count: count)
+            }
+            .sorted { lhs, rhs in
+                lhs.section == rhs.section ? lhs.bucket < rhs.bucket : lhs.section < rhs.section
+            }
+
         return AnalyticsSummary(
             days: recent.sorted { $0.date < $1.date },
             totalViews: totals.values.reduce(0, +),
@@ -367,8 +573,28 @@ final class AnalyticsStore: @unchecked Sendable {
             osBreakdown: osBreakdown,
             browserBreakdown: browserBreakdown,
             deviceModelBreakdown: Array(deviceModelBreakdown),
-            qrScans: qrScans
+            qrScans: qrScans,
+            scanDestinations: scanDestinations,
+            tableEngagement: tableEngagement,
+            neverScannedTables: try neverScannedTablesLocked(),
+            scanToFirstTapSeconds: scanToFirstTapTotal.samples > 0 ? scanToFirstTapTotal.totalSeconds / Double(scanToFirstTapTotal.samples) : nil,
+            scanToFirstTapSamples: scanToFirstTapTotal.samples,
+            scanSessionSeconds: scanSessionTotal.samples > 0 ? scanSessionTotal.totalSeconds / Double(scanSessionTotal.samples) : nil,
+            scanSessionSamples: scanSessionTotal.samples,
+            searchQueries: Array(searchQueries),
+            scrollDepth: scrollDepth
         )
+    }
+
+    /// Same logic as `neverScannedTables()`, but callable from inside
+    /// `summary(days:)` while the lock is already held — `neverScannedTables()`
+    /// itself takes the lock, so calling it directly from here would deadlock.
+    private func neverScannedTablesLocked() throws -> [String] {
+        var scanned = Set<String>()
+        for day in days {
+            scanned.formUnion(day.qrScanCounts.keys)
+        }
+        return TableMap.allIds.subtracting(scanned).sorted()
     }
 
     /// Most-viewed menu items over the given window, for auto-featuring.

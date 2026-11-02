@@ -61,6 +61,76 @@ function renderHbarTable(el, rows, { labelHeader, valueHeader, formatValue = (v)
   `;
 }
 
+function renderTableEngagementTable(el, rows) {
+  if (!rows.length) {
+    el.innerHTML = '<p class="hint">No data yet.</p>';
+    return;
+  }
+  el.innerHTML = `
+    <div class="data-table">
+      <table>
+        <thead><tr><th>Table</th><th>Scans</th><th>Item views</th><th>Engagement rate</th></tr></thead>
+        <tbody>
+          ${rows
+            .map(
+              (r) => `
+            <tr>
+              <td>${escapeHtmlAnalytics(r.table)}</td>
+              <td>${r.scans}</td>
+              <td>${r.itemViews}</td>
+              <td>${r.scans ? `${Math.round(r.engagementRate * 100)}%` : '—'}</td>
+            </tr>
+          `
+            )
+            .join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+/// One hbar table per section (menu/sushi/drinks/happy_hour), each row a
+/// scroll threshold with the count of page views that reached it.
+function renderScrollDepthTable(el, rows) {
+  if (!rows.length) {
+    el.innerHTML = '<p class="hint">No data yet.</p>';
+    return;
+  }
+  const bySection = new Map();
+  rows.forEach((r) => {
+    if (!bySection.has(r.section)) bySection.set(r.section, []);
+    bySection.get(r.section).push(r);
+  });
+  el.innerHTML = Array.from(bySection.entries())
+    .map(([section, buckets]) => {
+      const maxCount = Math.max(...buckets.map((b) => b.count));
+      return `
+        <h3 style="margin: 1rem 0 0.4rem;">${escapeHtmlAnalytics(section)}</h3>
+        <div class="data-table">
+          <table>
+            <thead><tr><th>Reached</th><th>Page views</th><th></th></tr></thead>
+            <tbody>
+              ${buckets
+                .map(
+                  (b) => `
+                <tr>
+                  <td>${b.bucket}%</td>
+                  <td>${b.count}</td>
+                  <td style="width: 40%;">
+                    <div class="analytics-hbar" style="width: ${Math.max(4, Math.round((b.count / maxCount) * 100))}%"></div>
+                  </td>
+                </tr>
+              `
+                )
+                .join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    })
+    .join('');
+}
+
 function renderSummaryPills(el, pills) {
   if (!el) return;
   el.innerHTML = pills.map((p) => `<span class="pill ${p.cls || ''}">${escapeHtmlAnalytics(p.label)}</span>`).join('');
@@ -77,6 +147,10 @@ async function loadAnalytics() {
   const topItemsEl = document.getElementById('top-items');
   const qrScansEl = document.getElementById('qr-scans');
   const dwellEl = document.getElementById('page-dwell');
+  const neverScannedEl = document.getElementById('never-scanned-tables');
+  const scanTimingEl = document.getElementById('scan-timing');
+  const searchQueriesEl = document.getElementById('search-queries');
+  const scrollDepthEl = document.getElementById('scroll-depth');
   const days = document.getElementById('range-select').value;
 
   overviewEl.textContent = 'Loading...';
@@ -152,9 +226,30 @@ async function loadAnalytics() {
     ]);
 
     const topTableScan = summary.qrScans.find((s) => s.table !== 'Front Door / No Table');
+    const happyHourScans = summary.scanDestinations.find((d) => d.destination === 'happy-hour')?.count || 0;
     renderSummaryPills(document.getElementById('qr-scans-summary'), [
       { label: `${summary.qrScans.reduce((sum, s) => sum + s.count, 0)} total scans` },
       ...(topTableScan ? [{ label: `Busiest table: ${topTableScan.table} (${topTableScan.count})`, cls: 'pill-approved' }] : []),
+      ...(happyHourScans ? [{ label: `${happyHourScans} landed on Happy Hour` }] : []),
+      ...(summary.neverScannedTables.length ? [{ label: `${summary.neverScannedTables.length} tables never scanned` }] : []),
+    ]);
+
+    const scanTimingPills = [];
+    if (summary.scanToFirstTapSeconds != null) {
+      scanTimingPills.push({ label: `Avg. first tap: ${Math.round(summary.scanToFirstTapSeconds)}s (${summary.scanToFirstTapSamples} scans)` });
+    }
+    if (summary.scanSessionSeconds != null) {
+      scanTimingPills.push({ label: `Avg. session: ${Math.round(summary.scanSessionSeconds)}s (${summary.scanSessionSamples} scans)` });
+    }
+    renderSummaryPills(document.getElementById('scan-timing-summary'), scanTimingPills.length ? scanTimingPills : [{ label: 'No data yet.' }]);
+
+    renderSummaryPills(document.getElementById('search-queries-summary'), [
+      { label: `${summary.searchQueries.length} distinct queries` },
+      ...(summary.searchQueries[0] ? [{ label: `Top: "${summary.searchQueries[0].query}" (${summary.searchQueries[0].count})`, cls: 'pill-approved' }] : []),
+    ]);
+
+    renderSummaryPills(document.getElementById('scroll-depth-summary'), [
+      { label: `${new Set(summary.scrollDepth.map((d) => d.section)).size} sections tracked` },
     ]);
 
     const totalDwellSamples = summary.pageDwell.reduce((sum, d) => sum + d.samples, 0);
@@ -219,11 +314,30 @@ async function loadAnalytics() {
       { labelHeader: 'Item', valueHeader: 'Detail views' }
     );
 
+    renderTableEngagementTable(qrScansEl, summary.tableEngagement.length ? summary.tableEngagement : summary.qrScans.map((s) => ({ table: s.table, scans: s.count, itemViews: 0, engagementRate: 0 })));
+
+    if (summary.neverScannedTables.length) {
+      neverScannedEl.innerHTML = `<strong>Never scanned:</strong> ${summary.neverScannedTables.map(escapeHtmlAnalytics).join(', ')}`;
+    } else {
+      neverScannedEl.innerHTML = '';
+    }
+
     renderHbarTable(
-      qrScansEl,
-      summary.qrScans.map((s) => ({ label: s.table, value: s.count })),
-      { labelHeader: 'Table', valueHeader: 'Scans' }
+      scanTimingEl,
+      [
+        ...(summary.scanToFirstTapSeconds != null ? [{ label: 'Avg. seconds to first tap', value: summary.scanToFirstTapSeconds }] : []),
+        ...(summary.scanSessionSeconds != null ? [{ label: 'Avg. session length (s)', value: summary.scanSessionSeconds }] : []),
+      ],
+      { labelHeader: 'Metric', valueHeader: 'Seconds', formatValue: (v) => `${Math.round(v)}s` }
     );
+
+    renderHbarTable(
+      searchQueriesEl,
+      summary.searchQueries.map((q) => ({ label: q.query, value: q.count })),
+      { labelHeader: 'Query', valueHeader: 'Times searched' }
+    );
+
+    renderScrollDepthTable(scrollDepthEl, summary.scrollDepth);
 
     renderHbarTable(
       dwellEl,

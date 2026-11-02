@@ -114,11 +114,39 @@
         </section>
 
         <section class="panel analytics-section" data-section="qr-scans">
-          <a class="analytics-section-title" href="?section=qr-scans"><h2>QR Code Scans by Table</h2></a>
+          <a class="analytics-section-title" href="?section=qr-scans"><h2>QR Scans &amp; Engagement by Table</h2></a>
           <div id="qr-scans-summary" class="loyalty-card-summary"></div>
           <div class="analytics-section-detail">
-            <p class="hint">Every "Scan for Menu" hit, recorded the moment the QR redirects — whether or not the guest goes on to order. "Front Door / No Table" is the host-stand "While You Wait" card, which shows real prices but never unlocks ordering.</p>
+            <p class="hint">Scans, and item-detail views opened while that table's scan was active ("engagement rate" = views &divide; scans — above 100% just means a table dug into several items per visit). "Front Door / No Table" is the host-stand "While You Wait" card, which shows real prices but never unlocks ordering.</p>
             <div id="qr-scans"></div>
+            <div id="never-scanned-tables" class="hint" style="margin-top: 0.75rem;"></div>
+          </div>
+        </section>
+
+        <section class="panel analytics-section" data-section="scan-timing">
+          <a class="analytics-section-title" href="?section=scan-timing"><h2>Scan-to-Engagement Timing</h2></a>
+          <div id="scan-timing-summary" class="loyalty-card-summary"></div>
+          <div class="analytics-section-detail">
+            <p class="hint">"First tap" is how long after scanning a guest first taps an item card. "Session length" is how long the tab stayed open/foregrounded afterward, across however many pages they browsed. Both are view-only signals — no ordering is involved.</p>
+            <div id="scan-timing"></div>
+          </div>
+        </section>
+
+        <section class="panel analytics-section" data-section="search-queries">
+          <a class="analytics-section-title" href="?section=search-queries"><h2>Menu Search Queries</h2></a>
+          <div id="search-queries-summary" class="loyalty-card-summary"></div>
+          <div class="analytics-section-detail">
+            <p class="hint">What guests type into the menu search box — single letters and typing-in-progress fragments are filtered out. Useful for spotting items people expect to find under a different name.</p>
+            <div id="search-queries"></div>
+          </div>
+        </section>
+
+        <section class="panel analytics-section" data-section="scroll-depth">
+          <a class="analytics-section-title" href="?section=scroll-depth"><h2>Scroll Depth</h2></a>
+          <div id="scroll-depth-summary" class="loyalty-card-summary"></div>
+          <div class="analytics-section-detail">
+            <p class="hint">Share of page views that reached each scroll threshold, per menu section — a low 75%/100% share means most guests never scroll to the bottom of that page.</p>
+            <div id="scroll-depth"></div>
           </div>
         </section>
 

@@ -124,6 +124,24 @@ struct WaitlistJoinRequest: Content {
 
 struct ItemViewRequest: Content {
     var name: String
+    var table: String?
+}
+
+struct ScanLatencyRequest: Content {
+    var seconds: Double
+}
+
+struct ScanSessionRequest: Content {
+    var seconds: Double
+}
+
+struct SearchQueryRequest: Content {
+    var query: String
+}
+
+struct ScrollDepthRequest: Content {
+    var section: String
+    var buckets: [Int]
 }
 
 struct MenuItemEngagementRequest: Content {
@@ -183,7 +201,10 @@ func routes(_ app: Application) throws {
         // to report "which tables are using the QR menu" at all: an
         // order-based report misses everyone who scanned and just browsed.
         let scannedTable = req.query[String.self, at: "table"]?.trimmingCharacters(in: .whitespacesAndNewlines)
-        AnalyticsStore.shared.recordQRScan(table: (scannedTable?.isEmpty ?? true) ? AnalyticsStore.genericScanLabel : scannedTable!)
+        AnalyticsStore.shared.recordQRScan(
+            table: (scannedTable?.isEmpty ?? true) ? AnalyticsStore.genericScanLabel : scannedTable!,
+            destination: target == "/happy-hour" ? "happy-hour" : "menu"
+        )
 
         var queryParts: [String] = []
         if let table = scannedTable, !table.isEmpty,
@@ -1272,7 +1293,47 @@ func routes(_ app: Application) throws {
         let body = try req.content.decode(ItemViewRequest.self)
         let name = body.name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return .ok }
-        AnalyticsStore.shared.recordItemView(name: name)
+        let table = body.table?.trimmingCharacters(in: .whitespacesAndNewlines)
+        AnalyticsStore.shared.recordItemView(name: name, table: (table?.isEmpty ?? true) ? nil : table)
+        return .ok
+    }
+
+    // How long from a fresh `/scan` landing to the first tap on any item
+    // card in that session — fired once per scan session client-side.
+    app.post("api", "analytics", "scan-latency") { req throws -> HTTPStatus in
+        let body = try req.content.decode(ScanLatencyRequest.self)
+        AnalyticsStore.shared.recordScanToFirstTap(seconds: body.seconds)
+        return .ok
+    }
+
+    // Total time a scan session held someone's attention before the tab was
+    // hidden/closed — fired once per scan session client-side, from nav.js.
+    app.post("api", "analytics", "scan-session") { req throws -> HTTPStatus in
+        let body = try req.content.decode(ScanSessionRequest.self)
+        AnalyticsStore.shared.recordScanSession(seconds: body.seconds)
+        return .ok
+    }
+
+    // Menu search box text — short/noise queries already filtered client-side,
+    // trimmed/lowercased/length-checked again here since this is a public,
+    // unauthenticated endpoint.
+    app.post("api", "analytics", "search-query") { req throws -> HTTPStatus in
+        let body = try req.content.decode(SearchQueryRequest.self)
+        let query = body.query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard query.count >= 2, query.count <= 80 else { return .ok }
+        AnalyticsStore.shared.recordSearchQuery(query)
+        return .ok
+    }
+
+    // Deepest scroll threshold(s) reached on a page view, flushed once at
+    // tab-hide/close — see the scroll-depth tracker in nav.js.
+    app.post("api", "analytics", "scroll-depth") { req throws -> HTTPStatus in
+        let body = try req.content.decode(ScrollDepthRequest.self)
+        let section = body.section.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !section.isEmpty else { return .ok }
+        for bucket in body.buckets.prefix(4) where [25, 50, 75, 100].contains(bucket) {
+            AnalyticsStore.shared.recordScrollDepth(section: section, bucket: bucket)
+        }
         return .ok
     }
 

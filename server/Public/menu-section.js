@@ -81,10 +81,27 @@ function getDeviceId() {
 /// anonymous /api/analytics/item-view call below, which keeps feeding the
 /// existing aggregate "most-viewed items" report untouched.
 function recordMenuItemEngagement(itemName, clickType) {
+  recordScanLatencyIfFirstTap();
   fetch('/api/analytics/menu-item-engagement', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ itemName, clickType, deviceId: getDeviceId() }),
+  }).catch(() => {});
+}
+
+/// First tap on any item card (photo or details) after a fresh QR scan —
+/// how long it takes a guest to actually start engaging with the menu once
+/// they land on it. Reuses the ohana_scan_arrived_at timestamp nav.js stamps
+/// for the scan-session-length tracker; fires at most once per scan session.
+function recordScanLatencyIfFirstTap() {
+  const arrivedAt = sessionStorage.getItem('ohana_scan_arrived_at');
+  if (!arrivedAt || sessionStorage.getItem('ohana_scan_latency_sent') === '1') return;
+  sessionStorage.setItem('ohana_scan_latency_sent', '1');
+  const seconds = (Date.now() - Number(arrivedAt)) / 1000;
+  fetch('/api/analytics/scan-latency', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ seconds }),
   }).catch(() => {});
 }
 
@@ -404,7 +421,9 @@ function renderControls(categories) {
   menuContainer.before(controls);
 
   document.getElementById('menu-search').addEventListener('input', (event) => {
-    filterMenu(event.target.value.trim().toLowerCase());
+    const query = event.target.value.trim().toLowerCase();
+    filterMenu(query);
+    queueSearchQueryTracking(query);
   });
 
   controls.querySelectorAll('.tag-chip').forEach((chip) => {
@@ -415,6 +434,22 @@ function renderControls(categories) {
       filterMenu(document.getElementById('menu-search').value.trim().toLowerCase());
     });
   });
+}
+
+/// Reports what guests actually search for — debounced so a query is only
+/// sent once typing pauses (not on every keystroke), and short/empty
+/// queries are skipped since a single letter mid-typing isn't a real term.
+let searchQueryTrackingTimer = null;
+function queueSearchQueryTracking(query) {
+  clearTimeout(searchQueryTrackingTimer);
+  if (query.length < 2) return;
+  searchQueryTrackingTimer = setTimeout(() => {
+    fetch('/api/analytics/search-query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+    }).catch(() => {});
+  }, 800);
 }
 
 function filterMenu(query) {
@@ -796,7 +831,7 @@ async function openItemModal(index) {
   fetch('/api/analytics/item-view', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: item.name }),
+    body: JSON.stringify({ name: item.name, table: getTableId() }),
   }).catch(() => {});
   recordMenuItemEngagement(item.name, 'details');
 

@@ -126,6 +126,79 @@ final class AnalyticsStoreTests: XCTestCase {
         XCTAssertFalse(summary.pageDwell.contains { $0.path == "/about" })
     }
 
+    func testQRScanTracksDestinationAlongsideTable() throws {
+        AnalyticsStore.shared.recordQRScan(table: "30", destination: "menu")
+        AnalyticsStore.shared.recordQRScan(table: "30", destination: "happy-hour")
+        AnalyticsStore.shared.recordQRScan(table: AnalyticsStore.genericScanLabel, destination: "menu")
+
+        let summary = try AnalyticsStore.shared.summary(days: 7)
+        let destinations = Dictionary(uniqueKeysWithValues: summary.scanDestinations.map { ($0.destination, $0.count) })
+        XCTAssertEqual(destinations["menu"], 2)
+        XCTAssertEqual(destinations["happy-hour"], 1)
+    }
+
+    func testTableEngagementCombinesScansAndAttributedItemViews() throws {
+        AnalyticsStore.shared.recordQRScan(table: "30", destination: "menu")
+        AnalyticsStore.shared.recordQRScan(table: "30", destination: "menu")
+        AnalyticsStore.shared.recordItemView(name: "Volcano Roll", table: "30")
+        AnalyticsStore.shared.recordItemView(name: "Spam Musubi", table: "30")
+        // Untabled item views (e.g. no table scanned yet) shouldn't pollute
+        // any table's engagement numbers.
+        AnalyticsStore.shared.recordItemView(name: "Poke Bowl")
+
+        let summary = try AnalyticsStore.shared.summary(days: 7)
+        let table30 = try XCTUnwrap(summary.tableEngagement.first { $0.table == "30" })
+        XCTAssertEqual(table30.scans, 2)
+        XCTAssertEqual(table30.itemViews, 2)
+        XCTAssertEqual(table30.engagementRate, 1.0, accuracy: 0.01)
+    }
+
+    func testNeverScannedTablesExcludesOnlyTablesWithAtLeastOneScanEver() throws {
+        AnalyticsStore.shared.recordQRScan(table: "30", destination: "menu")
+
+        let never = try AnalyticsStore.shared.neverScannedTables()
+        XCTAssertFalse(never.contains("30"))
+        XCTAssertTrue(never.contains("R1"))
+        XCTAssertTrue(TableMap.allIds.isSubset(of: Set(never).union(["30"])))
+    }
+
+    func testScanToFirstTapAndSessionLengthAverageAcrossSamples() throws {
+        AnalyticsStore.shared.recordScanToFirstTap(seconds: 10)
+        AnalyticsStore.shared.recordScanToFirstTap(seconds: 20)
+        AnalyticsStore.shared.recordScanSession(seconds: 60)
+        // Absurd outliers shouldn't skew the average.
+        AnalyticsStore.shared.recordScanToFirstTap(seconds: 999_999)
+
+        let summary = try AnalyticsStore.shared.summary(days: 7)
+        XCTAssertEqual(summary.scanToFirstTapSamples, 2)
+        XCTAssertEqual(summary.scanToFirstTapSeconds ?? -1, 15, accuracy: 0.01)
+        XCTAssertEqual(summary.scanSessionSamples, 1)
+        XCTAssertEqual(summary.scanSessionSeconds ?? -1, 60, accuracy: 0.01)
+    }
+
+    func testSearchQueriesAreCountedAndRankedMostSearchedFirst() throws {
+        AnalyticsStore.shared.recordSearchQuery("roll")
+        AnalyticsStore.shared.recordSearchQuery("roll")
+        AnalyticsStore.shared.recordSearchQuery("sake")
+
+        let summary = try AnalyticsStore.shared.summary(days: 7)
+        XCTAssertEqual(summary.searchQueries.first?.query, "roll")
+        XCTAssertEqual(summary.searchQueries.first?.count, 2)
+    }
+
+    func testScrollDepthBucketsArePerSection() throws {
+        AnalyticsStore.shared.recordScrollDepth(section: "menu", bucket: 25)
+        AnalyticsStore.shared.recordScrollDepth(section: "menu", bucket: 25)
+        AnalyticsStore.shared.recordScrollDepth(section: "menu", bucket: 100)
+        AnalyticsStore.shared.recordScrollDepth(section: "sushi", bucket: 25)
+
+        let summary = try AnalyticsStore.shared.summary(days: 7)
+        let menu25 = try XCTUnwrap(summary.scrollDepth.first { $0.section == "menu" && $0.bucket == 25 })
+        XCTAssertEqual(menu25.count, 2)
+        let sushi25 = try XCTUnwrap(summary.scrollDepth.first { $0.section == "sushi" && $0.bucket == 25 })
+        XCTAssertEqual(sushi25.count, 1)
+    }
+
     func testOldAnalyticsFileWithoutNewFieldsStillDecodes() throws {
         let legacyJSON = """
         [{"date":"2026-01-01","counts":{"/menu":5}}]

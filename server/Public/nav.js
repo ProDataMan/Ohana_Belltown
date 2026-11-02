@@ -624,3 +624,88 @@ function startStaffCompetitorPhotoAlerts() {
   });
   window.addEventListener('pagehide', sendDwell);
 })();
+
+// "Scan session length" — total time spent on the site after a QR scan
+// lands, across however many pages get browsed in that tab session (not
+// just the one landing page, unlike the dwell tracker above). The arrival
+// timestamp is stashed in sessionStorage the same way getTableId() stashes
+// ohana_table_id in menu-section.js, so it survives internal navigation —
+// and is only sent once per session (guarded in sessionStorage too, since
+// each page load runs this IIFE fresh) to avoid double-counting the same
+// stretch of time from more than one page's hidden/pagehide event.
+(() => {
+  const params = new URLSearchParams(window.location.search);
+  const freshScan = Boolean(params.get('table')) || params.get('hh') === '1' || params.get('prices') === '1';
+  if (freshScan && !sessionStorage.getItem('ohana_scan_arrived_at')) {
+    sessionStorage.setItem('ohana_scan_arrived_at', String(Date.now()));
+  }
+  const arrivedAt = sessionStorage.getItem('ohana_scan_arrived_at');
+  if (!arrivedAt) return;
+
+  let sent = false;
+  function sendScanSession() {
+    if (sent || sessionStorage.getItem('ohana_scan_session_sent') === '1') return;
+    sent = true;
+    sessionStorage.setItem('ohana_scan_session_sent', '1');
+    const seconds = (Date.now() - Number(arrivedAt)) / 1000;
+    const payload = JSON.stringify({ seconds });
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('/api/analytics/scan-session', new Blob([payload], { type: 'application/json' }));
+    } else {
+      fetch('/api/analytics/scan-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+        keepalive: true,
+      }).catch(() => {});
+    }
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') sendScanSession();
+  });
+  window.addEventListener('pagehide', sendScanSession);
+})();
+
+// Scroll depth — which thresholds of a page's scrollable height someone
+// actually reaches, bucketed (25/50/75/100%) rather than tracked
+// continuously. Fires once per distinct threshold reached, flushed as a
+// batch at tab-hide/close the same way menu-item impressions are.
+(() => {
+  const thresholds = [25, 50, 75, 100];
+  const reached = new Set();
+  const section = window.MENU_SECTION || window.location.pathname;
+
+  function checkScroll() {
+    const doc = document.documentElement;
+    const scrollable = doc.scrollHeight - doc.clientHeight;
+    const pct = scrollable <= 0 ? 100 : Math.min(100, Math.round((window.scrollY / scrollable) * 100));
+    thresholds.forEach((t) => {
+      if (pct >= t) reached.add(t);
+    });
+  }
+
+  function flush() {
+    if (!reached.size) return;
+    const buckets = Array.from(reached);
+    reached.clear();
+    const payload = JSON.stringify({ section, buckets });
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('/api/analytics/scroll-depth', new Blob([payload], { type: 'application/json' }));
+    } else {
+      fetch('/api/analytics/scroll-depth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+        keepalive: true,
+      }).catch(() => {});
+    }
+  }
+
+  window.addEventListener('scroll', checkScroll, { passive: true });
+  checkScroll();
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flush();
+  });
+  window.addEventListener('pagehide', flush);
+})();
