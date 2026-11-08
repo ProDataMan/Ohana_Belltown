@@ -22,6 +22,21 @@ struct QRInsights: Content {
     var deviceMix: [QRInsightsCount]
     /// Nil until POS orders have been imported for this range.
     var pos: QRInsightsPos?
+    /// Tables with no QR visit in the last 7 days, listed only when the
+    /// rest of the floor had enough scans (`QRInsightsBuilder.quietThreshold`)
+    /// that silence probably means a missing or damaged card, not a slow week.
+    var quietTables: [String] = []
+    /// From waitlist parties staff marked "Seated" at a table. Nil when none
+    /// were in this range.
+    var seating: QRInsightsSeating? = nil
+}
+
+struct QRInsightsSeating: Content {
+    var seatedParties: Int
+    var avgWaitMinutes: Double?
+    /// Seated parties whose table had a QR visit within 90 minutes.
+    var partiesThatScanned: Int
+    var avgMinutesSeatedToFirstScan: Double?
 }
 
 /// QR visits compared with what the POS says each table ordered.
@@ -152,6 +167,44 @@ struct QRInsightsParties: Content {
 
 enum QRInsightsBuilder {
     static let partyWindow: TimeInterval = 20 * 60
+    static let quietWindowDays = 7
+    static let quietThreshold = 20
+
+    /// Matches each seated waitlist party to the first QR visit at its table
+    /// from 5 minutes before to 90 minutes after it was seated.
+    static func seating(parties: [WaitlistEntry], visits: [QRVisitSummary]) -> QRInsightsSeating? {
+        guard !parties.isEmpty else { return nil }
+        let iso = ISO8601DateFormatter()
+        var waits: [Double] = []
+        var toScan: [Double] = []
+        for party in parties {
+            guard let seated = party.seatedAt.flatMap(iso.date), let table = party.seatedTable else { continue }
+            if let joined = iso.date(from: party.createdAt) {
+                waits.append(seated.timeIntervalSince(joined) / 60)
+            }
+            let firstScan = visits
+                .filter { PosMatching.tableKey($0.table) == table }
+                .compactMap { iso.date(from: $0.startedAt) }
+                .filter { $0 >= seated.addingTimeInterval(-5 * 60) && $0 <= seated.addingTimeInterval(90 * 60) }
+                .min()
+            if let firstScan {
+                toScan.append(max(0, firstScan.timeIntervalSince(seated) / 60))
+            }
+        }
+        func average(_ values: [Double]) -> Double? { values.isEmpty ? nil : values.reduce(0, +) / Double(values.count) }
+        return QRInsightsSeating(
+            seatedParties: parties.count, avgWaitMinutes: average(waits),
+            partiesThatScanned: toScan.count, avgMinutesSeatedToFirstScan: average(toScan)
+        )
+    }
+
+    /// See `QRInsights.quietTables`.
+    static func quietTables(lastWeek visits: [QRVisitSummary]) -> [String] {
+        let scanned = Set(visits.compactMap { PosMatching.tableKey($0.table) })
+        let tableVisits = visits.filter { PosMatching.tableKey($0.table).map { id in TableMap.entries.contains { $0.id == id } } ?? false }
+        guard tableVisits.count >= quietThreshold else { return [] }
+        return TableMap.entries.map(\.id).filter { !scanned.contains($0) }
+    }
 
     static func build(visits: [QRVisitSummary], from: Date, to: Date, menu: Menu?, orders: [PosOrder] = []) -> QRInsights {
         let iso = ISO8601DateFormatter()

@@ -41,11 +41,31 @@ struct DailyPageviews: Codable {
     /// page view (not continuous), so this counts visits-that-reached-X%,
     /// not scroll events.
     var scrollDepthCounts: [String: Int]
+    /// Page loads from crawlers, link previews, and monitors — left out of
+    /// every other count here, tallied only so the report can say how many.
+    var botViews: Int
+    /// Visits (one per browser tab session) by where they came from
+    /// ("google", "google-maps", "instagram", "qr", "direct", …) — see the
+    /// source tracker in nav.js.
+    var sourceCounts: [String: Int]
+    /// Visits by the first page they landed on.
+    var landingCounts: [String: Int]
+    /// Visits by `utm_campaign`, for links put on flyers and social posts.
+    var campaignCounts: [String: Int]
+    /// Distinct browsers that visited, counted once per day (by the random
+    /// per-browser id; the ids themselves are never stored).
+    var uniqueVisitors: Int
+    /// Taps on the actions that matter to the business — "order-online",
+    /// "call", "directions", "email", "social:<site>" — keyed
+    /// "<action>|<page>" and "<action>|<source>".
+    var actionPageCounts: [String: Int]
+    var actionSourceCounts: [String: Int]
 
     enum CodingKeys: String, CodingKey {
         case date, counts, deviceCounts, itemViewCounts, dwell, osCounts, browserCounts, deviceModelCounts, qrScanCounts
         case qrScanDestinationCounts, tableItemViewCounts, scanToFirstTapSeconds, scanSessionSeconds
         case searchQueryCounts, scrollDepthCounts
+        case botViews, sourceCounts, landingCounts, campaignCounts, uniqueVisitors, actionPageCounts, actionSourceCounts
     }
 
     init(
@@ -56,7 +76,10 @@ struct DailyPageviews: Codable {
         tableItemViewCounts: [String: Int] = [:],
         scanToFirstTapSeconds: DwellStat = DwellStat(totalSeconds: 0, samples: 0),
         scanSessionSeconds: DwellStat = DwellStat(totalSeconds: 0, samples: 0),
-        searchQueryCounts: [String: Int] = [:], scrollDepthCounts: [String: Int] = [:]
+        searchQueryCounts: [String: Int] = [:], scrollDepthCounts: [String: Int] = [:],
+        botViews: Int = 0, sourceCounts: [String: Int] = [:], landingCounts: [String: Int] = [:],
+        campaignCounts: [String: Int] = [:], uniqueVisitors: Int = 0,
+        actionPageCounts: [String: Int] = [:], actionSourceCounts: [String: Int] = [:]
     ) {
         self.date = date
         self.counts = counts
@@ -73,6 +96,13 @@ struct DailyPageviews: Codable {
         self.scanSessionSeconds = scanSessionSeconds
         self.searchQueryCounts = searchQueryCounts
         self.scrollDepthCounts = scrollDepthCounts
+        self.botViews = botViews
+        self.sourceCounts = sourceCounts
+        self.landingCounts = landingCounts
+        self.campaignCounts = campaignCounts
+        self.uniqueVisitors = uniqueVisitors
+        self.actionPageCounts = actionPageCounts
+        self.actionSourceCounts = actionSourceCounts
     }
 
     init(from decoder: Decoder) throws {
@@ -94,6 +124,13 @@ struct DailyPageviews: Codable {
             ?? DwellStat(totalSeconds: 0, samples: 0)
         searchQueryCounts = try container.decodeIfPresent([String: Int].self, forKey: .searchQueryCounts) ?? [:]
         scrollDepthCounts = try container.decodeIfPresent([String: Int].self, forKey: .scrollDepthCounts) ?? [:]
+        botViews = try container.decodeIfPresent(Int.self, forKey: .botViews) ?? 0
+        sourceCounts = try container.decodeIfPresent([String: Int].self, forKey: .sourceCounts) ?? [:]
+        landingCounts = try container.decodeIfPresent([String: Int].self, forKey: .landingCounts) ?? [:]
+        campaignCounts = try container.decodeIfPresent([String: Int].self, forKey: .campaignCounts) ?? [:]
+        uniqueVisitors = try container.decodeIfPresent(Int.self, forKey: .uniqueVisitors) ?? 0
+        actionPageCounts = try container.decodeIfPresent([String: Int].self, forKey: .actionPageCounts) ?? [:]
+        actionSourceCounts = try container.decodeIfPresent([String: Int].self, forKey: .actionSourceCounts) ?? [:]
     }
 }
 
@@ -117,6 +154,27 @@ struct AnalyticsSummary: Content {
     var scanSessionSamples: Int
     var searchQueries: [SearchQueryCount]
     var scrollDepth: [ScrollDepthCount]
+    var botViews: Int
+    var visits: Int
+    var uniqueVisitors: Int
+    var sources: [LabelCount]
+    var landingPages: [LabelCount]
+    var campaigns: [LabelCount]
+    var actions: [LabelCount]
+    var actionsByPage: [ActionCount]
+    var actionsBySource: [ActionCount]
+}
+
+struct LabelCount: Content {
+    var label: String
+    var count: Int
+}
+
+struct ActionCount: Content {
+    var action: String
+    /// A page path or a source, depending on the list.
+    var key: String
+    var count: Int
 }
 
 struct QRScanCount: Content {
@@ -208,6 +266,55 @@ final class AnalyticsStore: @unchecked Sendable {
     /// front-door "While You Wait" QR by the host stand, or any other scan
     /// that isn't tied to a specific table.
     static let genericScanLabel = "Front Door / No Table"
+
+    /// Daily totals are tiny, so they're kept two years for
+    /// year-over-year comparison (raw per-visit data elsewhere still expires
+    /// at 120 days).
+    static let retentionDays = 730
+
+    /// User-Agent fragments of crawlers, link-preview fetchers, uptime
+    /// monitors, and scripts. Lowercased substring match; a missing
+    /// User-Agent also counts as a bot.
+    static let botMarkers = [
+        "bot", "crawl", "spider", "slurp", "facebookexternalhit", "facebookcatalog", "meta-externalagent", "embedly",
+        "preview", "whatsapp", "headless", "lighthouse", "pagespeed", "curl/", "wget", "python", "go-http", "java/",
+        "okhttp", "axios", "node-fetch", "monitor", "pingdom", "statuscake", "uptime", "ahrefs", "semrush", "yandex",
+        "baidu", "bytespider", "petalbot", "google-inspectiontool", "mediapartners", "feedfetcher", "httpclient",
+    ]
+
+    static let actions: Set<String> = ["order-online", "call", "directions", "email"]
+    static let socialSites: Set<String> = ["instagram", "facebook", "tiktok", "yelp", "x", "google-reviews", "tripadvisor"]
+
+    static func isKnownAction(_ action: String) -> Bool {
+        if actions.contains(action) { return true }
+        guard action.hasPrefix("social:") else { return false }
+        return socialSites.contains(String(action.dropFirst("social:".count)))
+    }
+
+    /// A source/campaign label: lowercase letters, digits, and - . : _ only,
+    /// at most 60 characters (they come from public, unauthenticated posts).
+    static func cleanLabel(_ value: String?) -> String? {
+        guard let text = value?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !text.isEmpty, text.count <= 60,
+              text.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "-.:_".contains($0)) }) else { return nil }
+        return text
+    }
+
+    /// A site path like "/menu": starts with "/", no query, at most 100 characters.
+    static func cleanPath(_ value: String?) -> String? {
+        guard let text = value?.trimmingCharacters(in: .whitespacesAndNewlines), text.hasPrefix("/"), text.count <= 100,
+              !text.contains("?"), !text.contains(" ") else { return nil }
+        return text
+    }
+
+    static func isBot(userAgent: String?) -> Bool {
+        guard let ua = userAgent?.lowercased(), !ua.isEmpty else { return true }
+        return botMarkers.contains { ua.contains($0) }
+    }
+
+    /// Visitor ids seen today, in memory only: enough to count each browser
+    /// once per day without writing any per-visitor id to disk. A restart
+    /// mid-day can count a returning browser twice that day.
+    private var visitorsSeenToday: (date: String, ids: Set<String>) = ("", [])
 
     private let lock = NSLock()
     private var fileURL = URL(fileURLWithPath: "Data/analytics.json")
@@ -430,6 +537,48 @@ final class AnalyticsStore: @unchecked Sendable {
         schedulePersistLocked()
     }
 
+    func recordBotView() {
+        lock.lock()
+        defer { lock.unlock() }
+        try? loadIfNeeded()
+        days[todayIndex()].botViews += 1
+        schedulePersistLocked()
+    }
+
+    /// The first page of a browser tab session: where it came from and
+    /// where it landed. `visitorId` is only used to count unique visitors.
+    func recordVisit(source: String, landing: String, campaign: String?, visitorId: String?) {
+        lock.lock()
+        defer { lock.unlock() }
+        try? loadIfNeeded()
+        let idx = todayIndex()
+        days[idx].sourceCounts[source, default: 0] += 1
+        days[idx].landingCounts[landing, default: 0] += 1
+        if let campaign {
+            days[idx].campaignCounts[campaign, default: 0] += 1
+        }
+        if let visitorId {
+            let today = days[idx].date
+            if visitorsSeenToday.date != today {
+                visitorsSeenToday = (today, [])
+            }
+            if visitorsSeenToday.ids.insert(visitorId).inserted {
+                days[idx].uniqueVisitors += 1
+            }
+        }
+        schedulePersistLocked()
+    }
+
+    func recordAction(_ action: String, page: String, source: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        try? loadIfNeeded()
+        let idx = todayIndex()
+        days[idx].actionPageCounts["\(action)|\(page)", default: 0] += 1
+        days[idx].actionSourceCounts["\(action)|\(source)", default: 0] += 1
+        schedulePersistLocked()
+    }
+
     /// Every table on the floor map that hasn't had a single `/scan` hit in
     /// any stored day — not just the summary's windowed range, since a table
     /// that was scanned once three months ago shouldn't show up as "never
@@ -478,7 +627,21 @@ final class AnalyticsStore: @unchecked Sendable {
         var scanSessionTotal = DwellStat(totalSeconds: 0, samples: 0)
         var searchQueryTotals: [String: Int] = [:]
         var scrollDepthTotals: [String: Int] = [:]
+        var botViewTotal = 0
+        var uniqueVisitorTotal = 0
+        var sourceTotals: [String: Int] = [:]
+        var landingTotals: [String: Int] = [:]
+        var campaignTotals: [String: Int] = [:]
+        var actionPageTotals: [String: Int] = [:]
+        var actionSourceTotals: [String: Int] = [:]
         for day in recent {
+            botViewTotal += day.botViews
+            uniqueVisitorTotal += day.uniqueVisitors
+            day.sourceCounts.forEach { sourceTotals[$0.key, default: 0] += $0.value }
+            day.landingCounts.forEach { landingTotals[$0.key, default: 0] += $0.value }
+            day.campaignCounts.forEach { campaignTotals[$0.key, default: 0] += $0.value }
+            day.actionPageCounts.forEach { actionPageTotals[$0.key, default: 0] += $0.value }
+            day.actionSourceCounts.forEach { actionSourceTotals[$0.key, default: 0] += $0.value }
             for (path, count) in day.counts {
                 totals[path, default: 0] += count
             }
@@ -624,8 +787,36 @@ final class AnalyticsStore: @unchecked Sendable {
             scanSessionSeconds: scanSessionTotal.samples > 0 ? scanSessionTotal.totalSeconds / Double(scanSessionTotal.samples) : nil,
             scanSessionSamples: scanSessionTotal.samples,
             searchQueries: Array(searchQueries),
-            scrollDepth: scrollDepth
+            scrollDepth: scrollDepth,
+            botViews: botViewTotal,
+            visits: sourceTotals.values.reduce(0, +),
+            // Summed per day, so a browser that visits on 3 days counts 3
+            // times — "daily unique visitors, added up".
+            uniqueVisitors: uniqueVisitorTotal,
+            sources: Self.ranked(sourceTotals),
+            landingPages: Self.ranked(landingTotals, limit: 15),
+            campaigns: Self.ranked(campaignTotals, limit: 20),
+            actions: Self.ranked(actionPageTotals.reduce(into: [String: Int]()) { result, entry in
+                result[String(entry.key.split(separator: "|", maxSplits: 1).first ?? ""), default: 0] += entry.value
+            }),
+            actionsByPage: Self.actionCounts(actionPageTotals),
+            actionsBySource: Self.actionCounts(actionSourceTotals)
         )
+    }
+
+    private static func ranked(_ counts: [String: Int], limit: Int = .max) -> [LabelCount] {
+        counts.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }
+            .prefix(limit)
+            .map { LabelCount(label: $0.key, count: $0.value) }
+    }
+
+    private static func actionCounts(_ counts: [String: Int]) -> [ActionCount] {
+        counts.compactMap { key, count -> ActionCount? in
+            let parts = key.split(separator: "|", maxSplits: 1).map(String.init)
+            guard parts.count == 2 else { return nil }
+            return ActionCount(action: parts[0], key: parts[1], count: count)
+        }
+        .sorted { $0.count != $1.count ? $0.count > $1.count : ($0.action, $0.key) < ($1.action, $1.key) }
     }
 
     /// Same logic as `neverScannedTables()`, but callable from inside
@@ -659,9 +850,8 @@ final class AnalyticsStore: @unchecked Sendable {
     }
 
     private func persist() throws {
-        // Keep at most 120 days of history so the file doesn't grow forever.
-        if days.count > 120 {
-            days = Array(days.sorted { $0.date > $1.date }.prefix(120))
+        if days.count > Self.retentionDays {
+            days = Array(days.sorted { $0.date > $1.date }.prefix(Self.retentionDays))
         }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -679,11 +869,30 @@ struct AnalyticsMiddleware: AsyncMiddleware {
            response.headers.contentType?.type == "text",
            response.headers.contentType?.subType == "html" {
             let path = request.url.path
+            let userAgent = request.headers[.userAgent].first
             if !path.hasPrefix("/api/") && path != "/healthz" {
-                AnalyticsStore.shared.recordView(path: path.isEmpty ? "/" : path, userAgent: request.headers[.userAgent].first)
+                if AnalyticsStore.isBot(userAgent: userAgent) {
+                    AnalyticsStore.shared.recordBotView()
+                } else if !isStaffRequest(request) {
+                    AnalyticsStore.shared.recordView(path: path.isEmpty ? "/" : path, userAgent: userAgent)
+                }
             }
         }
 
         return response
     }
+}
+
+/// Signed-in staff browsing the site (checking their edits, testing a QR
+/// card) shouldn't count as guest traffic in any report.
+func isStaffRequest(_ req: Request) -> Bool {
+    // Only read the session if the sessions middleware set one up for this
+    // request; touching `req.session` otherwise traps.
+    guard req.hasSession else { return false }
+    return (try? currentUser(req)) != nil
+}
+
+/// What every public analytics endpoint skips: staff, and bots.
+func shouldSkipAnalytics(_ req: Request) -> Bool {
+    isStaffRequest(req) || AnalyticsStore.isBot(userAgent: req.headers[.userAgent].first)
 }

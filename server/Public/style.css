@@ -2960,3 +2960,14 @@ button.floor-map-table {
 .pos-steps li {
   margin-bottom: 0.35rem;
 }
+
+.waitlist-seat {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  margin: 0.2rem 0;
+}
+
+.waitlist-seat select {
+  padding: 0.3rem;
+}

@@ -131,6 +131,87 @@ function renderScrollDepthTable(el, rows) {
     .join('');
 }
 
+const ACTION_LABELS = {
+  'order-online': 'Order Online',
+  call: 'Call',
+  directions: 'Directions',
+  email: 'Email',
+};
+
+function actionLabel(action) {
+  if (ACTION_LABELS[action]) return ACTION_LABELS[action];
+  return action.startsWith('social:') ? `Social: ${action.slice(7)}` : action;
+}
+
+/// Rows = keys (sources or pages), columns = the main actions, plus "per
+/// 100 visits" for Order Online when the rows are sources.
+function renderActionMatrix(el, counts, { keyHeader, visitsByKey }) {
+  const keys = [...new Set(counts.map((c) => c.key))];
+  if (!keys.length) {
+    el.innerHTML = '<p class="hint">No data yet.</p>';
+    return;
+  }
+  const columns = ['order-online', 'call', 'directions'];
+  const value = (key, action) => counts.filter((c) => c.key === key && c.action === action).reduce((s, c) => s + c.count, 0);
+  const other = (key) => counts.filter((c) => c.key === key && !columns.includes(c.action)).reduce((s, c) => s + c.count, 0);
+  keys.sort((a, b) => value(b, 'order-online') - value(a, 'order-online') || counts.filter((c) => c.key === b).length - counts.filter((c) => c.key === a).length);
+  const perVisit = visitsByKey
+    ? (key) => {
+        const visits = visitsByKey[key] || 0;
+        return visits ? `${((value(key, 'order-online') / visits) * 100).toFixed(1)}` : '—';
+      }
+    : null;
+  el.innerHTML = `
+    <div class="data-table">
+      <table>
+        <thead><tr><th>${keyHeader}</th>${columns.map((c) => `<th>${actionLabel(c)}</th>`).join('')}<th>Other</th>${perVisit ? '<th>Orders per 100 visits</th>' : ''}</tr></thead>
+        <tbody>
+          ${keys
+            .map(
+              (key) => `<tr><td>${escapeHtmlAnalytics(key)}</td>${columns.map((c) => `<td>${value(key, c) || ''}</td>`).join('')}<td>${other(key) || ''}</td>${perVisit ? `<td>${perVisit(key)}</td>` : ''}</tr>`
+            )
+            .join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderTrafficAndActions(summary) {
+  const totalActions = summary.actions.reduce((s, a) => s + a.count, 0);
+  renderSummaryPills(
+    document.getElementById('actions-summary'),
+    totalActions
+      ? summary.actions.slice(0, 5).map((a, i) => ({ label: `${actionLabel(a.label)}: ${a.count}`, cls: i === 0 ? 'pill-approved' : '' }))
+      : [{ label: 'No data yet.' }]
+  );
+  const visitsBySource = Object.fromEntries(summary.sources.map((s) => [s.label, s.count]));
+  renderActionMatrix(document.getElementById('actions-by-source'), summary.actionsBySource, { keyHeader: 'Source', visitsByKey: visitsBySource });
+  renderActionMatrix(document.getElementById('actions-by-page'), summary.actionsByPage, { keyHeader: 'Page' });
+
+  renderSummaryPills(
+    document.getElementById('traffic-sources-summary'),
+    summary.visits
+      ? summary.sources.slice(0, 4).map((s, i) => ({ label: `${Math.round((s.count / summary.visits) * 100)}% ${s.label}`, cls: i === 0 ? 'pill-approved' : '' }))
+      : [{ label: 'No data yet.' }]
+  );
+  renderHbarTable(
+    document.getElementById('traffic-sources'),
+    summary.sources.map((s) => ({ label: s.label, value: s.count })),
+    { labelHeader: 'Source', valueHeader: 'Visits' }
+  );
+  renderHbarTable(
+    document.getElementById('landing-pages'),
+    summary.landingPages.map((s) => ({ label: s.label, value: s.count })),
+    { labelHeader: 'Landing page', valueHeader: 'Visits' }
+  );
+  renderHbarTable(
+    document.getElementById('campaigns'),
+    summary.campaigns.map((s) => ({ label: s.label, value: s.count })),
+    { labelHeader: 'Campaign', valueHeader: 'Visits' }
+  );
+}
+
 function renderSummaryPills(el, pills) {
   if (!el) return;
   el.innerHTML = pills.map((p) => `<span class="pill ${p.cls || ''}">${escapeHtmlAnalytics(p.label)}</span>`).join('');
@@ -169,9 +250,13 @@ async function loadAnalytics() {
       <div class="loyalty-card-summary">
         <span class="pill pill-approved">${summary.totalViews} total views</span>
         <span class="pill">${avgPerDay}/day average</span>
+        ${summary.visits ? `<span class="pill">${summary.visits} visits</span>` : ''}
+        ${summary.uniqueVisitors ? `<span class="pill">${summary.uniqueVisitors} daily unique visitors (summed)</span>` : ''}
         ${mobilePct !== null ? `<span class="pill">${mobilePct}% mobile</span>` : ''}
+        ${summary.botViews ? `<span class="pill">${summary.botViews} bot/crawler views excluded</span>` : ''}
       </div>
     `;
+    renderTrafficAndActions(summary);
 
     const maxCount = Math.max(1, ...summary.days.map((d) => Object.values(d.counts).reduce((a, b) => a + b, 0)));
     const peakDay = summary.days.reduce((best, d) => {

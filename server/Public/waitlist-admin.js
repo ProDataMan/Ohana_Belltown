@@ -22,11 +22,22 @@ function minutesWaiting(createdAt) {
 
 const waitlistListEl = document.getElementById('waitlist-list');
 
+// Floor-map table ids for the "Seated at" picker — recording the table lets
+// QR Insights report wait times and how soon a seated party scans the menu.
+let seatingTableIds = [];
+const seatingTablesLoaded = fetch('/api/table-map')
+  .then((r) => (r.ok ? r.json() : []))
+  .then((entries) => {
+    seatingTableIds = entries.map((e) => e.id).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  })
+  .catch(() => {});
+
 async function loadWaitlist() {
   try {
     const response = await staffFetch('/api/waitlist');
     if (!response.ok) throw new Error(`Unable to load the waitlist (${response.status}).`);
     const entries = await response.json();
+    await seatingTablesLoaded;
     if (!entries.length) {
       waitlistListEl.innerHTML = '<p class="hint">Nobody\'s on the waitlist right now.</p>';
       return;
@@ -52,6 +63,13 @@ async function loadWaitlist() {
                   <a class="cta-button secondary" style="padding: 0.35rem 0.7rem; font-size: 0.82rem;"
                      href="${smsHref(e.phone, `Hi ${e.name}, your table at Ohana Belltown is ready!`)}"
                      data-notify-id="${e.id}">Text they're ready</a>
+                  <span class="waitlist-seat">
+                    <select class="seat-table" aria-label="Table for ${escapeHtmlWaitlist(e.name)}">
+                      <option value="">Table…</option>
+                      ${seatingTableIds.map((id) => `<option value="${escapeHtmlWaitlist(id)}">${escapeHtmlWaitlist(id)}</option>`).join('')}
+                    </select>
+                    <button type="button" class="secondary seat-btn">Seated</button>
+                  </span>
                   <button type="button" class="secondary remove-btn">Remove</button>
                 </td>
               </tr>
@@ -66,6 +84,22 @@ async function loadWaitlist() {
     waitlistListEl.querySelectorAll('[data-notify-id]').forEach((link) => {
       link.addEventListener('click', () => {
         staffFetch(`/api/waitlist/${link.dataset.notifyId}/notify`, { method: 'POST' }).catch(() => {});
+      });
+    });
+    waitlistListEl.querySelectorAll('.seat-btn').forEach((btn) => {
+      btn.addEventListener('click', async (event) => {
+        const row = event.target.closest('tr');
+        const table = row.querySelector('.seat-table').value;
+        if (!table) {
+          row.querySelector('.seat-table').focus();
+          return;
+        }
+        await staffFetch(`/api/waitlist/${row.dataset.id}/seat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ table }),
+        });
+        await loadWaitlist();
       });
     });
     waitlistListEl.querySelectorAll('.remove-btn').forEach((btn) => {

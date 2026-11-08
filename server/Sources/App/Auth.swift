@@ -141,6 +141,13 @@ func registerAuthRoutes(_ app: Application) throws {
         return .ok
     }
 
+    // Who's signed in on this browser, staff and/or customer — 200 either
+    // way, so public pages can check once (see window.ohanaSession in
+    // nav.js) without a 401 per check for every signed-out guest.
+    app.get("api", "session") { req throws -> SessionStatus in
+        SessionStatus(staff: try currentUser(req).map(StaffUserPublic.init), customer: try currentCustomer(req).map(CustomerUserPublic.init))
+    }
+
     app.get("api", "auth", "me") { req throws -> StaffUserPublic in
         guard let user = try currentUser(req) else {
             throw Abort(.unauthorized)
@@ -220,4 +227,9 @@ func registerAuthRoutes(_ app: Application) throws {
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
         return try UserStore.shared.reactivate(id: id)
     }
+}
+
+struct SessionStatus: Content {
+    var staff: StaffUserPublic?
+    var customer: CustomerUserPublic?
 }

@@ -12,6 +12,10 @@ final class RouteTests: XCTestCase {
 
         app = try await Application.make(.testing)
         try configure(app)
+        // Real browsers always send a User-Agent; requests without one are
+        // treated as bots and left out of analytics. Give test requests a
+        // phone's unless a test sets its own (the bot tests do).
+        app.middleware.use(DefaultUserAgentMiddleware(), at: .beginning)
 
         // Point every store at an isolated temp directory so tests don't touch
         // real data or interfere with each other.
@@ -182,6 +186,99 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testSessionEndpointAnswersForGuestsStaffAndCustomers() throws {
+        try app.test(.GET, "api/session") { res in
+            XCTAssertEqual(res.status, .ok)
+            let session = try res.content.decode(SessionStatus.self)
+            XCTAssertNil(session.staff)
+            XCTAssertNil(session.customer)
+        }
+        let (admin, _) = try makeAdminAndSecondAccount(username: "sess", password: "password123", role: "employee")
+        try app.test(.GET, "api/session", headers: ["Cookie": admin]) { res in
+            XCTAssertEqual(try res.content.decode(SessionStatus.self).staff?.role, .admin)
+        }
+    }
+
+    func testStaffAndBotsAreLeftOutOfAnalytics() throws {
+        let (admin, _) = try makeAdminAndSecondAccount(username: "botcheck", password: "password123", role: "employee")
+        try app.test(.GET, "about") { XCTAssertEqual($0.status, .ok) }
+        try app.test(.GET, "about", headers: ["User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"]) { _ in }
+        try app.test(.GET, "about", headers: ["User-Agent": "facebookexternalhit/1.1"]) { _ in }
+        try app.test(.GET, "about", headers: ["Cookie": admin]) { _ in }
+        try app.test(.GET, "scan?table=30", headers: ["Cookie": admin]) { XCTAssertEqual($0.status, .seeOther) }
+        AnalyticsStore.shared.flush()
+        let summary = try AnalyticsStore.shared.summary(days: 1)
+        XCTAssertEqual(summary.topPages.first { $0.path == "/about" }?.count, 1)
+        XCTAssertEqual(summary.botViews, 2)
+        XCTAssertTrue(summary.qrScans.isEmpty, "a staff member testing a card isn't a scan")
+    }
+
+    func testVisitSourcesActionsAndUniqueVisitors() throws {
+        let json: HTTPHeaders = ["Content-Type": "application/json"]
+        for body in [
+            #"{"source":"google-maps","landing":"/menu","deviceId":"device-aaaa-0001"}"#,
+            #"{"source":"google-maps","landing":"/","deviceId":"device-aaaa-0001"}"#,
+            #"{"source":"flyer","landing":"/specials","campaign":"fall-specials","deviceId":"device-bbbb-0002"}"#,
+            // Rejected: label with spaces, landing that isn't a path.
+            #"{"source":"bad source","landing":"/"}"#,
+            #"{"source":"direct","landing":"https://evil.example"}"#,
+        ] {
+            try app.test(.POST, "api/analytics/visit", headers: json, body: ByteBuffer(string: body)) { XCTAssertEqual($0.status, .ok) }
+        }
+        for body in [
+            #"{"action":"order-online","page":"/menu","source":"google-maps"}"#,
+            #"{"action":"call","page":"/contact","source":"flyer"}"#,
+            #"{"action":"social:instagram","page":"/","source":"direct"}"#,
+            #"{"action":"steal-cookies","page":"/","source":"direct"}"#,
+        ] {
+            try app.test(.POST, "api/analytics/action", headers: json, body: ByteBuffer(string: body)) { XCTAssertEqual($0.status, .ok) }
+        }
+        AnalyticsStore.shared.flush()
+        let summary = try AnalyticsStore.shared.summary(days: 1)
+        XCTAssertEqual(summary.visits, 3)
+        XCTAssertEqual(summary.uniqueVisitors, 2)
+        XCTAssertEqual(summary.sources.first?.label, "google-maps")
+        XCTAssertEqual(summary.sources.first?.count, 2)
+        XCTAssertEqual(summary.campaigns.map(\.label), ["fall-specials"])
+        XCTAssertEqual(Set(summary.actions.map(\.label)), ["order-online", "call", "social:instagram"])
+        XCTAssertEqual(summary.actionsBySource.first { $0.action == "order-online" }?.key, "google-maps")
+        XCTAssertEqual(summary.actionsByPage.first { $0.action == "call" }?.key, "/contact")
+    }
+
+    func testWaitlistPartyCanBeSeatedAtAFloorMapTable() throws {
+        let (admin, _) = try makeAdminAndSecondAccount(username: "seat", password: "password123", role: "employee")
+        var id = ""
+        try app.test(.POST, "api/waitlist/join", headers: ["Content-Type": "application/json"],
+                     body: ByteBuffer(string: #"{"name":"Kai","phone":"2065550100","partySize":2}"#)) { res in
+            id = try res.content.decode(WaitlistEntry.self).id
+        }
+        let headers: HTTPHeaders = ["Cookie": admin, "Content-Type": "application/json"]
+        try app.test(.POST, "api/waitlist/\(id)/seat", headers: headers, body: ByteBuffer(string: #"{"table":"Z99"}"#)) {
+            XCTAssertEqual($0.status, .badRequest)
+        }
+        try app.test(.POST, "api/waitlist/\(id)/seat", headers: headers, body: ByteBuffer(string: #"{"table":"Table 30"}"#)) { res in
+            let entry = try res.content.decode(WaitlistEntry.self)
+            XCTAssertEqual(entry.status, "seated")
+            XCTAssertEqual(entry.seatedTable, "30")
+            XCTAssertNotNil(entry.seatedAt)
+        }
+        XCTAssertEqual(try WaitlistStore.shared.seated(from: Date().addingTimeInterval(-60), to: Date().addingTimeInterval(60)).count, 1)
+    }
+
+    func testWaitlistDropsEntriesOlderThanRetention() throws {
+        let old = WaitlistEntry(
+            id: "old", name: "Old Guest", phone: "2065550199", partySize: 2, note: nil, status: "removed",
+            createdAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-121 * 86_400)),
+            updatedAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-121 * 86_400))
+        )
+        try JSONEncoder().encode([old]).write(to: tempDir.appendingPathComponent("waitlist.json"))
+        WaitlistStore.shared.configure(dataDirectory: tempDir.path)
+        try WaitlistStore.shared.join(name: "New Guest", phone: "2065550100", partySize: 2, note: nil)
+        let stored = try String(contentsOf: tempDir.appendingPathComponent("waitlist.json"), encoding: .utf8)
+        XCTAssertFalse(stored.contains("Old Guest"))
+        XCTAssertTrue(stored.contains("New Guest"))
+    }
+
     func testUploadsAreCachedForGoodButPagesStayNoCache() throws {
         try Data("not really a jpeg".utf8).write(to: URL(fileURLWithPath: Uploads.directory + "photo.jpg"))
         try app.test(.GET, "uploads/photo.jpg") { res in
@@ -195,6 +292,7 @@ final class RouteTests: XCTestCase {
             XCTAssertEqual(res.body.string, "not really a jpeg")
         }
         try app.test(.GET, "uploads/missing.jpg") { res in
+            XCTAssertEqual(res.status, .notFound)
             XCTAssertNotEqual(res.headers.first(name: .cacheControl), "public, max-age=31536000, immutable")
         }
         try app.test(.GET, "api/menu") { res in
@@ -2429,5 +2527,16 @@ final class RouteTests: XCTestCase {
             }
         }
         fatalError("no matching weekday found within a week — should never happen")
+    }
+}
+
+struct DefaultUserAgentMiddleware: AsyncMiddleware {
+    static let phone = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
+
+    func respond(to request: Request, chainingTo next: any AsyncResponder) async throws -> Response {
+        if request.headers.first(name: .userAgent) == nil {
+            request.headers.replaceOrAdd(name: .userAgent, value: Self.phone)
+        }
+        return try await next.respond(to: request)
     }
 }

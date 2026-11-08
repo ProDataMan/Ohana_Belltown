@@ -67,6 +67,22 @@
       </section>
 
       <section class="panel">
+        <h2>Menu engineering</h2>
+        <p class="hint">Every dish sold, sorted into four groups by popularity (share of items sold, against 70% of an even share) and profit (margin per unit, against the average unit sold). <strong>Stars</strong>: popular and profitable — keep and feature. <strong>Plowhorses</strong>: popular, thinner margin — reprice or re-cost. <strong>Puzzles</strong>: profitable, not popular — promote, re-photo, rename, move up the menu. <strong>Dogs</strong>: neither — rework or drop. "QR opens" shows how often QR visitors looked at it.</p>
+        <div class="qr-visits-filters">
+          <label class="hint">Range
+            <select id="me-range">
+              <option value="7">Last 7 days</option>
+              <option value="30" selected>Last 30 days</option>
+              <option value="90">Last 90 days</option>
+            </select>
+          </label>
+        </div>
+        <div id="me-summary" class="loyalty-card-summary"></div>
+        <div id="me-table"></div>
+      </section>
+
+      <section class="panel">
         <h2>Imported tickets</h2>
         <div class="qr-visits-filters">
           <label class="hint">Day <input type="date" id="orders-date" /></label>

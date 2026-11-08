@@ -9,6 +9,11 @@ struct WaitlistEntry: Codable, Content {
     var status: String
     var createdAt: String
     var updatedAt: String
+    /// Set when staff mark the party seated ("seated" status) — which table
+    /// and when, so QR Insights can report wait times and time from sitting
+    /// down to the first QR scan at that table.
+    var seatedTable: String?
+    var seatedAt: String?
 }
 
 enum WaitlistError: Error, Equatable {
@@ -36,6 +41,7 @@ final class WaitlistStore: @unchecked Sendable {
     /// staff clearing it) — this is a same-day walk-in list, not a
     /// reservation book, so old entries shouldn't linger forever.
     static let staleAfterSeconds: TimeInterval = 4 * 60 * 60
+    static let retentionDays = 120
 
     private let lock = NSLock()
     private var fileURL = URL(fileURLWithPath: "Data/waitlist.json")
@@ -69,6 +75,11 @@ final class WaitlistStore: @unchecked Sendable {
             createdAt: timestamp,
             updatedAt: timestamp
         )
+        // Names and phone numbers aren't kept past the site's usual 120
+        // days; pruned here since every join rewrites the file anyway.
+        let cutoff = Date().addingTimeInterval(-Double(Self.retentionDays) * 86_400)
+        let formatter = ISO8601DateFormatter()
+        entries.removeAll { (formatter.date(from: $0.createdAt) ?? .distantPast) < cutoff }
         entries.append(entry)
         try persist()
         return entry
@@ -93,6 +104,35 @@ final class WaitlistStore: @unchecked Sendable {
     @discardableResult
     func markNotified(id: String) throws -> WaitlistEntry {
         try updateStatus(id: id, status: "notified")
+    }
+
+    func markSeated(id: String, table: String) throws -> WaitlistEntry {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard let idx = entries.firstIndex(where: { $0.id == id }) else {
+            throw WaitlistError.entryNotFound
+        }
+        let timestamp = now()
+        entries[idx].status = "seated"
+        entries[idx].seatedTable = table
+        entries[idx].seatedAt = timestamp
+        entries[idx].updatedAt = timestamp
+        try persist()
+        return entries[idx]
+    }
+
+    /// Parties seated at a table in `[from, to)`.
+    func seated(from: Date, to: Date) throws -> [WaitlistEntry] {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        let formatter = ISO8601DateFormatter()
+        return entries.filter { entry in
+            guard entry.status == "seated", entry.seatedTable != nil,
+                  let seated = entry.seatedAt.flatMap(formatter.date) else { return false }
+            return seated >= from && seated < to
+        }
     }
 
     @discardableResult

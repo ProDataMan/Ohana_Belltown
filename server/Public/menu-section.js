@@ -1251,8 +1251,8 @@ async function revealStaffOnlyElementsIfLoggedIn() {
   const extras = document.querySelectorAll('.staff-revealable-extras');
   if (!links.length && !prices.length && !extras.length) return;
   try {
-    const response = await fetch('/api/auth/me');
-    if (response.ok) {
+    const session = await (window.ohanaSession || fetch('/api/session').then((r) => (r.ok ? r.json() : {})).catch(() => ({})));
+    if (session.staff) {
       staffLoggedIn = true;
       links.forEach((link) => { link.hidden = false; });
       prices.forEach((price) => { price.hidden = false; });
@@ -1275,8 +1275,8 @@ async function revealStaffOnlyElementsIfLoggedIn() {
 let customerLoggedIn = false;
 async function checkCustomerLoggedIn() {
   try {
-    const response = await fetch('/api/customer/me');
-    customerLoggedIn = response.ok;
+    const session = await (window.ohanaSession || fetch('/api/session').then((r) => (r.ok ? r.json() : {})).catch(() => ({})));
+    customerLoggedIn = Boolean(session.customer);
   } catch {
     customerLoggedIn = false;
   }

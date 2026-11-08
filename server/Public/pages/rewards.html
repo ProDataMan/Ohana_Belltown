@@ -10,6 +10,9 @@
     <meta property="og:title" content="Sushi Punch Card | Ohana Belltown" />
     <meta property="og:description" content="Earn a punch with every sushi order, plus bonus punches for sharing photos or tagging us on social. 10 punches gets you a free roll." />
     <meta property="og:url" content="https://www.ohanasushigrill.com/rewards" />
+    <meta property="og:image" content="https://www.ohanasushigrill.com/images/hero-menu-1400.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://www.ohanasushigrill.com/images/hero-menu-1400.jpg" />
     <link rel="canonical" href="https://www.ohanasushigrill.com/rewards" />
     <link rel="stylesheet" href="/style.css" />
   </head>
@@ -113,7 +116,7 @@
         <div id="referral-existing-card" hidden>
           <p class="hint">You've already got a punch card, so the form below is for brand-new customers, not you. Send a friend this link instead — it fills in their "Referred by" automatically, and once they earn their first punch, you both get a bonus one.</p>
           <div class="cta-row">
-            <input type="text" id="referral-share-link" readonly />
+            <input type="text" id="referral-share-link" readonly aria-label="Your referral link" />
             <button type="button" id="copy-referral-link-btn" class="secondary">Copy Link</button>
           </div>
           <p id="referral-copy-status" class="status"></p>

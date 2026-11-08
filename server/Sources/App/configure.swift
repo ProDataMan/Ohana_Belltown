@@ -64,6 +64,7 @@ func configure(_ app: Application) throws {
         }
         HeartlandSync.schedule(app)
         FeedbackDigest.schedule(app)
+        WeeklyDigest.schedule(app)
         Task { await LightNotifier.shared.configureFromEnvironment() }
         LightNotifier.scheduleReadyPoll(app)
         // Pays a bonus punch to any customer whose birthday is today and who

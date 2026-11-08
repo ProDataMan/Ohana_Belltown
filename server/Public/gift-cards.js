@@ -70,7 +70,9 @@ if (!renderCheckoutBanner()) {
   checkAvailability();
 }
 
-document.getElementById('gc-form').addEventListener('submit', async (event) => {
+// The form is replaced with a "call us" message while online checkout is
+// off (see checkAvailability), so it may not exist.
+document.getElementById('gc-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
   const statusEl = document.getElementById('gc-form-status');
   const submitBtn = document.getElementById('gc-submit-btn');

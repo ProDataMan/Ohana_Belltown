@@ -7,8 +7,8 @@
   const badge = document.getElementById('last-updated-badge');
   if (!badge) return;
   try {
-    const response = await fetch('/api/auth/me');
-    if (response.ok) {
+    const session = await (window.ohanaSession || fetch('/api/session').then((r) => (r.ok ? r.json() : {})).catch(() => ({})));
+    if (session.staff) {
       badge.href = 'https://github.com/ProDataMan/Ohana_Belltown/blob/main/README.md';
       badge.target = '_blank';
       badge.rel = 'noopener';

@@ -37,6 +37,14 @@ document.addEventListener('click', (event) => {
   document.querySelectorAll('.nav-dropdown.open').forEach((d) => d.classList.remove('open'));
 });
 
+// One shared "who's signed in" check per page load. /api/session answers 200
+// whether or not anyone is signed in, so a signed-out guest no longer gets a
+// 401 (and a console error) from every script that asks. Other scripts read
+// window.ohanaSession instead of calling /api/auth/me or /api/customer/me.
+window.ohanaSession = window.ohanaSession || fetch('/api/session')
+  .then((response) => (response.ok ? response.json() : {}))
+  .catch(() => ({}));
+
 (async () => {
   // #nav-login-link only exists on public pages (the header nav) — staff
   // admin pages have their own layout instead, but should still get the
@@ -56,21 +64,19 @@ document.addEventListener('click', (event) => {
   }
 
   try {
-    const customerResponse = await fetch('/api/customer/me');
-    if (customerResponse.ok) {
+    const session = await window.ohanaSession;
+    if (session.customer) {
       makeLogoutLink('/api/customer/logout');
       return;
     }
-    const staffResponse = await fetch('/api/auth/me');
-    if (staffResponse.ok) {
+    if (session.staff) {
       makeLogoutLink('/api/auth/logout');
       insertStaffNavDropdown();
       enableSpeechPrimingForStaff();
       startStaffAlertMuteToggle();
       startStaffTableOrderAlerts();
       startStaffFeedbackAlerts();
-      const staffData = await staffResponse.json().catch(() => null);
-      if (staffData?.role === 'admin') {
+      if (session.staff.role === 'admin') {
         startStaffCompetitorPhotoAlerts();
       }
     }
@@ -711,6 +717,123 @@ function startStaffCompetitorPhotoAlerts() {
     if (document.visibilityState === 'hidden') flush();
   });
   window.addEventListener('pagehide', flush);
+})();
+
+// Where visits come from, and the actions that matter: on the first page of
+// a tab session, report the traffic source (QR code, Google, Google Maps,
+// Instagram, a utm_ campaign link, or direct) and landing page once; on
+// every page, report taps on "Order Online" (ChowNow), phone numbers,
+// directions, email, and social links, tagged with that same source. Counts
+// only — the per-browser id is sent just so the server can count unique
+// visitors per day, and is never stored. Must run before the QR visit
+// tracker below, which strips `qr=1` from the address bar.
+(() => {
+  const SOURCE_KEY = 'ohana_visit_source';
+
+  function classifyReferrer(referrer) {
+    let url;
+    try {
+      url = new URL(referrer);
+    } catch {
+      return 'direct';
+    }
+    const host = url.hostname.replace(/^www\./, '').toLowerCase();
+    if (host === window.location.hostname.replace(/^www\./, '').toLowerCase()) return null;
+    if (host === 'maps.app.goo.gl' || host.startsWith('maps.google.') || (host.startsWith('google.') && url.pathname.startsWith('/maps'))) return 'google-maps';
+    if (host.startsWith('google.') || host.endsWith('.google.com')) return 'google';
+    if (/(^|\.)(bing\.com|duckduckgo\.com|yahoo\.com|ecosia\.org|search\.brave\.com)$/.test(host)) return 'search-other';
+    if (/(^|\.)instagram\.com$/.test(host)) return 'instagram';
+    if (/(^|\.)(facebook\.com|fb\.com|fb\.me|messenger\.com)$/.test(host)) return 'facebook';
+    if (/(^|\.)yelp\.[a-z.]+$/.test(host)) return 'yelp';
+    if (/(^|\.)tiktok\.com$/.test(host)) return 'tiktok';
+    if (/(^|\.)(t\.co|x\.com|twitter\.com)$/.test(host)) return 'x';
+    if (/(^|\.)tripadvisor\.[a-z.]+$/.test(host)) return 'tripadvisor';
+    if (/(^|\.)reddit\.com$/.test(host)) return 'reddit';
+    if (/(^|\.)chownow\.com$/.test(host)) return 'chownow';
+    return `other:${host.slice(0, 50)}`;
+  }
+
+  function currentSource() {
+    try {
+      return sessionStorage.getItem(SOURCE_KEY) || 'unknown';
+    } catch {
+      return 'unknown';
+    }
+  }
+
+  function beacon(url, body) {
+    const payload = JSON.stringify(body);
+    if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([payload], { type: 'application/json' }))) return;
+    fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).catch(() => {});
+  }
+
+  let isNewSession = false;
+  try {
+    isNewSession = !sessionStorage.getItem(SOURCE_KEY);
+  } catch {}
+  if (isNewSession) {
+    const params = new URLSearchParams(window.location.search);
+    let source = null;
+    if (params.get('qr') === '1' || params.get('table')) source = 'qr';
+    else if (params.get('utm_source')) source = params.get('utm_source').toLowerCase().replace(/[^a-z0-9._:-]/g, '-').slice(0, 60);
+    else source = document.referrer ? classifyReferrer(document.referrer) : 'direct';
+    if (source) {
+      try {
+        sessionStorage.setItem(SOURCE_KEY, source);
+      } catch {}
+      let deviceId = null;
+      try {
+        deviceId = localStorage.getItem('ohana_device_id');
+        if (!deviceId) {
+          deviceId = window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
+          localStorage.setItem('ohana_device_id', deviceId);
+        }
+      } catch {}
+      const campaign = params.get('utm_campaign');
+      beacon('/api/analytics/visit', {
+        source,
+        landing: window.location.pathname,
+        campaign: campaign ? campaign.toLowerCase().replace(/[^a-z0-9._:-]/g, '-').slice(0, 60) : null,
+        deviceId,
+      });
+    }
+  }
+
+  const SOCIAL = [
+    [/instagram\.com/, 'instagram'],
+    [/(facebook\.com|fb\.com|fb\.me)/, 'facebook'],
+    [/tiktok\.com/, 'tiktok'],
+    [/yelp\.[a-z.]+/, 'yelp'],
+    [/(x\.com|twitter\.com)/, 'x'],
+    [/tripadvisor\./, 'tripadvisor'],
+    [/(g\.page|search\.google\.com\/local\/writereview|google\.com\/maps\/place.*review)/, 'google-reviews'],
+  ];
+
+  function actionFor(link) {
+    const href = (link.getAttribute('href') || '').trim();
+    if (!href) return null;
+    if (href.startsWith('tel:')) return 'call';
+    if (href.startsWith('mailto:')) return 'email';
+    if (/chownow\.com/i.test(href)) return 'order-online';
+    if (/(maps\.app\.goo\.gl|maps\.google\.|google\.[a-z.]+\/maps\/(dir|search)|maps\.apple\.com|goo\.gl\/maps)/i.test(href)) return 'directions';
+    for (const [pattern, site] of SOCIAL) {
+      if (pattern.test(href)) return `social:${site}`;
+    }
+    return null;
+  }
+
+  // Capture phase, so the tap is recorded even if another handler stops
+  // propagation; sendBeacon survives the page navigating away.
+  document.addEventListener(
+    'click',
+    (event) => {
+      const link = event.target.closest && event.target.closest('a[href]');
+      if (!link) return;
+      const action = actionFor(link);
+      if (action) beacon('/api/analytics/action', { action, page: window.location.pathname, source: currentSource() });
+    },
+    true
+  );
 })();
 
 // QR visit tracker — what someone who scanned a QR code looked at, page by

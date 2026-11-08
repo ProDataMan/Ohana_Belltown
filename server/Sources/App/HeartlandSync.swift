@@ -127,7 +127,8 @@ enum HeartlandSync {
             if string(item["voided_dt"]) != nil { return nil }
             // Sub items are add-ons rolled into their parent's price.
             if bool(item["sub_item"]) == true { return nil }
-            return PosOrderItem(name: name, quantity: double(item["quantity"]) ?? 1, netSales: double(item["net_sales"]))
+            let cost = double(item["cost"]).flatMap { $0 > 0 ? $0 : nil }
+            return PosOrderItem(name: name, quantity: double(item["quantity"]) ?? 1, netSales: double(item["net_sales"]), cost: cost)
         }
         return PosOrder(
             id: "heartland:\(id)",

@@ -183,6 +183,23 @@ struct PosOrderRow: Content {
     var qrVisits: Int
 }
 
+struct WaitlistSeatRequest: Content {
+    var table: String
+}
+
+struct SiteVisitRequest: Content {
+    var source: String
+    var landing: String
+    var campaign: String?
+    var deviceId: String?
+}
+
+struct SiteActionRequest: Content {
+    var action: String
+    var page: String
+    var source: String?
+}
+
 struct MenuItemImpressionsRequest: Content {
     var itemNames: [String]
     var deviceId: String?
@@ -234,10 +251,13 @@ func routes(_ app: Application) throws {
         // to report "which tables are using the QR menu" at all: an
         // order-based report misses everyone who scanned and just browsed.
         let scannedTable = req.query[String.self, at: "table"]?.trimmingCharacters(in: .whitespacesAndNewlines)
-        AnalyticsStore.shared.recordQRScan(
-            table: (scannedTable?.isEmpty ?? true) ? AnalyticsStore.genericScanLabel : scannedTable!,
-            destination: target == "/happy-hour" ? "happy-hour" : "menu"
-        )
+        // Link previews of a QR URL and staff testing a card aren't scans.
+        if !shouldSkipAnalytics(req) {
+            AnalyticsStore.shared.recordQRScan(
+                table: (scannedTable?.isEmpty ?? true) ? AnalyticsStore.genericScanLabel : scannedTable!,
+                destination: target == "/happy-hour" ? "happy-hour" : "menu"
+            )
+        }
 
         // `qr=1` tells the visit tracker in nav.js that this page load is a
         // fresh scan (it strips the flag from the address bar right away, so
@@ -382,6 +402,11 @@ func routes(_ app: Application) throws {
         // `?w=480` / `?w=960` serve a resized copy (see UploadVariants);
         // anything else, or a file that can't be resized, gets the original.
         var path = Uploads.directory + filename
+        // A deleted or never-uploaded photo is a 404, not the 500 that
+        // streaming a missing file would otherwise produce.
+        guard FileManager.default.fileExists(atPath: path) else {
+            throw Abort(.notFound)
+        }
         if let width = req.query[Int.self, at: "w"],
            let variant = await UploadVariants.path(for: filename, width: width) {
             path = variant
@@ -1059,6 +1084,17 @@ func routes(_ app: Application) throws {
         return try WaitlistStore.shared.markNotified(id: id)
     }
 
+    // Seated, and at which table (a floor-map id).
+    app.post("api", "waitlist", ":id", "seat") { req throws -> WaitlistEntry in
+        try requireStaffAccess(req)
+        guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
+        let body = try req.content.decode(WaitlistSeatRequest.self)
+        guard let table = PosMatching.tableKey(body.table), TableMap.entries.contains(where: { $0.id == table }) else {
+            throw Abort(.badRequest, reason: "Pick a table from the floor map.")
+        }
+        return try WaitlistStore.shared.markSeated(id: id, table: table)
+    }
+
     app.post("api", "waitlist", ":id", "remove") { req throws -> WaitlistEntry in
         try requireStaffAccess(req)
         guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
@@ -1346,6 +1382,7 @@ func routes(_ app: Application) throws {
     }
 
     app.post("api", "analytics", "item-view") { req throws -> HTTPStatus in
+        if shouldSkipAnalytics(req) { return .ok }
         let body = try req.content.decode(ItemViewRequest.self)
         let name = body.name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return .ok }
@@ -1357,6 +1394,7 @@ func routes(_ app: Application) throws {
     // How long from a fresh `/scan` landing to the first tap on any item
     // card in that session — fired once per scan session client-side.
     app.post("api", "analytics", "scan-latency") { req throws -> HTTPStatus in
+        if shouldSkipAnalytics(req) { return .ok }
         let body = try req.content.decode(ScanLatencyRequest.self)
         AnalyticsStore.shared.recordScanToFirstTap(seconds: body.seconds)
         return .ok
@@ -1365,6 +1403,7 @@ func routes(_ app: Application) throws {
     // Total time a scan session held someone's attention before the tab was
     // hidden/closed — fired once per scan session client-side, from nav.js.
     app.post("api", "analytics", "scan-session") { req throws -> HTTPStatus in
+        if shouldSkipAnalytics(req) { return .ok }
         let body = try req.content.decode(ScanSessionRequest.self)
         AnalyticsStore.shared.recordScanSession(seconds: body.seconds)
         return .ok
@@ -1374,6 +1413,7 @@ func routes(_ app: Application) throws {
     // trimmed/lowercased/length-checked again here since this is a public,
     // unauthenticated endpoint.
     app.post("api", "analytics", "search-query") { req throws -> HTTPStatus in
+        if shouldSkipAnalytics(req) { return .ok }
         let body = try req.content.decode(SearchQueryRequest.self)
         let query = body.query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard query.count >= 2, query.count <= 80 else { return .ok }
@@ -1384,6 +1424,7 @@ func routes(_ app: Application) throws {
     // Deepest scroll threshold(s) reached on a page view, flushed once at
     // tab-hide/close — see the scroll-depth tracker in nav.js.
     app.post("api", "analytics", "scroll-depth") { req throws -> HTTPStatus in
+        if shouldSkipAnalytics(req) { return .ok }
         let body = try req.content.decode(ScrollDepthRequest.self)
         let section = body.section.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !section.isEmpty else { return .ok }
@@ -1394,8 +1435,35 @@ func routes(_ app: Application) throws {
     }
 
     app.post("api", "analytics", "dwell") { req throws -> HTTPStatus in
+        if shouldSkipAnalytics(req) { return .ok }
         let body = try req.content.decode(DwellRequest.self)
         AnalyticsStore.shared.recordDwell(path: body.path, seconds: body.seconds)
+        return .ok
+    }
+
+    // The first page of a browser tab session — where the visit came from
+    // (see the source tracker in nav.js). Public and unauthenticated, so
+    // every field is checked and capped.
+    app.post("api", "analytics", "visit") { req throws -> HTTPStatus in
+        if shouldSkipAnalytics(req) { return .ok }
+        let body = try req.content.decode(SiteVisitRequest.self)
+        guard let source = AnalyticsStore.cleanLabel(body.source), let landing = AnalyticsStore.cleanPath(body.landing) else {
+            return .ok
+        }
+        let visitorId = body.deviceId.flatMap { QRVisitStore.isValidId($0) ? $0 : nil }
+        AnalyticsStore.shared.recordVisit(
+            source: source, landing: landing, campaign: AnalyticsStore.cleanLabel(body.campaign), visitorId: visitorId
+        )
+        return .ok
+    }
+
+    // A tap on "Order Online", a phone number, directions, email, or a
+    // social link — see the action tracker in nav.js.
+    app.post("api", "analytics", "action") { req throws -> HTTPStatus in
+        if shouldSkipAnalytics(req) { return .ok }
+        let body = try req.content.decode(SiteActionRequest.self)
+        guard AnalyticsStore.isKnownAction(body.action), let page = AnalyticsStore.cleanPath(body.page) else { return .ok }
+        AnalyticsStore.shared.recordAction(body.action, page: page, source: AnalyticsStore.cleanLabel(body.source) ?? "unknown")
         return .ok
     }
 
@@ -1405,6 +1473,7 @@ func routes(_ app: Application) throws {
     // separate store from the anonymous item-view counter above; see
     // MenuItemEngagementStore's doc comment for why.
     app.post("api", "analytics", "menu-item-engagement") { req throws -> HTTPStatus in
+        if shouldSkipAnalytics(req) { return .ok }
         let body = try req.content.decode(MenuItemEngagementRequest.self)
         let itemName = body.itemName.trimmingCharacters(in: .whitespacesAndNewlines)
         let deviceId = body.deviceId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -1431,6 +1500,7 @@ func routes(_ app: Application) throws {
     // unauthenticated (guests aren't signed in), so every field is validated
     // and length-capped, and the timestamp is the server's.
     app.post("api", "analytics", "qr-visit-event") { req throws -> HTTPStatus in
+        if shouldSkipAnalytics(req) { return .ok }
         let body = try req.content.decode(QRVisitEventRequest.self)
         let isStart = body.type == QRVisitStore.EventType.start.rawValue
         let userAgent = req.headers[.userAgent].first
@@ -1481,11 +1551,18 @@ func routes(_ app: Application) throws {
         calendar.timeZone = HappyHourSchedule.pacific
         let to = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: Date())) ?? Date()
         let from = calendar.date(byAdding: .day, value: -days, to: to) ?? to
-        return QRInsightsBuilder.build(
+        var insights = QRInsightsBuilder.build(
             visits: QRVisitStore.shared.visits(from: from, to: to), from: from, to: to,
             menu: try? MenuStore.shared.get(),
             orders: PosOrderStore.shared.orders(from: from.addingTimeInterval(-6 * 3600), to: to.addingTimeInterval(6 * 3600))
         )
+        let lastWeekStart = calendar.date(byAdding: .day, value: -QRInsightsBuilder.quietWindowDays, to: to) ?? from
+        insights.quietTables = QRInsightsBuilder.quietTables(lastWeek: QRVisitStore.shared.visits(from: lastWeekStart, to: to))
+        insights.seating = QRInsightsBuilder.seating(
+            parties: (try? WaitlistStore.shared.seated(from: from, to: to)) ?? [],
+            visits: QRVisitStore.shared.visits(from: from, to: to.addingTimeInterval(2 * 3600))
+        )
+        return insights
     }
 
     // MARK: - POS orders (Heartland), for comparing QR visits with what was ordered
@@ -1523,6 +1600,19 @@ func routes(_ app: Application) throws {
         } catch let error as PosCSVImport.ImportError {
             throw Abort(.badRequest, reason: error.description)
         }
+    }
+
+    // Menu engineering over the last `days` days of imported tickets.
+    app.get("api", "pos", "menu-engineering") { req throws -> MenuEngineeringReport in
+        try requireAdmin(req)
+        let days = min(max(req.query[Int.self, at: "days"] ?? 30, 1), PosOrderStore.retentionDays)
+        let to = Date()
+        let from = to.addingTimeInterval(-Double(days) * 86_400)
+        var qrViews: [String: Int] = [:]
+        for visit in QRVisitStore.shared.visits(from: from, to: to) {
+            visit.detailViews.forEach { qrViews[$0.itemName, default: 0] += $0.count }
+        }
+        return MenuEngineering.build(orders: PosOrderStore.shared.orders(from: from, to: to), from: from, to: to, qrViews: qrViews)
     }
 
     // Imported tickets for one day (restaurant time), with how many QR
@@ -1581,6 +1671,7 @@ func routes(_ app: Application) throws {
     // card, since a full menu is 200+ items. Capped defensively; a real
     // menu page never approaches this many distinct items at once.
     app.post("api", "analytics", "menu-item-impressions") { req throws -> HTTPStatus in
+        if shouldSkipAnalytics(req) { return .ok }
         let body = try req.content.decode(MenuItemImpressionsRequest.self)
         let deviceId = body.deviceId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let itemNames = body.itemNames

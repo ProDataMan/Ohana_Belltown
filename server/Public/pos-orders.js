@@ -106,6 +106,7 @@ document.getElementById('csv-btn').addEventListener('click', async () => {
       (r.ignoredColumns.length ? `<br>Ignored: ${escapeHtmlPos(r.ignoredColumns.join(', '))}` : '');
     loadStatus();
     loadOrders();
+    loadMenuEngineering();
   } catch (error) {
     resultEl.textContent = error.message;
   }
@@ -163,6 +164,62 @@ async function loadOrders() {
     listEl.innerHTML = `<p class="status status-error">${escapeHtmlPos(error.message)}</p>`;
   }
 }
+
+const ME_LABELS = { star: 'Star', plowhorse: 'Plowhorse', puzzle: 'Puzzle', dog: 'Dog' };
+const ME_PILL = { star: 'pill-approved', plowhorse: 'pill-warning', puzzle: '', dog: 'pill-denied' };
+
+async function loadMenuEngineering() {
+  const summaryEl = document.getElementById('me-summary');
+  const tableEl = document.getElementById('me-table');
+  tableEl.innerHTML = '<p class="hint">Loading...</p>';
+  try {
+    const response = await staffFetch(`/api/pos/menu-engineering?days=${document.getElementById('me-range').value}`);
+    if (!response.ok) throw new Error(await errorMessage(response, 'Unable to load the report'));
+    const report = await response.json();
+    if (!report.items.length) {
+      summaryEl.innerHTML = '';
+      tableEl.innerHTML = '<p class="hint">No tickets imported for this range yet.</p>';
+      return;
+    }
+    const byCategory = (c) => report.items.filter((i) => i.category === c).length;
+    summaryEl.innerHTML =
+      ['star', 'plowhorse', 'puzzle', 'dog'].map((c) => `<span class="pill ${ME_PILL[c]}">${byCategory(c)} ${ME_LABELS[c]}${byCategory(c) === 1 ? '' : 's'}</span>`).join('') +
+      (report.usesCost ? '' : '<span class="pill pill-warning">No plate costs in the POS data, so "profit" here is average price, not margin</span>');
+    const money = (v) => (v == null ? '—' : `$${v.toFixed(2)}`);
+    tableEl.innerHTML = `
+      <div class="data-table">
+        <table>
+          <thead><tr><th>Item</th><th>Group</th><th>Sold</th><th>Share</th><th>Avg price</th><th>Margin / unit</th><th>Food cost</th><th>Sales</th><th>QR opens</th></tr></thead>
+          <tbody>
+            ${report.items
+              .map(
+                (i) => `
+              <tr>
+                <td>${escapeHtmlPos(i.name)}</td>
+                <td><span class="pill ${ME_PILL[i.category]}">${ME_LABELS[i.category]}</span></td>
+                <td>${Math.round(i.quantity)}</td>
+                <td>${(i.popularityShare * 100).toFixed(1)}%</td>
+                <td>${money(i.avgPrice)}</td>
+                <td>${money(i.marginPerUnit)}</td>
+                <td>${i.foodCostPercent != null ? `${Math.round(i.foodCostPercent * 100)}%` : '—'}</td>
+                <td>${money(i.netSales)}</td>
+                <td>${i.qrDetailViews ?? '—'}</td>
+              </tr>
+            `
+              )
+              .join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (error) {
+    summaryEl.innerHTML = '';
+    tableEl.innerHTML = `<p class="status status-error">${escapeHtmlPos(error.message)}</p>`;
+  }
+}
+
+document.getElementById('me-range').addEventListener('change', loadMenuEngineering);
+loadMenuEngineering();
 
 document.getElementById('sync-from').value = restaurantDate(-2);
 document.getElementById('sync-to').value = restaurantDate(-1);

@@ -28,6 +28,10 @@ struct PosOrderItem: Codable, Equatable {
     var name: String
     var quantity: Double
     var netSales: Double?
+    /// Plate cost for this line as the POS reports it (Heartland's item
+    /// `cost`), for the menu engineering report. Nil when not set up in the
+    /// POS or not in the CSV.
+    var cost: Double? = nil
 }
 
 struct PosSyncStatus: Codable, Content {

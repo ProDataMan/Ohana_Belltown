@@ -64,6 +64,14 @@ function renderOverview() {
   ]);
 }
 
+function renderQuietTables() {
+  const el = document.getElementById('quiet-tables');
+  el.hidden = !insights.quietTables.length;
+  el.innerHTML = insights.quietTables.length
+    ? `<strong>Check these table cards:</strong> no QR scans in the last 7 days at ${insights.quietTables.map(escapeHtmlInsights).join(', ')}, while the rest of the floor was scanning normally. The card may be missing, damaged, or face-down.`
+    : '';
+}
+
 function renderHeatMap() {
   const sections = ['dining', 'bar', 'sushi', 'deck'].filter((s) => insights.tables.some((t) => t.section === s));
   const tabs = document.getElementById('heat-tabs');
@@ -273,6 +281,18 @@ function renderGuests() {
     r.multiVisitDevicesInRange ? { label: `${r.sameSectionDevices} of ${r.multiVisitDevicesInRange} repeat phones always sat in the same section` } : null,
     { label: `${p.parties} parties` },
   ]);
+  const s = insights.seating;
+  pills(
+    document.getElementById('seating-summary'),
+    s
+      ? [
+          { label: `${s.seatedParties} waitlist parties seated` },
+          s.avgWaitMinutes != null ? { label: `Avg. wait ${Math.round(s.avgWaitMinutes)} min` } : null,
+          { label: `${s.partiesThatScanned} scanned the QR menu (${pct(s.seatedParties ? s.partiesThatScanned / s.seatedParties : null)})` },
+          s.avgMinutesSeatedToFirstScan != null ? { label: `First scan ${Math.round(s.avgMinutesSeatedToFirstScan)} min after sitting down` } : null,
+        ]
+      : [{ label: 'Mark waitlist parties "Seated" at a table (Waitlist page) to see wait times and seated-to-scan time here.' }]
+  );
   document.getElementById('party-table').innerHTML = table(
     ['Phones that scanned', 'Parties'],
     p.phonesPerParty.map((c) => [c.label, c.count])
@@ -291,6 +311,7 @@ async function loadInsights() {
     if (!response.ok) throw new Error(`Unable to load QR insights (${response.status}).`);
     insights = await response.json();
     renderOverview();
+    renderQuietTables();
     renderHeatMap();
     renderSections();
     renderTimes();

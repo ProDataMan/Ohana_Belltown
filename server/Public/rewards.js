@@ -77,13 +77,12 @@ document.getElementById('copy-referral-link-btn').addEventListener('click', asyn
 });
 
 async function loadPunchCard() {
-  const meResponse = await fetch('/api/customer/me');
-  if (meResponse.status === 401) {
+  const session = await (window.ohanaSession || fetch('/api/session').then((r) => (r.ok ? r.json() : {})).catch(() => ({})));
+  if (!session.customer) {
     showLoyaltySection('logged-out');
     showReferralSection(null);
     return;
   }
-  if (!meResponse.ok) return;
 
   const loyaltyResponse = await fetch('/api/customer/loyalty');
   if (!loyaltyResponse.ok) return;

@@ -36,6 +36,7 @@ enum PosCSVImport {
         "price": ["netsales", "net", "itemnetsales", "price", "amount", "subtotal", "total", "grosssales"],
         "guests": ["guests", "guestcount", "covers", "party", "partysize"],
         "voided": ["voided", "voideddt", "voidtime", "void"],
+        "cost": ["cost", "platecost", "itemcost", "foodcost"],
     ]
 
     static func normalizeHeader(_ header: String) -> String {
@@ -51,7 +52,7 @@ enum PosCSVImport {
         var used = Set<Int>()
         // Fields claim headers in this order, so "date" doesn't take a
         // column "opened" already matched.
-        for field in ["ticket", "table", "room", "opened", "closed", "date", "time", "item", "quantity", "price", "guests", "voided"] {
+        for field in ["ticket", "table", "room", "opened", "closed", "date", "time", "item", "quantity", "price", "guests", "voided", "cost"] {
             let names = headerNames[field] ?? []
             for name in names {
                 if let index = header.indices.first(where: { !used.contains($0) && normalizeHeader(header[$0]) == name }) {
@@ -113,7 +114,10 @@ enum PosCSVImport {
             }
             if current.table == nil { current.table = table }
             let price = value(row, "price").flatMap(parseMoney)
-            current.items.append(PosOrderItem(name: itemName, quantity: value(row, "quantity").flatMap { Double($0) } ?? 1, netSales: price))
+            current.items.append(PosOrderItem(
+                name: itemName, quantity: value(row, "quantity").flatMap { Double($0) } ?? 1, netSales: price,
+                cost: value(row, "cost").flatMap(parseMoney)
+            ))
             if let price { current.netSales = (current.netSales ?? 0) + price }
             orders[key] = current
             itemCount += 1
