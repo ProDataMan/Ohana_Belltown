@@ -5,7 +5,7 @@ import Vapor
 /// an item's photo, searching, or adding an item to a table order.
 ///
 /// A visit begins when someone scans a table card (or the front-door / Happy
-/// Hour QR) and lasts for that browser tab until two hours pass without
+/// Hour QR) and lasts for that browser tab until an hour passes without
 /// activity (see the visit tracker in nav.js). Every event carries the
 /// visit's table, so "what did table 12 look at between 7 and 8pm" is a
 /// filter over this log, and the same table + time window is what lines a
@@ -19,7 +19,8 @@ struct QRVisitEvent: Codable, Equatable {
     var deviceId: String
     var customerId: String?
     var table: String?
-    /// Only on `start`: "table", "front-door", or "happy-hour".
+    /// Only on `start`: "table", "happy-hour-card" (the flip side of a table
+    /// card), "front-door", or "happy-hour" (front-door QR during Happy Hour).
     var source: String?
     /// Only on `start`: coarse device label from the User-Agent, e.g.
     /// "iPhone · Safari". The raw User-Agent is never stored.
@@ -28,6 +29,9 @@ struct QRVisitEvent: Codable, Equatable {
     var page: String?
     var itemName: String?
     var query: String?
+    /// Only on `search`: how many menu items matched. Nil on searches
+    /// recorded before this was tracked.
+    var resultCount: Int? = nil
     /// Server time (ISO 8601), never the phone's clock.
     var at: String
 }
@@ -43,6 +47,7 @@ struct QRVisitTimelineEntry: Content {
     var page: String?
     var itemName: String?
     var query: String?
+    var resultCount: Int?
 }
 
 struct QRVisitSummary: Content {
@@ -61,11 +66,21 @@ struct QRVisitSummary: Content {
     var detailViews: [QRVisitItemCount]
     var photoTaps: [QRVisitItemCount]
     var searches: [String]
+    /// Searches that matched no menu items.
+    var emptySearches: [String]
     var addedToOrder: [String]
+    /// The page the scan landed on.
+    var landingPage: String?
+    /// Seconds from the scan to the first item detail open or photo tap;
+    /// nil if they never tapped an item.
+    var firstTapSeconds: Double?
     /// Earlier QR visits from this same browser, so a regular can be told
     /// apart from a first-timer.
     var previousVisits: Int
     var timeline: [QRVisitTimelineEntry]
+    /// POS tickets at this visit's table that overlap it in time (see
+    /// PosMatching), filled in by the report routes, not by QRVisitStore.
+    var posOrders: [PosOrderBrief] = []
 }
 
 final class QRVisitStore: @unchecked Sendable {
@@ -85,7 +100,7 @@ final class QRVisitStore: @unchecked Sendable {
         case addToOrder = "add-to-order"
     }
 
-    static let sources: Set<String> = ["table", "front-door", "happy-hour"]
+    static let sources: Set<String> = ["table", "happy-hour-card", "front-door", "happy-hour"]
 
     private let lock = NSLock()
     private var log = JSONLinesLog<QRVisitEvent>(fileURL: URL(fileURLWithPath: "Data/qr-visit-events.jsonl"))
@@ -200,9 +215,15 @@ final class QRVisitStore: @unchecked Sendable {
                 detailViews: counts(.details),
                 photoTaps: counts(.photo),
                 searches: sorted.filter { $0.type == EventType.search.rawValue }.compactMap(\.query),
+                emptySearches: sorted.filter { $0.type == EventType.search.rawValue && $0.resultCount == 0 }.compactMap(\.query),
                 addedToOrder: sorted.filter { $0.type == EventType.addToOrder.rawValue }.compactMap(\.itemName),
+                landingPage: start?.page ?? pageEvents.first?.page,
+                firstTapSeconds: sorted
+                    .first { $0.type == EventType.details.rawValue || $0.type == EventType.photo.rawValue }
+                    .flatMap { formatter.date(from: $0.at) }
+                    .map { $0.timeIntervalSince(startDate) },
                 previousVisits: 0,
-                timeline: sorted.map { QRVisitTimelineEntry(type: $0.type, at: $0.at, page: $0.page, itemName: $0.itemName, query: $0.query) }
+                timeline: sorted.map { QRVisitTimelineEntry(type: $0.type, at: $0.at, page: $0.page, itemName: $0.itemName, query: $0.query, resultCount: $0.resultCount) }
             )))
         }
         return built

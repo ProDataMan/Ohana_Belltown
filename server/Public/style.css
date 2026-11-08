@@ -2867,3 +2867,96 @@ fieldset legend {
     margin-bottom: 0.3rem;
   }
 }
+
+/* QR insights (staff/qr-insights.html): heat shading shared by the floor
+   map tables, legend dots, and the hour/weekday grids. */
+.heat-0 {
+  background: var(--panel);
+}
+
+.heat-1 {
+  background: #ffe3f0;
+}
+
+.heat-2 {
+  background: #ffb3d4;
+}
+
+.heat-3 {
+  background: #ff6fb0;
+  color: #fff;
+}
+
+.heat-4 {
+  background: var(--pink-text);
+  color: #fff;
+}
+
+.floor-map-dot.heat-0 {
+  border: 1px solid var(--panel-border);
+}
+
+button.floor-map-table {
+  cursor: pointer;
+  flex-direction: column;
+  line-height: 1.05;
+  height: 3rem;
+}
+
+.floor-map-table.heat-3,
+.floor-map-table.heat-4 {
+  border-color: transparent;
+}
+
+.heat-count {
+  font-size: 0.65rem;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.insights-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.5rem 1.5rem;
+}
+
+.insights-list {
+  margin: 0;
+  padding-left: 1.3rem;
+}
+
+.insights-grid th,
+.insights-grid td {
+  text-align: center;
+  padding: 0.35rem 0.4rem;
+  white-space: nowrap;
+}
+
+.insights-grid tbody th {
+  text-align: left;
+}
+
+/* Floor plan rows can sit 10% of the canvas height apart, so on a phone the
+   heat map needs a much taller canvas than the desktop 55% for tables not to
+   overlap. */
+@media (max-width: 600px) {
+  .heat-canvas {
+    padding-bottom: 160%;
+  }
+
+  .heat-canvas button.floor-map-table {
+    min-width: 2.3rem;
+    height: 2.5rem;
+    font-size: 0.75rem;
+  }
+}
+
+.pos-steps {
+  margin: 0.5rem 0 0.8rem;
+  padding-left: 1.3rem;
+  line-height: 1.5;
+}
+
+.pos-steps li {
+  margin-bottom: 0.35rem;
+}

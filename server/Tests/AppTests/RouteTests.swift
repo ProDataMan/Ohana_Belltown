@@ -38,6 +38,7 @@ final class RouteTests: XCTestCase {
         EntertainmentStore.shared.configure(dataDirectory: tempDir.path)
         MenuItemEngagementStore.shared.configure(dataDirectory: tempDir.path)
         QRVisitStore.shared.configure(dataDirectory: tempDir.path)
+        PosOrderStore.shared.configure(dataDirectory: tempDir.path)
     }
 
     override func tearDown() async throws {
@@ -113,6 +114,14 @@ final class RouteTests: XCTestCase {
             XCTAssertEqual(visits.first?.detailViews.first?.count, 2)
             XCTAssertEqual(visits.first?.timeline.count, 4)
         }
+        try app.test(.GET, "api/analytics/qr-insights") { XCTAssertEqual($0.status, .unauthorized) }
+        try app.test(.GET, "api/analytics/qr-insights", headers: ["Cookie": employee]) { XCTAssertEqual($0.status, .forbidden) }
+        try app.test(.GET, "api/analytics/qr-insights?days=7", headers: ["Cookie": admin]) { res in
+            XCTAssertEqual(res.status, .ok)
+            let insights = try res.content.decode(QRInsights.self)
+            XCTAssertEqual(insights.totalVisits, 1)
+            XCTAssertEqual(insights.items.first?.itemName, "Spam Musubi")
+        }
         try app.test(.GET, "api/analytics/qr-visits?table=7", headers: ["Cookie": admin]) { res in
             XCTAssertEqual(try res.content.decode([QRVisitSummary].self).count, 0)
         }
@@ -122,6 +131,54 @@ final class RouteTests: XCTestCase {
             let lines = res.body.string.split(separator: "\n")
             XCTAssertEqual(lines.count, 5)
             XCTAssertTrue(lines[3].contains(#""details","/menu","Spam Musubi""#))
+        }
+    }
+
+    func testPosEndpointsAreAdminOnlyAndCSVImportFeedsVisitMatching() throws {
+        let (admin, employee) = try makeAdminAndSecondAccount(username: "pos", password: "password123", role: "employee")
+        for (method, path) in [(HTTPMethod.GET, "api/pos/status"), (.POST, "api/pos/sync"), (.POST, "api/pos/import-csv"), (.GET, "api/pos/orders")] {
+            try app.test(method, path) { XCTAssertEqual($0.status, .unauthorized, path) }
+            try app.test(method, path, headers: ["Cookie": employee]) { XCTAssertEqual($0.status, .forbidden, path) }
+        }
+        try app.test(.GET, "api/pos/status", headers: ["Cookie": admin]) { res in
+            XCTAssertEqual(try res.content.decode(PosStatusResponse.self).apiConfigured, false)
+        }
+        // Without HEARTLAND_API_KEY, a manual sync fails with a clear reason.
+        try app.test(.POST, "api/pos/sync", headers: ["Cookie": admin]) { res in
+            XCTAssertEqual(res.status, .badGateway)
+            XCTAssertTrue(res.body.string.contains("HEARTLAND_API_KEY"))
+        }
+
+        // A QR visit at table 30 now, and a ticket at table 30 opened now.
+        let json: HTTPHeaders = ["Content-Type": "application/json"]
+        for body in [
+            #"{"visitId":"visit-pos-0001","deviceId":"device-pos-0001","table":"30","type":"start","source":"table","page":"/menu"}"#,
+            #"{"visitId":"visit-pos-0001","deviceId":"device-pos-0001","table":"30","type":"details","page":"/menu","itemName":"Spam Musubi"}"#,
+        ] {
+            try app.test(.POST, "api/analytics/qr-visit-event", headers: json, body: ByteBuffer(string: body)) { XCTAssertEqual($0.status, .ok) }
+        }
+        let now = ISO8601DateFormatter().string(from: Date())
+        let csv = "Ticket,Table,Opened,Item,Qty,Net Sales,Guests\n77,30,\(now),Spam Musubi,2,10.00,2\n"
+        try app.test(.POST, "api/pos/import-csv", headers: ["Cookie": admin, "Content-Type": "text/csv"], body: ByteBuffer(string: csv)) { res in
+            XCTAssertEqual(res.status, .ok)
+            XCTAssertEqual(try res.content.decode(PosCSVImport.Result.self).orders, 1)
+        }
+        try app.test(.POST, "api/pos/import-csv", headers: ["Cookie": admin, "Content-Type": "text/csv"], body: ByteBuffer(string: "a,b\n1,2\n")) { res in
+            XCTAssertEqual(res.status, .badRequest)
+        }
+        try app.test(.GET, "api/analytics/qr-visits", headers: ["Cookie": admin]) { res in
+            let visits = try res.content.decode([QRVisitSummary].self)
+            XCTAssertEqual(visits.first?.posOrders.first?.ticketNumber, "77")
+        }
+        try app.test(.GET, "api/pos/orders", headers: ["Cookie": admin]) { res in
+            let rows = try res.content.decode([PosOrderRow].self)
+            XCTAssertEqual(rows.first?.qrVisits, 1)
+            XCTAssertEqual(rows.first?.onFloorMap, true)
+        }
+        try app.test(.GET, "api/analytics/qr-insights?days=7", headers: ["Cookie": admin]) { res in
+            let insights = try res.content.decode(QRInsights.self)
+            XCTAssertEqual(insights.pos?.tableOrdersWithQRVisit, 1)
+            XCTAssertEqual(insights.items.first { $0.itemName == "Spam Musubi" }?.visitsThatOrdered, 1)
         }
     }
 
@@ -196,11 +253,11 @@ final class RouteTests: XCTestCase {
     func testScanHappyHourFlagAlwaysLandsOnHappyHourRegardlessOfTime() throws {
         try app.test(.GET, "scan?hh=1") { res in
             XCTAssertEqual(res.status, .seeOther)
-            XCTAssertEqual(res.headers.first(name: .location), "/happy-hour?qr=1")
+            XCTAssertEqual(res.headers.first(name: .location), "/happy-hour?qr=1&card=hh")
         }
         try app.test(.GET, "scan?table=5&hh=1") { res in
             XCTAssertEqual(res.status, .seeOther)
-            XCTAssertEqual(res.headers.first(name: .location), "/happy-hour?qr=1&table=5")
+            XCTAssertEqual(res.headers.first(name: .location), "/happy-hour?qr=1&card=hh&table=5")
         }
     }
 

@@ -12,7 +12,7 @@
       <header class="hero">
         <p class="eyebrow">Ohana Belltown — Staff</p>
         <h1>QR Visits</h1>
-        <p>Every visit that started from a QR code scan: which table, when, which device, and what they looked at. Compare it against that table's ticket in the POS to see what people browsed versus what they ordered.</p>
+        <p>Every visit that started from a QR code scan: which table, when, which device, and what they looked at. Compare it against that table's ticket in the POS to see what people browsed versus what they ordered. For patterns across tables, sections and times, see <a href="/qr-insights.html">QR Insights</a>.</p>
         <p class="admin-link"><a href="/analytics.html">&larr; Back to analytics</a></p>
         <div class="staff-tools-nav">
           <a href="/edit.html">Menu Editor</a>
@@ -26,6 +26,8 @@
           <a href="/manage-users.html">Manage Users</a>
           <a href="/analytics.html">Analytics</a>
           <a href="/qr-visits.html" class="active">QR Visits</a>
+          <a href="/qr-insights.html">QR Insights</a>
+          <a href="/pos-orders.html">POS Orders</a>
           <a href="/staff-rewards-admin.html">Staff Rewards</a>
           <a href="/competitor-pricing-admin.html">Competitor Pricing</a>
           <a href="/swag-admin.html">Swag</a>
@@ -60,7 +62,7 @@
 
       <section class="panel">
         <h2>Visits</h2>
-        <p class="hint">Newest first. Times are restaurant time. A visit ends after two hours without activity. "Device" is a random id kept in that phone's browser, not a name, unless the guest was signed in.</p>
+        <p class="hint">Newest first. Times are restaurant time. A visit ends after an hour without activity. "Device" is a random id kept in that phone's browser, not a name, unless the guest was signed in.</p>
         <div id="visit-list"></div>
       </section>
     </main>

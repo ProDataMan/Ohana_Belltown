@@ -45,6 +45,7 @@ func configure(_ app: Application) throws {
     EntertainmentStore.shared.configure(dataDirectory: dataDirectory)
     MenuItemEngagementStore.shared.configure(dataDirectory: dataDirectory)
     QRVisitStore.shared.configure(dataDirectory: dataDirectory)
+    PosOrderStore.shared.configure(dataDirectory: dataDirectory)
 
     app.routes.defaultMaxBodySize = "10mb"
 
@@ -61,6 +62,7 @@ func configure(_ app: Application) throws {
                 await UploadVariants.prewarm(menu: menu)
             }
         }
+        HeartlandSync.schedule(app)
         FeedbackDigest.schedule(app)
         Task { await LightNotifier.shared.configureFromEnvironment() }
         LightNotifier.scheduleReadyPoll(app)

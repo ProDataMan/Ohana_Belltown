@@ -30,7 +30,7 @@ function formatDuration(seconds) {
 }
 
 function tableLabel(visit) {
-  if (visit.table) return `Table ${visit.table}`;
+  if (visit.table) return `Table ${visit.table}${visit.source === 'happy-hour-card' ? ' (Happy Hour card)' : ''}`;
   return visit.source === 'happy-hour' ? 'Happy Hour QR (no table)' : 'Front door QR (no table)';
 }
 
@@ -121,7 +121,8 @@ const TIMELINE_LABELS = {
 
 function timelineText(entry) {
   const what = entry.itemName || (entry.query ? `"${entry.query}"` : entry.page) || '';
-  return `${TIMELINE_LABELS[entry.type] || entry.type}${what ? `: ${what}` : ''}`;
+  const empty = entry.type === 'search' && entry.resultCount === 0 ? ' (no results)' : '';
+  return `${TIMELINE_LABELS[entry.type] || entry.type}${what ? `: ${what}` : ''}${empty}`;
 }
 
 function renderVisitList(visits) {
@@ -142,8 +143,9 @@ function renderVisitList(visits) {
       <dl class="qr-visit-facts">
         <dt>Details opened</dt><dd>${v.detailViews.length ? itemList(v.detailViews) : '<span class="hint">none</span>'}</dd>
         ${v.photoTaps.length ? `<dt>Photos tapped</dt><dd>${itemList(v.photoTaps)}</dd>` : ''}
-        ${v.searches.length ? `<dt>Searched</dt><dd>${v.searches.map((q) => `"${escapeHtmlVisits(q)}"`).join(', ')}</dd>` : ''}
+        ${v.searches.length ? `<dt>Searched</dt><dd>${v.searches.map((q) => `"${escapeHtmlVisits(q)}"${v.emptySearches.includes(q) ? ' <span class="hint">(no results)</span>' : ''}`).join(', ')}</dd>` : ''}
         ${v.addedToOrder.length ? `<dt>Added to order</dt><dd>${v.addedToOrder.map(escapeHtmlVisits).join(', ')}</dd>` : ''}
+        ${v.posOrders.length ? `<dt>Ordered (POS)</dt><dd>${v.posOrders.map((o) => `${itemList(o.items)} <span class="hint">(ticket ${escapeHtmlVisits(o.ticketNumber || '?')}, ${formatTime(o.openedAt)}${o.netSales != null ? `, $${o.netSales.toFixed(2)}` : ''})</span>`).join('<br>')}</dd>` : ''}
         <dt>Pages</dt><dd>${v.pages.map(escapeHtmlVisits).join(' &rarr; ') || '<span class="hint">none</span>'}</dd>
       </dl>
       <details>

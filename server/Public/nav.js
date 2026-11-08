@@ -101,6 +101,8 @@ function insertStaffNavDropdown() {
       <a href="/table-card.html">Table Cards</a>
       <a href="/analytics.html">Analytics</a>
       <a href="/qr-visits.html">QR Visits</a>
+      <a href="/qr-insights.html">QR Insights</a>
+      <a href="/pos-orders.html">POS Orders</a>
       <a href="/staff-rewards-admin.html">Staff Rewards</a>
       <a href="/competitor-pricing-admin.html">Competitor Pricing</a>
       <a href="/swag-admin.html">Swag</a>
@@ -714,14 +716,14 @@ function startStaffCompetitorPhotoAlerts() {
 // QR visit tracker — what someone who scanned a QR code looked at, page by
 // page and item by item, attributed to the table on the card. A visit starts
 // on a fresh scan (/scan adds `qr=1` to the landing URL, and a `table` there
-// also counts for older printed links) and lasts for this tab until two
-// hours pass with no activity, so a phone left on the menu tab overnight
+// also counts for older printed links) and lasts for this tab until an
+// hour passes with no activity, so a phone left on the menu tab overnight
 // doesn't attribute tomorrow's browsing to tonight's table. Uses the same
 // per-browser ohana_device_id menu-section.js uses for order history.
 // Disclosed on /privacy; see QRVisitStore server-side.
 (() => {
   const VISIT_KEY = 'ohana_qr_visit';
-  const IDLE_LIMIT_MS = 2 * 60 * 60 * 1000;
+  const IDLE_LIMIT_MS = 60 * 60 * 1000;
 
   function randomId() {
     return window.crypto && window.crypto.randomUUID
@@ -761,8 +763,10 @@ function startStaffCompetitorPhotoAlerts() {
   let visit = readVisit();
   if (freshScan) {
     const table = params.get('table') || null;
+    // `card=hh` is the "flip the table card over" Happy Hour QR (see /scan).
     let source = 'front-door';
-    if (table) source = 'table';
+    if (params.get('card') === 'hh') source = 'happy-hour-card';
+    else if (table) source = 'table';
     else if (window.location.pathname.startsWith('/happy-hour')) source = 'happy-hour';
     // A re-scan of the same table within an active visit (or an old printed
     // ?table= link reloaded) continues it rather than starting another.
@@ -772,6 +776,7 @@ function startStaffCompetitorPhotoAlerts() {
   }
   if (params.get('qr') === '1') {
     params.delete('qr');
+    params.delete('card');
     const query = params.toString();
     try {
       history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : '') + window.location.hash);

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>POS Orders — Ohana Belltown</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="stylesheet" href="../style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <p class="eyebrow">Ohana Belltown — Staff</p>
+        <h1>POS Orders</h1>
+        <p>Tickets imported from Heartland, matched by table and time to QR visits, so <a href="/qr-visits.html">QR Visits</a> and <a href="/qr-insights.html">QR Insights</a> can show what people looked at versus what they ordered. Only table, times, guest count and items are kept; guest names, phone numbers and payment details are never imported.</p>
+        <p class="admin-link"><a href="/analytics.html">&larr; Back to analytics</a></p>
+        <div class="staff-tools-nav">
+          <a href="/edit.html">Menu Editor</a>
+          <a href="/table-orders-admin.html">Table Orders</a>
+          <a href="/table-card.html">Table Cards</a>
+          <a href="/analytics.html">Analytics</a>
+          <a href="/qr-visits.html">QR Visits</a>
+          <a href="/qr-insights.html">QR Insights</a>
+          <a href="/pos-orders.html" class="active">POS Orders</a>
+          <a href="/help.html">Help</a>
+        </div>
+      </header>
+
+      <section class="panel">
+        <h2>Automatic daily import</h2>
+        <div id="sync-status" class="loyalty-card-summary"><span class="hint">Loading...</span></div>
+        <div class="qr-visits-filters" id="sync-controls">
+          <label class="hint">From <input type="date" id="sync-from" /></label>
+          <label class="hint">To <input type="date" id="sync-to" /></label>
+          <button type="button" id="sync-btn" class="cta-button secondary">Import from Heartland now</button>
+        </div>
+        <p id="sync-result" class="hint"></p>
+        <details>
+          <summary><strong>How to turn on the automatic import</strong></summary>
+          <ol class="pos-steps">
+            <li>Log in to the Heartland Restaurant <strong>Admin Portal</strong> as an owner or manager.</li>
+            <li>Choose the Ohana Belltown <strong>location</strong>, then <strong>Integrations</strong> in the left menu.</li>
+            <li>Click <strong>New</strong> (or the + button), set <strong>Integration Type</strong> to <strong>API</strong>, make sure <strong>Active</strong> is checked, and click <strong>Save</strong>.</li>
+            <li>Copy the key that appears in the <strong>API Key</strong> field. Treat it like a password.</li>
+            <li>If the Integrations page won't create a key, or asks you to pick a partner from a list, contact Heartland Restaurant support and ask for "a location API key for our own reporting integration, read-only access to closed orders and rooms/tables (API v2)". Also ask whether a <strong>partner key</strong> is required for the API's <code>authentication</code> header; if they give you one, it goes in <code>HEARTLAND_PARTNER_KEY</code>.</li>
+            <li>Send the key(s) to whoever manages the website server to add as the secrets <code>HEARTLAND_API_KEY</code> (and <code>HEARTLAND_PARTNER_KEY</code> if issued). After the next deploy, this page shows "API connected", the import runs every day at 4:30am, and you can backfill earlier days with the button above.</li>
+          </ol>
+        </details>
+      </section>
+
+      <section class="panel">
+        <h2>Upload a CSV export</h2>
+        <p class="hint">Works without the API key, and for backfilling. One row per item sold, with at least: an item name, a date/time, and a ticket (check) number or table. Quantity, price, guest count and close time are used if present. Uploading the same days again updates them instead of double counting.</p>
+        <details>
+          <summary><strong>How to export from Heartland</strong></summary>
+          <ol class="pos-steps">
+            <li>In the <strong>Admin Portal</strong>, open <strong>Reports</strong> and choose a ticket-level report that lists each item with its ticket number and table (for example a <em>Ticket Detail</em> or <em>Item Sales by Ticket</em> report; names vary by version).</li>
+            <li>Set the date range and click <strong>Export</strong> (top right) &rarr; <strong>CSV</strong>.</li>
+            <li>Upload the file here. If it's rejected, the message lists the columns it found; send a sample file so the importer can be taught that report's layout.</li>
+          </ol>
+        </details>
+        <div class="qr-visits-filters">
+          <input type="file" id="csv-file" accept=".csv,text/csv" />
+          <button type="button" id="csv-btn" class="cta-button secondary">Upload</button>
+        </div>
+        <p id="csv-result" class="hint"></p>
+      </section>
+
+      <section class="panel">
+        <h2>Imported tickets</h2>
+        <div class="qr-visits-filters">
+          <label class="hint">Day <input type="date" id="orders-date" /></label>
+        </div>
+        <div id="orders-summary" class="loyalty-card-summary"></div>
+        <div id="orders-list"></div>
+      </section>
+    </main>
+
+    <script src="/nav.js"></script>
+    <script src="../staff-auth.js"></script>
+    <script src="../pos-orders.js"></script>
+  </body>
+</html>

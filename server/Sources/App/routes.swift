@@ -159,6 +159,28 @@ struct QRVisitEventRequest: Content {
     var page: String?
     var itemName: String?
     var query: String?
+    var resultCount: Int?
+}
+
+struct PosStatusResponse: Content {
+    var apiConfigured: Bool
+    var partnerKeySet: Bool
+    var lastSync: PosSyncStatus?
+}
+
+struct PosSyncRequest: Content {
+    var from: String?
+    var to: String?
+}
+
+struct PosOrderRow: Content {
+    var order: PosOrderBrief
+    var id: String
+    var source: String
+    var table: String?
+    var room: String?
+    var onFloorMap: Bool
+    var qrVisits: Int
 }
 
 struct MenuItemImpressionsRequest: Content {
@@ -221,6 +243,9 @@ func routes(_ app: Application) throws {
         // fresh scan (it strips the flag from the address bar right away, so
         // a reload doesn't count as another scan).
         var queryParts: [String] = ["qr=1"]
+        if req.query[String.self, at: "hh"] == "1" {
+            queryParts.append("card=hh")
+        }
         if let table = scannedTable, !table.isEmpty,
            let encoded = table.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
             queryParts.append("table=\(encoded)")
@@ -1298,6 +1323,8 @@ func routes(_ app: Application) throws {
         ("manage-users.html", "staff/manage-users.html", true),
         ("analytics.html", "staff/analytics.html", true),
         ("qr-visits.html", "staff/qr-visits.html", true),
+        ("qr-insights.html", "staff/qr-insights.html", true),
+        ("pos-orders.html", "staff/pos-orders.html", true),
         ("staff-rewards-admin.html", "staff/staff-rewards-admin.html", true),
         ("competitor-pricing-admin.html", "staff/competitor-pricing-admin.html", true),
         ("competitor-pricing-upload.html", "staff/competitor-pricing-upload.html", true),
@@ -1423,6 +1450,7 @@ func routes(_ app: Application) throws {
             page: page,
             itemName: QRVisitStore.clean(body.itemName, maxLength: 200),
             query: QRVisitStore.clean(body.query, maxLength: 80)?.lowercased(),
+            resultCount: body.resultCount.flatMap { (0...10_000).contains($0) ? $0 : nil },
             at: ISO8601DateFormatter().string(from: Date())
         ))
         return .ok
@@ -1435,7 +1463,83 @@ func routes(_ app: Application) throws {
         try requireAdmin(req)
         let (from, to) = try qrVisitDayRange(req)
         let table = QRVisitStore.clean(req.query[String.self, at: "table"], maxLength: 20)
-        return QRVisitStore.shared.visits(from: from, to: to, table: table)
+        // Tickets can close up to a few hours after the day's last scan.
+        let orders = PosOrderStore.shared.orders(from: from.addingTimeInterval(-6 * 3600), to: to.addingTimeInterval(6 * 3600))
+        return QRVisitStore.shared.visits(from: from, to: to, table: table).map { visit in
+            var visit = visit
+            visit.posOrders = PosMatching.orders(for: visit, in: orders).map(PosOrderBrief.init)
+            return visit
+        }
+    }
+
+    // Aggregate QR reporting over the last `days` days (default 30, max
+    // 120, the retention window) for /qr-insights.html.
+    app.get("api", "analytics", "qr-insights") { req throws -> QRInsights in
+        try requireAdmin(req)
+        let days = min(max(req.query[Int.self, at: "days"] ?? 30, 1), QRVisitStore.retentionDays)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = HappyHourSchedule.pacific
+        let to = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: Date())) ?? Date()
+        let from = calendar.date(byAdding: .day, value: -days, to: to) ?? to
+        return QRInsightsBuilder.build(
+            visits: QRVisitStore.shared.visits(from: from, to: to), from: from, to: to,
+            menu: try? MenuStore.shared.get(),
+            orders: PosOrderStore.shared.orders(from: from.addingTimeInterval(-6 * 3600), to: to.addingTimeInterval(6 * 3600))
+        )
+    }
+
+    // MARK: - POS orders (Heartland), for comparing QR visits with what was ordered
+
+    app.get("api", "pos", "status") { req throws -> PosStatusResponse in
+        try requireAdmin(req)
+        return PosStatusResponse(apiConfigured: HeartlandSync.isConfigured, partnerKeySet: HeartlandSync.partnerKey != nil,
+                                 lastSync: PosOrderStore.shared.lastSync())
+    }
+
+    // Pull a date range from Heartland now (default: the last 2 business
+    // days, same as the 4:30am daily sync).
+    app.post("api", "pos", "sync") { req async throws -> PosSyncStatus in
+        try requireAdmin(req)
+        let body = try? req.content.decode(PosSyncRequest.self)
+        let defaults = HeartlandSync.recentBusinessDays(2)
+        let from = body?.from ?? defaults.0
+        let to = body?.to ?? defaults.1
+        do {
+            try await HeartlandSync.sync(client: req.client, from: from, to: to)
+        } catch {
+            throw Abort(.badGateway, reason: "\(error)")
+        }
+        return PosOrderStore.shared.lastSync() ?? PosSyncStatus(at: "", source: "heartland-api", from: from, to: to, ordersImported: 0, error: nil)
+    }
+
+    // CSV upload: the request body is the CSV file's text.
+    app.on(.POST, "api", "pos", "import-csv", body: .collect(maxSize: "10mb")) { req throws -> PosCSVImport.Result in
+        try requireAdmin(req)
+        guard let buffer = req.body.data, case let text = String(buffer: buffer), !text.isEmpty else {
+            throw Abort(.badRequest, reason: "Choose a CSV file to upload.")
+        }
+        do {
+            return try PosCSVImport.run(csv: text)
+        } catch let error as PosCSVImport.ImportError {
+            throw Abort(.badRequest, reason: error.description)
+        }
+    }
+
+    // Imported tickets for one day (restaurant time), with how many QR
+    // visits each lines up with.
+    app.get("api", "pos", "orders") { req throws -> [PosOrderRow] in
+        try requireAdmin(req)
+        let (from, to) = try qrVisitDayRange(req)
+        let orders = PosOrderStore.shared.orders(from: from, to: to)
+        let visits = QRVisitStore.shared.visits(from: from.addingTimeInterval(-6 * 3600), to: to)
+        return orders.map { order in
+            let matched = visits.filter { PosMatching.orders(for: $0, in: [order]).isEmpty == false }
+            return PosOrderRow(
+                order: PosOrderBrief(order), id: order.id, source: order.source, table: order.table, room: order.room,
+                onFloorMap: order.table.map { table in TableMap.entries.contains { $0.id == table } } ?? false,
+                qrVisits: matched.count
+            )
+        }
     }
 
     // Same window as above, one row per event, for lining visits up against

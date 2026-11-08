@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QR Insights — Ohana Belltown</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="stylesheet" href="../style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <p class="eyebrow">Ohana Belltown — Staff</p>
+        <h1>QR Insights</h1>
+        <p>Patterns across all QR scans: which tables and sections use the QR menu, when, what they look at, and what they search for. For individual visits, see <a href="/qr-visits.html">QR Visits</a>.</p>
+        <p class="admin-link"><a href="/analytics.html">&larr; Back to analytics</a></p>
+        <div class="staff-tools-nav">
+          <a href="/edit.html">Menu Editor</a>
+          <a href="/loyalty-admin.html">Loyalty</a>
+          <a href="/waitlist-admin.html">Waitlist</a>
+          <a href="/table-orders-admin.html">Table Orders</a>
+          <a href="/events-admin.html">Events</a>
+          <a href="/entertainment-admin.html">Entertainment</a>
+          <a href="/table-card.html">Table Cards</a>
+          <a href="/account.html">My Account</a>
+          <a href="/manage-users.html">Manage Users</a>
+          <a href="/analytics.html">Analytics</a>
+          <a href="/qr-visits.html">QR Visits</a>
+          <a href="/qr-insights.html" class="active">QR Insights</a>
+          <a href="/pos-orders.html">POS Orders</a>
+          <a href="/staff-rewards-admin.html">Staff Rewards</a>
+          <a href="/competitor-pricing-admin.html">Competitor Pricing</a>
+          <a href="/swag-admin.html">Swag</a>
+          <a href="/gift-cards-admin.html">Gift Cards</a>
+          <a href="/help.html">Help</a>
+        </div>
+      </header>
+
+      <div class="editor-toolbar analytics-page-toolbar">
+        <div class="toolbar-actions qr-visits-filters">
+          <label class="hint">Range
+            <select id="insights-range">
+              <option value="7">Last 7 days</option>
+              <option value="30" selected>Last 30 days</option>
+              <option value="90">Last 90 days</option>
+              <option value="120">Last 120 days</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <section class="panel">
+        <h2>Overview</h2>
+        <div id="insights-overview" class="loyalty-card-summary"><span class="hint">Loading...</span></div>
+      </section>
+
+      <section class="panel">
+        <h2>Floor map</h2>
+        <p class="hint">Darker tables had more QR visits. A table with no visits for weeks may have a missing or damaged card. Tap a table for its numbers.</p>
+        <div class="floor-map-tabs" id="heat-tabs"></div>
+        <div class="floor-map-legend" id="heat-legend"></div>
+        <div class="floor-map-canvas heat-canvas" id="heat-canvas"></div>
+        <p id="heat-detail" class="hint"></p>
+        <p id="heat-unscanned" class="hint"></p>
+      </section>
+
+      <section class="panel">
+        <h2>Sections compared</h2>
+        <div id="section-table"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Most-opened items by section</h2>
+        <div id="section-items" class="insights-columns"></div>
+      </section>
+
+      <section class="panel">
+        <h2>When people scan</h2>
+        <p class="hint">QR visits by hour and by weekday (restaurant time). Darker cells are busier.</p>
+        <h3>By hour</h3>
+        <div id="by-hour"></div>
+        <h3>By weekday</h3>
+        <div id="by-weekday"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Happy Hour</h2>
+        <div id="happy-hour-summary" class="loyalty-card-summary"></div>
+        <div id="happy-hour-items"></div>
+      </section>
+
+      <section class="panel" id="pos-panel">
+        <h2>Looked at vs. ordered</h2>
+        <p class="hint">QR visits matched to POS tickets at the same table and time. Import tickets on <a href="/pos-orders.html">POS Orders</a>.</p>
+        <div id="pos-summary" class="loyalty-card-summary"></div>
+        <div id="pos-unmatched"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Items: looked at vs. acted on</h2>
+        <p class="hint">How many visits opened each item, and how often that turned into a photo tap or an add-to-order. Add-to-order only counts while table ordering is switched on. Items people open a lot without a photo are good candidates for one.</p>
+        <div id="item-table"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Searches</h2>
+        <p class="hint">Searches with no results usually mean a dish people expect, or different wording than the menu uses (e.g. "gyoza" vs. "potstickers").</p>
+        <div id="empty-searches" class="loyalty-card-summary"></div>
+        <div id="search-table"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Browsing paths</h2>
+        <p class="hint">The pages a visit went through, in order.</p>
+        <div id="path-table"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Guests and phones</h2>
+        <div id="guests-summary" class="loyalty-card-summary"></div>
+        <p class="hint">Phones that scan the same table within 20 minutes of each other are counted as one party. Parties where only one person scanned still count as one phone.</p>
+        <div id="party-table"></div>
+        <h3>Phone types</h3>
+        <div id="device-table"></div>
+      </section>
+    </main>
+
+    <script src="/nav.js"></script>
+    <script src="../staff-auth.js"></script>
+    <script src="../qr-insights.js"></script>
+  </body>
+</html>

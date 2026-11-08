@@ -435,8 +435,8 @@ function renderControls(categories) {
 
   document.getElementById('menu-search').addEventListener('input', (event) => {
     const query = event.target.value.trim().toLowerCase();
-    filterMenu(query);
-    queueSearchQueryTracking(query);
+    const resultCount = filterMenu(query);
+    queueSearchQueryTracking(query, resultCount);
   });
 
   controls.querySelectorAll('.tag-chip').forEach((chip) => {
@@ -453,11 +453,11 @@ function renderControls(categories) {
 /// sent once typing pauses (not on every keystroke), and short/empty
 /// queries are skipped since a single letter mid-typing isn't a real term.
 let searchQueryTrackingTimer = null;
-function queueSearchQueryTracking(query) {
+function queueSearchQueryTracking(query, resultCount) {
   clearTimeout(searchQueryTrackingTimer);
   if (query.length < 2) return;
   searchQueryTrackingTimer = setTimeout(() => {
-    trackVisit('search', { query });
+    trackVisit('search', { query, resultCount });
     fetch('/api/analytics/search-query', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -466,9 +466,12 @@ function queueSearchQueryTracking(query) {
   }, 800);
 }
 
+/// Returns how many items matched, so a search that found nothing can be
+/// reported as such (see the empty-search report on /qr-insights.html).
 function filterMenu(query) {
   const categories = menuContainer.querySelectorAll('.category');
   let anyVisible = false;
+  let matchCount = 0;
 
   categories.forEach((category) => {
     const items = category.querySelectorAll('.item');
@@ -481,7 +484,10 @@ function filterMenu(query) {
       const matchesTag = !activeTagFilter || itemTags.includes(activeTagFilter);
       const matches = matchesQuery && matchesTag;
       item.classList.toggle('item-hidden', !matches);
-      if (matches) categoryHasMatch = true;
+      if (matches) {
+        categoryHasMatch = true;
+        matchCount += 1;
+      }
     });
 
     category.classList.toggle('category-hidden', !categoryHasMatch);
@@ -499,6 +505,7 @@ function filterMenu(query) {
   } else if (noResults) {
     noResults.remove();
   }
+  return matchCount;
 }
 
 function injectMenuSchema(categories, tableId) {
