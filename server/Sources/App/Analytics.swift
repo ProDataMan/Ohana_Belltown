@@ -214,11 +214,53 @@ final class AnalyticsStore: @unchecked Sendable {
     private var days: [DailyPageviews] = []
     private var loaded = false
 
+    /// Counts are saved at most once per `persistDelay` on a background
+    /// queue instead of on every recorded event. Every page view hits this
+    /// store (see AnalyticsMiddleware), and rewriting the whole file on each
+    /// one, on an event-loop thread over the Azure Files mount, slowed down
+    /// every other request. A crash loses at most a few seconds of counts.
+    static let persistDelay: TimeInterval = 5
+    private let writeQueue = DispatchQueue(label: "analytics.persist")
+    private var persistScheduled = false
+    /// Bumped by `configure`, so a save scheduled before a reconfigure never
+    /// writes the old data into the newly configured file.
+    private var generation = 0
+
     func configure(dataDirectory: String) {
         lock.lock()
         defer { lock.unlock() }
+        if persistScheduled, loaded {
+            try? persist()
+        }
+        persistScheduled = false
+        generation += 1
         fileURL = URL(fileURLWithPath: dataDirectory).appendingPathComponent("analytics.json")
         loaded = false
+    }
+
+    /// Writes any pending counts now — for tests.
+    func flush() {
+        lock.lock()
+        defer { lock.unlock() }
+        if persistScheduled, loaded {
+            try? persist()
+        }
+        persistScheduled = false
+    }
+
+    /// Must be called with `lock` held.
+    private func schedulePersistLocked() {
+        guard !persistScheduled else { return }
+        persistScheduled = true
+        let scheduledGeneration = generation
+        writeQueue.asyncAfter(deadline: .now() + Self.persistDelay) { [weak self] in
+            guard let self else { return }
+            self.lock.lock()
+            defer { self.lock.unlock() }
+            guard self.persistScheduled, self.generation == scheduledGeneration else { return }
+            self.persistScheduled = false
+            try? self.persist()
+        }
     }
 
     private static func today() -> String {
@@ -308,7 +350,7 @@ final class AnalyticsStore: @unchecked Sendable {
         if let model = Self.androidModel(from: userAgent) {
             days[idx].deviceModelCounts[model, default: 0] += 1
         }
-        try? persist()
+        schedulePersistLocked()
     }
 
     /// `table`, when present, is the table id active when the item's detail
@@ -323,7 +365,7 @@ final class AnalyticsStore: @unchecked Sendable {
         if let table, !table.isEmpty {
             days[idx].tableItemViewCounts[table, default: 0] += 1
         }
-        try? persist()
+        schedulePersistLocked()
     }
 
     /// A `/scan` hit — `table` is the raw table/seat id off the physical QR
@@ -342,7 +384,7 @@ final class AnalyticsStore: @unchecked Sendable {
         let idx = todayIndex()
         days[idx].qrScanCounts[table, default: 0] += 1
         days[idx].qrScanDestinationCounts[destination, default: 0] += 1
-        try? persist()
+        schedulePersistLocked()
     }
 
     func recordScanToFirstTap(seconds: Double) {
@@ -353,7 +395,7 @@ final class AnalyticsStore: @unchecked Sendable {
         let idx = todayIndex()
         days[idx].scanToFirstTapSeconds.totalSeconds += seconds
         days[idx].scanToFirstTapSeconds.samples += 1
-        try? persist()
+        schedulePersistLocked()
     }
 
     func recordScanSession(seconds: Double) {
@@ -364,7 +406,7 @@ final class AnalyticsStore: @unchecked Sendable {
         let idx = todayIndex()
         days[idx].scanSessionSeconds.totalSeconds += seconds
         days[idx].scanSessionSeconds.samples += 1
-        try? persist()
+        schedulePersistLocked()
     }
 
     /// Lowercased/trimmed search text only — queries under 2 characters are
@@ -376,7 +418,7 @@ final class AnalyticsStore: @unchecked Sendable {
         try? loadIfNeeded()
         let idx = todayIndex()
         days[idx].searchQueryCounts[query, default: 0] += 1
-        try? persist()
+        schedulePersistLocked()
     }
 
     func recordScrollDepth(section: String, bucket: Int) {
@@ -385,7 +427,7 @@ final class AnalyticsStore: @unchecked Sendable {
         try? loadIfNeeded()
         let idx = todayIndex()
         days[idx].scrollDepthCounts["\(section):\(bucket)", default: 0] += 1
-        try? persist()
+        schedulePersistLocked()
     }
 
     /// Every table on the floor map that hasn't had a single `/scan` hit in
@@ -413,7 +455,7 @@ final class AnalyticsStore: @unchecked Sendable {
         stat.totalSeconds += seconds
         stat.samples += 1
         days[idx].dwell[path] = stat
-        try? persist()
+        schedulePersistLocked()
     }
 
     func summary(days dayCount: Int) throws -> AnalyticsSummary {

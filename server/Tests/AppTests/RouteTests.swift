@@ -37,6 +37,7 @@ final class RouteTests: XCTestCase {
         GiftCardOrdersStore.shared.configure(dataDirectory: tempDir.path)
         EntertainmentStore.shared.configure(dataDirectory: tempDir.path)
         MenuItemEngagementStore.shared.configure(dataDirectory: tempDir.path)
+        QRVisitStore.shared.configure(dataDirectory: tempDir.path)
     }
 
     override func tearDown() async throws {
@@ -79,6 +80,71 @@ final class RouteTests: XCTestCase {
         XCTAssertEqual(try CompetitorPricingStore.shared.restaurants()[0].menuPhotoUrls, ["/uploads/new.jpg"])
     }
 
+    func testQRVisitEventsAreRecordedValidatedAndAdminOnly() throws {
+        let (admin, employee) = try makeAdminAndSecondAccount(username: "visits", password: "password123", role: "employee")
+        let json: HTTPHeaders = ["Content-Type": "application/json"]
+        let visit = "visit-0001-abcd"
+        let device = "device-0001-abcd"
+        for body in [
+            #"{"visitId":"\#(visit)","deviceId":"\#(device)","table":"12","type":"start","source":"table","page":"/menu"}"#,
+            #"{"visitId":"\#(visit)","deviceId":"\#(device)","table":"12","type":"page","page":"/menu"}"#,
+            #"{"visitId":"\#(visit)","deviceId":"\#(device)","table":"12","type":"details","page":"/menu","itemName":"Spam Musubi"}"#,
+            #"{"visitId":"\#(visit)","deviceId":"\#(device)","table":"12","type":"details","page":"/menu","itemName":"Spam Musubi"}"#,
+            // Rejected: unknown type, bad id, page that isn't a path.
+            #"{"visitId":"\#(visit)","deviceId":"\#(device)","table":"12","type":"hack"}"#,
+            #"{"visitId":"x","deviceId":"\#(device)","type":"page","page":"/menu"}"#,
+        ] {
+            try app.test(.POST, "api/analytics/qr-visit-event", headers: json, body: ByteBuffer(string: body)) {
+                XCTAssertEqual($0.status, .ok)
+            }
+        }
+
+        try app.test(.GET, "api/analytics/qr-visits") { XCTAssertEqual($0.status, .unauthorized) }
+        try app.test(.GET, "api/analytics/qr-visits", headers: ["Cookie": employee]) { XCTAssertEqual($0.status, .forbidden) }
+        try app.test(.GET, "api/analytics/qr-visits?date=nope", headers: ["Cookie": admin]) { XCTAssertEqual($0.status, .badRequest) }
+        try app.test(.GET, "api/analytics/qr-visits", headers: ["Cookie": admin]) { res in
+            XCTAssertEqual(res.status, .ok)
+            let visits = try res.content.decode([QRVisitSummary].self)
+            XCTAssertEqual(visits.count, 1)
+            XCTAssertEqual(visits.first?.table, "12")
+            XCTAssertEqual(visits.first?.source, "table")
+            XCTAssertEqual(visits.first?.pageViews, 1)
+            XCTAssertEqual(visits.first?.detailViews.first?.itemName, "Spam Musubi")
+            XCTAssertEqual(visits.first?.detailViews.first?.count, 2)
+            XCTAssertEqual(visits.first?.timeline.count, 4)
+        }
+        try app.test(.GET, "api/analytics/qr-visits?table=7", headers: ["Cookie": admin]) { res in
+            XCTAssertEqual(try res.content.decode([QRVisitSummary].self).count, 0)
+        }
+        try app.test(.GET, "api/analytics/qr-visits.csv", headers: ["Cookie": admin]) { res in
+            XCTAssertEqual(res.status, .ok)
+            XCTAssertEqual(res.headers.contentType?.subType, "csv")
+            let lines = res.body.string.split(separator: "\n")
+            XCTAssertEqual(lines.count, 5)
+            XCTAssertTrue(lines[3].contains(#""details","/menu","Spam Musubi""#))
+        }
+    }
+
+    func testUploadsAreCachedForGoodButPagesStayNoCache() throws {
+        try Data("not really a jpeg".utf8).write(to: URL(fileURLWithPath: Uploads.directory + "photo.jpg"))
+        try app.test(.GET, "uploads/photo.jpg") { res in
+            XCTAssertEqual(res.status, .ok)
+            XCTAssertEqual(res.headers.first(name: .cacheControl), "public, max-age=31536000, immutable")
+        }
+        // A size the server can't produce (here: ImageMagick can't read the
+        // file) falls back to the original rather than failing.
+        try app.test(.GET, "uploads/photo.jpg?w=480") { res in
+            XCTAssertEqual(res.status, .ok)
+            XCTAssertEqual(res.body.string, "not really a jpeg")
+        }
+        try app.test(.GET, "uploads/missing.jpg") { res in
+            XCTAssertNotEqual(res.headers.first(name: .cacheControl), "public, max-age=31536000, immutable")
+        }
+        try app.test(.GET, "api/menu") { res in
+            XCTAssertEqual(res.headers.first(name: .cacheControl), "no-cache")
+        }
+    }
+
     func testHealthz() throws {
         try app.test(.GET, "healthz") { res in
             XCTAssertEqual(res.status, .ok)
@@ -90,7 +156,7 @@ final class RouteTests: XCTestCase {
         try app.test(.GET, "scan") { res in
             XCTAssertEqual(res.status, .seeOther)
             let location = res.headers.first(name: .location)
-            XCTAssertTrue(location == "/menu" || location == "/happy-hour", "unexpected redirect target: \(location ?? "nil")")
+            XCTAssertTrue(location == "/menu?qr=1" || location == "/happy-hour?qr=1", "unexpected redirect target: \(location ?? "nil")")
         }
     }
 
@@ -98,7 +164,7 @@ final class RouteTests: XCTestCase {
         try app.test(.GET, "scan?table=5") { res in
             XCTAssertEqual(res.status, .seeOther)
             let location = res.headers.first(name: .location)
-            XCTAssertTrue(location == "/menu?table=5" || location == "/happy-hour?table=5", "unexpected redirect target: \(location ?? "nil")")
+            XCTAssertTrue(location == "/menu?qr=1&table=5" || location == "/happy-hour?qr=1&table=5", "unexpected redirect target: \(location ?? "nil")")
         }
     }
 
@@ -108,7 +174,7 @@ final class RouteTests: XCTestCase {
         try app.test(.GET, "scan?prices=1") { res in
             XCTAssertEqual(res.status, .seeOther)
             let location = res.headers.first(name: .location)
-            XCTAssertTrue(location == "/menu?prices=1" || location == "/happy-hour?prices=1", "unexpected redirect target: \(location ?? "nil")")
+            XCTAssertTrue(location == "/menu?qr=1&prices=1" || location == "/happy-hour?qr=1&prices=1", "unexpected redirect target: \(location ?? "nil")")
         }
     }
 
@@ -117,7 +183,7 @@ final class RouteTests: XCTestCase {
             XCTAssertEqual(res.status, .seeOther)
             let location = res.headers.first(name: .location)
             XCTAssertTrue(
-                location == "/menu?table=5&prices=1" || location == "/happy-hour?table=5&prices=1",
+                location == "/menu?qr=1&table=5&prices=1" || location == "/happy-hour?qr=1&table=5&prices=1",
                 "unexpected redirect target: \(location ?? "nil")"
             )
         }
@@ -130,11 +196,11 @@ final class RouteTests: XCTestCase {
     func testScanHappyHourFlagAlwaysLandsOnHappyHourRegardlessOfTime() throws {
         try app.test(.GET, "scan?hh=1") { res in
             XCTAssertEqual(res.status, .seeOther)
-            XCTAssertEqual(res.headers.first(name: .location), "/happy-hour")
+            XCTAssertEqual(res.headers.first(name: .location), "/happy-hour?qr=1")
         }
         try app.test(.GET, "scan?table=5&hh=1") { res in
             XCTAssertEqual(res.status, .seeOther)
-            XCTAssertEqual(res.headers.first(name: .location), "/happy-hour?table=5")
+            XCTAssertEqual(res.headers.first(name: .location), "/happy-hour?qr=1&table=5")
         }
     }
 

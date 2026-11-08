@@ -89,6 +89,18 @@ function recordMenuItemEngagement(itemName, clickType) {
   }).catch(() => {});
 }
 
+/// A resized copy of an uploaded photo (see UploadVariants server-side) —
+/// cards use 480px, the detail view 960px, the lightbox the original.
+function sizedPhotoUrl(src, width) {
+  return src && src.startsWith('/uploads/') && !src.includes('?') ? `${src}?w=${width}` : src;
+}
+
+/// Hands one step of a QR visit to the tracker in nav.js (a no-op outside
+/// a QR visit, or if nav.js didn't load).
+function trackVisit(type, fields) {
+  if (typeof window.ohanaTrackVisit === 'function') window.ohanaTrackVisit(type, fields);
+}
+
 /// First tap on any item card (photo or details) after a fresh QR scan —
 /// how long it takes a guest to actually start engaging with the menu once
 /// they land on it. Reuses the ohana_scan_arrived_at timestamp nav.js stamps
@@ -273,6 +285,7 @@ function addItemToCart(button) {
   if (missingChoice) return false;
 
   setPendingCartItem(itemName, { itemId, section: window.MENU_SECTION, modifiers: [...modifiers, ...choiceSelections] });
+  trackVisit('add-to-order', { itemName });
 
   findOrderButtons(itemName).forEach((btn) => {
     btn.textContent = 'Added — Tap to Remove';
@@ -444,6 +457,7 @@ function queueSearchQueryTracking(query) {
   clearTimeout(searchQueryTrackingTimer);
   if (query.length < 2) return;
   searchQueryTrackingTimer = setTimeout(() => {
+    trackVisit('search', { query });
     fetch('/api/analytics/search-query', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -626,7 +640,7 @@ function renderMenu(data) {
               : '';
           const featuredImage = (item.images || [])[0];
           const imageMarkup = featuredImage
-            ? `<img class="item-photo" src="${escapeHtml(featuredImage)}" alt="${escapeHtml(item.name)}" loading="lazy" />`
+            ? `<img class="item-photo" src="${escapeHtml(sizedPhotoUrl(featuredImage, 480))}" data-full="${escapeHtml(featuredImage)}" alt="${escapeHtml(item.name)}" loading="lazy" />`
             : '';
           const searchText = `${item.name} ${item.description || ''}`.toLowerCase();
           const tags = item.tags || [];
@@ -834,6 +848,7 @@ async function openItemModal(index) {
     body: JSON.stringify({ name: item.name, table: getTableId() }),
   }).catch(() => {});
   recordMenuItemEngagement(item.name, 'details');
+  trackVisit('details', { itemName: item.name });
 
   modal.querySelector('.item-modal-category').textContent = categoryName;
   modal.querySelector('.item-modal-sold-out').hidden = item.available !== false;
@@ -915,15 +930,21 @@ async function openItemModal(index) {
   const images = item.images || [];
   if (images.length) {
     gallery.hidden = false;
+    // The card's 480px copy is almost always already downloaded, so it goes
+    // in as the backdrop: something shows the instant the modal opens while
+    // the sharper 960px copy loads on top. The first photo is fetched
+    // eagerly at high priority so it isn't queued behind card thumbnails
+    // still lazy-loading in the list underneath.
+    gallery.style.backgroundImage = `url("${sizedPhotoUrl(images[0], 480).replace(/"/g, '%22')}")`;
     gallery.innerHTML = images
       .map(
         (src, i) =>
-          `<img class="item-modal-gallery-img${i === 0 ? ' active' : ''}" src="${escapeHtml(src)}" alt="${escapeHtml(item.name)}" loading="lazy" />`
+          `<img class="item-modal-gallery-img${i === 0 ? ' active' : ''}" src="${escapeHtml(sizedPhotoUrl(src, 960))}" data-full="${escapeHtml(src)}" alt="${escapeHtml(item.name)}" ${i === 0 ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"'} />`
       )
       .join('');
     const imgs = gallery.querySelectorAll('img');
     imgs.forEach((imgEl) => {
-      imgEl.addEventListener('click', () => window.openLightbox(imgEl.src, item.name));
+      imgEl.addEventListener('click', () => window.openLightbox(imgEl.dataset.full, item.name));
     });
     if (imgs.length > 1) {
       let current = 0;
@@ -935,6 +956,7 @@ async function openItemModal(index) {
     }
   } else {
     gallery.hidden = true;
+    gallery.style.backgroundImage = '';
     gallery.innerHTML = '';
   }
 
@@ -952,7 +974,7 @@ async function openItemModal(index) {
     label.textContent = 'More photos of this dish:';
     strip.innerHTML = images
       .map(
-        (src) => `<img src="${escapeHtml(src)}" alt="${escapeHtml(item.name)}" loading="lazy" data-full="${escapeHtml(src)}" data-caption="${escapeHtml(item.name)}" />`
+        (src) => `<img src="${escapeHtml(sizedPhotoUrl(src, 480))}" alt="${escapeHtml(item.name)}" loading="lazy" data-full="${escapeHtml(src)}" data-caption="${escapeHtml(item.name)}" />`
       )
       .join('');
     strip.querySelectorAll('img').forEach((imgEl) => {
@@ -1038,8 +1060,11 @@ menuContainer.addEventListener('click', (event) => {
   if (photo) {
     const photoItemEl = photo.closest('.item');
     const entry = photoItemEl && photoItemEl.dataset.index != null ? itemsByIndex[Number(photoItemEl.dataset.index)] : null;
-    if (entry) recordMenuItemEngagement(entry.item.name, 'photo');
-    window.openLightbox(photo.src, photo.alt);
+    if (entry) {
+      recordMenuItemEngagement(entry.item.name, 'photo');
+      trackVisit('photo', { itemName: entry.item.name });
+    }
+    window.openLightbox(photo.dataset.full || photo.src, photo.alt);
     return;
   }
   const itemEl = event.target.closest('.item');

@@ -55,15 +55,37 @@ final class MenuItemEngagementStore: @unchecked Sendable {
     }
 
     private let lock = NSLock()
-    private var fileURL = URL(fileURLWithPath: "Data/menu-item-engagement.json")
+    /// The pre-append-only file — a single JSON array rewritten on every
+    /// event. Migrated into `log` on first load, then renamed aside.
+    private var legacyFileURL = URL(fileURLWithPath: "Data/menu-item-engagement.json")
+    private var log = JSONLinesLog<MenuItemEngagementEvent>(fileURL: URL(fileURLWithPath: "Data/menu-item-engagement.jsonl"))
     private var events: [MenuItemEngagementEvent] = []
     private var loaded = false
+    private var lastCompaction = Date()
 
     func configure(dataDirectory: String) {
         lock.lock()
         defer { lock.unlock() }
-        fileURL = URL(fileURLWithPath: dataDirectory).appendingPathComponent("menu-item-engagement.json")
+        log.flush()
+        let directory = URL(fileURLWithPath: dataDirectory)
+        legacyFileURL = directory.appendingPathComponent("menu-item-engagement.json")
+        log = JSONLinesLog(fileURL: directory.appendingPathComponent("menu-item-engagement.jsonl"))
         loaded = false
+    }
+
+    /// Waits for queued appends to reach disk — for tests.
+    func flush() {
+        lock.lock()
+        defer { lock.unlock() }
+        log.flush()
+    }
+
+    /// Loads (and, the first time, migrates) the event file ahead of the
+    /// first request, so no guest's tap pays for parsing it.
+    func warmUp() {
+        lock.lock()
+        defer { lock.unlock() }
+        try? loadIfNeeded()
     }
 
     @discardableResult
@@ -76,8 +98,8 @@ final class MenuItemEngagementStore: @unchecked Sendable {
             deviceId: deviceId, customerId: customerId, timestamp: ISO8601DateFormatter().string(from: Date())
         )
         events.append(event)
-        pruneLocked()
-        try persist()
+        log.append([event])
+        compactIfDueLocked()
         return event
     }
 
@@ -92,14 +114,15 @@ final class MenuItemEngagementStore: @unchecked Sendable {
         guard !menuItemNames.isEmpty else { return 0 }
         try loadIfNeeded()
         let timestamp = ISO8601DateFormatter().string(from: Date())
-        for name in menuItemNames {
-            events.append(MenuItemEngagementEvent(
+        let batch = menuItemNames.map { name in
+            MenuItemEngagementEvent(
                 id: UUID().uuidString, menuItemName: name, clickType: clickType.rawValue,
                 deviceId: deviceId, customerId: customerId, timestamp: timestamp
-            ))
+            )
         }
-        pruneLocked()
-        try persist()
+        events.append(contentsOf: batch)
+        log.append(batch)
+        compactIfDueLocked()
         return menuItemNames.count
     }
 
@@ -165,6 +188,20 @@ final class MenuItemEngagementStore: @unchecked Sendable {
             .sorted { ($0.tapRate ?? -1) > ($1.tapRate ?? -1) }
     }
 
+    /// Drops events past retention from memory and rewrites the file without
+    /// them, at most once a day. Pruning on every event (as before) meant a
+    /// full rewrite on every event; the file can carry a day's worth of
+    /// expired lines in between at no cost. Must be called with `lock` held.
+    private func compactIfDueLocked() {
+        guard Date().timeIntervalSince(lastCompaction) > 24 * 60 * 60 else { return }
+        lastCompaction = Date()
+        let before = events.count
+        pruneLocked()
+        if events.count != before {
+            log.rewrite(events)
+        }
+    }
+
     /// Must be called with `lock` already held.
     private func pruneLocked() {
         let cutoff = Calendar(identifier: .gregorian).date(byAdding: .day, value: -Self.retentionDays, to: Date()) ?? .distantPast
@@ -178,20 +215,24 @@ final class MenuItemEngagementStore: @unchecked Sendable {
     private func loadIfNeeded() throws {
         guard !loaded else { return }
         let fileManager = FileManager.default
-        if fileManager.fileExists(atPath: fileURL.path) {
-            let data = try Data(contentsOf: fileURL)
-            events = try JSONDecoder().decode([MenuItemEngagementEvent].self, from: data)
+        if fileManager.fileExists(atPath: legacyFileURL.path) {
+            // One-time migration. Anything already appended to the new log
+            // (none in practice; the legacy file is migrated on first load)
+            // is kept after the legacy events.
+            let data = try Data(contentsOf: legacyFileURL)
+            let legacy = (try? JSONDecoder().decode([MenuItemEngagementEvent].self, from: data)) ?? []
+            events = legacy + log.readAll()
+            pruneLocked()
+            log.rewrite(events)
+            log.flush()
+            let backup = legacyFileURL.appendingPathExtension("migrated")
+            try? fileManager.removeItem(at: backup)
+            try fileManager.moveItem(at: legacyFileURL, to: backup)
         } else {
-            events = []
-            try persist()
+            events = log.readAll()
+            pruneLocked()
         }
+        lastCompaction = Date()
         loaded = true
-    }
-
-    private func persist() throws {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(events)
-        try data.write(to: fileURL, options: .atomic)
     }
 }

@@ -150,6 +150,17 @@ struct MenuItemEngagementRequest: Content {
     var deviceId: String?
 }
 
+struct QRVisitEventRequest: Content {
+    var visitId: String
+    var deviceId: String
+    var type: String
+    var table: String?
+    var source: String?
+    var page: String?
+    var itemName: String?
+    var query: String?
+}
+
 struct MenuItemImpressionsRequest: Content {
     var itemNames: [String]
     var deviceId: String?
@@ -206,7 +217,10 @@ func routes(_ app: Application) throws {
             destination: target == "/happy-hour" ? "happy-hour" : "menu"
         )
 
-        var queryParts: [String] = []
+        // `qr=1` tells the visit tracker in nav.js that this page load is a
+        // fresh scan (it strips the flag from the address bar right away, so
+        // a reload doesn't count as another scan).
+        var queryParts: [String] = ["qr=1"]
         if let table = scannedTable, !table.isEmpty,
            let encoded = table.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
             queryParts.append("table=\(encoded)")
@@ -217,9 +231,7 @@ func routes(_ app: Application) throws {
         if req.query[String.self, at: "prices"] == "1" {
             queryParts.append("prices=1")
         }
-        if !queryParts.isEmpty {
-            target += "?" + queryParts.joined(separator: "&")
-        }
+        target += "?" + queryParts.joined(separator: "&")
         return req.redirect(to: target, redirectType: .normal)
     }
 
@@ -342,7 +354,23 @@ func routes(_ app: Application) throws {
         guard let filename = req.parameters.get("filename"), !filename.contains("..") else {
             throw Abort(.badRequest)
         }
-        return try await req.fileio.asyncStreamFile(at: Uploads.directory + filename)
+        // `?w=480` / `?w=960` serve a resized copy (see UploadVariants);
+        // anything else, or a file that can't be resized, gets the original.
+        var path = Uploads.directory + filename
+        if let width = req.query[Int.self, at: "w"],
+           let variant = await UploadVariants.path(for: filename, width: width) {
+            path = variant
+        }
+        let response = try await req.fileio.asyncStreamFile(at: path)
+        // Uploads are write-once: every upload gets a fresh UUID filename and
+        // is optimized before its URL is handed out, and nothing rewrites one
+        // in place afterward. So browsers can keep them for good instead of
+        // re-checking with the server on every view (NoCacheMiddleware
+        // leaves an existing Cache-Control alone).
+        if response.status == .ok || response.status == .partialContent {
+            response.headers.replaceOrAdd(name: .cacheControl, value: "public, max-age=31536000, immutable")
+        }
+        return response
     }
 
     // A separate route from /api/upload rather than widening that one's size
@@ -1269,6 +1297,7 @@ func routes(_ app: Application) throws {
         ("create-account.html", "staff/create-account.html", true),
         ("manage-users.html", "staff/manage-users.html", true),
         ("analytics.html", "staff/analytics.html", true),
+        ("qr-visits.html", "staff/qr-visits.html", true),
         ("staff-rewards-admin.html", "staff/staff-rewards-admin.html", true),
         ("competitor-pricing-admin.html", "staff/competitor-pricing-admin.html", true),
         ("competitor-pricing-upload.html", "staff/competitor-pricing-upload.html", true),
@@ -1371,6 +1400,78 @@ func routes(_ app: Application) throws {
         return try MenuItemEngagementStore.shared.summary(days: days)
     }
 
+    // One step of a QR-originated visit — see QRVisitStore. Public and
+    // unauthenticated (guests aren't signed in), so every field is validated
+    // and length-capped, and the timestamp is the server's.
+    app.post("api", "analytics", "qr-visit-event") { req throws -> HTTPStatus in
+        let body = try req.content.decode(QRVisitEventRequest.self)
+        let isStart = body.type == QRVisitStore.EventType.start.rawValue
+        let userAgent = req.headers[.userAgent].first
+        let source = QRVisitStore.clean(body.source, maxLength: 20)
+        var page = QRVisitStore.clean(body.page, maxLength: 200)
+        if let current = page, !current.hasPrefix("/") { page = nil }
+        QRVisitStore.shared.record(QRVisitEvent(
+            visitId: body.visitId,
+            deviceId: body.deviceId,
+            customerId: try? currentCustomer(req)?.id,
+            table: QRVisitStore.clean(body.table, maxLength: 20),
+            source: isStart ? source.flatMap { QRVisitStore.sources.contains($0) ? $0 : nil } : nil,
+            device: isStart
+                ? "\(AnalyticsStore.operatingSystem(from: userAgent)) · \(AnalyticsStore.browserName(from: userAgent))"
+                : nil,
+            type: body.type,
+            page: page,
+            itemName: QRVisitStore.clean(body.itemName, maxLength: 200),
+            query: QRVisitStore.clean(body.query, maxLength: 80)?.lowercased(),
+            at: ISO8601DateFormatter().string(from: Date())
+        ))
+        return .ok
+    }
+
+    // The staff QR visit report (qr-visits.html): every QR visit that
+    // started on `date` (YYYY-MM-DD, restaurant time; default today),
+    // optionally only one table's.
+    app.get("api", "analytics", "qr-visits") { req throws -> [QRVisitSummary] in
+        try requireAdmin(req)
+        let (from, to) = try qrVisitDayRange(req)
+        let table = QRVisitStore.clean(req.query[String.self, at: "table"], maxLength: 20)
+        return QRVisitStore.shared.visits(from: from, to: to, table: table)
+    }
+
+    // Same window as above, one row per event, for lining visits up against
+    // a POS export in a spreadsheet.
+    app.get("api", "analytics", "qr-visits.csv") { req throws -> Response in
+        try requireAdmin(req)
+        let (from, to) = try qrVisitDayRange(req)
+        let table = QRVisitStore.clean(req.query[String.self, at: "table"], maxLength: 20)
+        let local = DateFormatter()
+        local.timeZone = TimeZone(identifier: "America/Los_Angeles")
+        local.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        let iso = ISO8601DateFormatter()
+        func field(_ value: String?) -> String {
+            let text = value ?? ""
+            // A leading =, +, -, or @ would run as a formula in Excel/Sheets.
+            let safe = text.first.map { "=+-@".contains($0) } == true ? "'" + text : text
+            return "\"" + safe.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+        }
+        var tableByVisit: [String: String] = [:]
+        var lines = ["time,table,visit,device_id,customer_id,event,page,item,search"]
+        for event in QRVisitStore.shared.events(from: from, to: to, table: table) {
+            if let eventTable = event.table { tableByVisit[event.visitId] = eventTable }
+            let time = iso.date(from: event.at).map { local.string(from: $0) } ?? event.at
+            lines.append([
+                field(time), field(event.table ?? tableByVisit[event.visitId]), field(event.visitId),
+                field(event.deviceId), field(event.customerId), field(event.type), field(event.page),
+                field(event.itemName), field(event.query),
+            ].joined(separator: ","))
+        }
+        let date = req.query[String.self, at: "date"] ?? "today"
+        var headers = HTTPHeaders()
+        headers.add(name: .contentType, value: "text/csv; charset=utf-8")
+        headers.add(name: .contentDisposition, value: "attachment; filename=\"qr-visits-\(date).csv\"")
+        return Response(status: .ok, headers: headers, body: .init(string: lines.joined(separator: "\n") + "\n"))
+    }
+
     // A batch of item cards that scrolled into view — the client queues
     // these and flushes periodically rather than firing one request per
     // card, since a full menu is 200+ items. Capped defensively; a real
@@ -1434,4 +1535,26 @@ func routes(_ app: Application) throws {
             req.redirect(to: target, redirectType: .permanent)
         }
     }
+}
+
+/// `?date=YYYY-MM-DD` as a midnight-to-midnight window in restaurant time
+/// (America/Los_Angeles), defaulting to today.
+func qrVisitDayRange(_ req: Request) throws -> (Date, Date) {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+    let start: Date
+    if let raw = req.query[String.self, at: "date"] {
+        let parser = DateFormatter()
+        parser.calendar = calendar
+        parser.timeZone = calendar.timeZone
+        parser.dateFormat = "yyyy-MM-dd"
+        guard let parsed = parser.date(from: raw) else {
+            throw Abort(.badRequest, reason: "date must be YYYY-MM-DD.")
+        }
+        start = calendar.startOfDay(for: parsed)
+    } else {
+        start = calendar.startOfDay(for: Date())
+    }
+    let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start.addingTimeInterval(86_400)
+    return (start, end)
 }

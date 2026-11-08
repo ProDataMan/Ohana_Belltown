@@ -2325,7 +2325,7 @@ select {
   border-radius: 14px;
   overflow: hidden;
   margin-bottom: 1rem;
-  background: var(--paper);
+  background: var(--paper) center / cover no-repeat;
 }
 
 .item-modal-gallery-img {
@@ -2803,4 +2803,67 @@ fieldset legend {
 
 .plain-list li {
   padding: 0.2rem 0;
+}
+
+/* QR visit report (staff/qr-visits.html) */
+.qr-visits-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.qr-visits-filters label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.qr-visit-card {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  padding: 0.8rem 1rem;
+  margin-bottom: 0.8rem;
+  background: var(--paper);
+}
+
+.qr-visit-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.8rem;
+  align-items: baseline;
+  margin-bottom: 0.5rem;
+}
+
+.qr-visit-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 0.8rem;
+  margin: 0 0 0.5rem;
+}
+
+.qr-visit-facts dt {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.qr-visit-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.qr-visit-timeline {
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
+  font-size: 0.88rem;
+}
+
+@media (max-width: 560px) {
+  .qr-visit-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .qr-visit-facts dd {
+    margin-bottom: 0.3rem;
+  }
 }

@@ -44,10 +44,23 @@ func configure(_ app: Application) throws {
     GiftCardOrdersStore.shared.configure(dataDirectory: dataDirectory)
     EntertainmentStore.shared.configure(dataDirectory: dataDirectory)
     MenuItemEngagementStore.shared.configure(dataDirectory: dataDirectory)
+    QRVisitStore.shared.configure(dataDirectory: dataDirectory)
 
     app.routes.defaultMaxBodySize = "10mb"
 
     if app.environment != .testing {
+        // Parse the event logs (and migrate the legacy engagement file) and
+        // pre-resize menu photos off the event loop at startup, so the first
+        // guests after a deploy don't pay for either.
+        DispatchQueue.global(qos: .utility).async {
+            MenuItemEngagementStore.shared.warmUp()
+            QRVisitStore.shared.warmUp()
+        }
+        Task.detached(priority: .background) {
+            if let menu = try? MenuStore.shared.get() {
+                await UploadVariants.prewarm(menu: menu)
+            }
+        }
         FeedbackDigest.schedule(app)
         Task { await LightNotifier.shared.configureFromEnvironment() }
         LightNotifier.scheduleReadyPoll(app)

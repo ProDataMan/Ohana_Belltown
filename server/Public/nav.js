@@ -100,6 +100,7 @@ function insertStaffNavDropdown() {
       <a href="/events-admin.html">Events</a>
       <a href="/table-card.html">Table Cards</a>
       <a href="/analytics.html">Analytics</a>
+      <a href="/qr-visits.html">QR Visits</a>
       <a href="/staff-rewards-admin.html">Staff Rewards</a>
       <a href="/competitor-pricing-admin.html">Competitor Pricing</a>
       <a href="/swag-admin.html">Swag</a>
@@ -708,4 +709,101 @@ function startStaffCompetitorPhotoAlerts() {
     if (document.visibilityState === 'hidden') flush();
   });
   window.addEventListener('pagehide', flush);
+})();
+
+// QR visit tracker — what someone who scanned a QR code looked at, page by
+// page and item by item, attributed to the table on the card. A visit starts
+// on a fresh scan (/scan adds `qr=1` to the landing URL, and a `table` there
+// also counts for older printed links) and lasts for this tab until two
+// hours pass with no activity, so a phone left on the menu tab overnight
+// doesn't attribute tomorrow's browsing to tonight's table. Uses the same
+// per-browser ohana_device_id menu-section.js uses for order history.
+// Disclosed on /privacy; see QRVisitStore server-side.
+(() => {
+  const VISIT_KEY = 'ohana_qr_visit';
+  const IDLE_LIMIT_MS = 2 * 60 * 60 * 1000;
+
+  function randomId() {
+    return window.crypto && window.crypto.randomUUID
+      ? window.crypto.randomUUID()
+      : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  function deviceId() {
+    try {
+      let id = localStorage.getItem('ohana_device_id');
+      if (!id) {
+        id = randomId();
+        localStorage.setItem('ohana_device_id', id);
+      }
+      return id;
+    } catch {
+      return null;
+    }
+  }
+
+  function readVisit() {
+    try {
+      const visit = JSON.parse(sessionStorage.getItem(VISIT_KEY) || 'null');
+      if (visit && Date.now() - visit.lastAt < IDLE_LIMIT_MS) return visit;
+    } catch {}
+    return null;
+  }
+
+  function saveVisit(visit) {
+    try {
+      sessionStorage.setItem(VISIT_KEY, JSON.stringify(visit));
+    } catch {}
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const freshScan = params.get('qr') === '1' || Boolean(params.get('table'));
+  let visit = readVisit();
+  if (freshScan) {
+    const table = params.get('table') || null;
+    let source = 'front-door';
+    if (table) source = 'table';
+    else if (window.location.pathname.startsWith('/happy-hour')) source = 'happy-hour';
+    // A re-scan of the same table within an active visit (or an old printed
+    // ?table= link reloaded) continues it rather than starting another.
+    if (!visit || params.get('qr') === '1' || visit.table !== table) {
+      visit = { id: randomId(), table, source, lastAt: Date.now(), started: false };
+    }
+  }
+  if (params.get('qr') === '1') {
+    params.delete('qr');
+    const query = params.toString();
+    try {
+      history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : '') + window.location.hash);
+    } catch {}
+  }
+  const device = deviceId();
+  if (!visit || !device) {
+    window.ohanaTrackVisit = () => {};
+    return;
+  }
+
+  function send(type, fields) {
+    visit.lastAt = Date.now();
+    saveVisit(visit);
+    const payload = JSON.stringify({ visitId: visit.id, deviceId: device, table: visit.table, type, ...fields });
+    if (navigator.sendBeacon && navigator.sendBeacon('/api/analytics/qr-visit-event', new Blob([payload], { type: 'application/json' }))) {
+      return;
+    }
+    fetch('/api/analytics/qr-visit-event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+      keepalive: true,
+    }).catch(() => {});
+  }
+
+  if (!visit.started) {
+    visit.started = true;
+    send('start', { source: visit.source, page: window.location.pathname });
+  }
+  send('page', { page: window.location.pathname });
+
+  /// For menu-section.js: 'details', 'photo', 'search', 'add-to-order'.
+  window.ohanaTrackVisit = (type, fields = {}) => send(type, { page: window.location.pathname, ...fields });
 })();
