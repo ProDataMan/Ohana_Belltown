@@ -300,6 +300,23 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    // Facebook's link-preview crawler asks for bytes 0-524287 of every page;
+    // a file smaller than that must still come back (in full), not 400.
+    func testOverLongByteRangeGetsTheWholeFileInsteadOf400() throws {
+        let crawler: HTTPHeaders = ["Range": "bytes=0-524287", "User-Agent": "facebookexternalhit/1.1"]
+        for path in ["robots.txt", "menu", "about"] {
+            try app.test(.GET, path, headers: crawler) { res in
+                XCTAssertEqual(res.status, .ok, path)
+                XCTAssertFalse(res.body.string.isEmpty, path)
+            }
+        }
+        // An in-bounds range is still honored.
+        try app.test(.GET, "robots.txt", headers: ["Range": "bytes=0-9"]) { res in
+            XCTAssertEqual(res.status, .partialContent)
+            XCTAssertEqual(res.body.readableBytes, 10)
+        }
+    }
+
     func testHealthz() throws {
         try app.test(.GET, "healthz") { res in
             XCTAssertEqual(res.status, .ok)

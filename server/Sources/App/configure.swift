@@ -6,6 +6,9 @@ func configure(_ app: Application) throws {
 
     let dataDirectory = Environment.get("DATA_DIR") ?? app.directory.workingDirectory + "Data"
 
+    // First, so it can re-answer an over-long byte range from any file or
+    // page as a full response. See LenientRangeMiddleware.
+    app.middleware.use(LenientRangeMiddleware())
     app.middleware.use(NoCacheMiddleware())
     app.middleware.use(AnalyticsMiddleware())
     // File-backed rather than `.memory`, so logins survive a deploy/restart —
