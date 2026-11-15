@@ -63,6 +63,9 @@ final class MenuStore: @unchecked Sendable {
         try loadIfNeeded()
         var updated = newMenu
         updated.lastUpdated = String(ISO8601DateFormatter().string(from: Date()).prefix(10))
+        // Editors don't send this flag; keep it so a save never re-seeds
+        // pitches staff have since changed or removed.
+        updated.scanPitchesSeeded = updated.scanPitchesSeeded || menu.scanPitchesSeeded
         menu = updated
         try persist()
         return menu
@@ -225,6 +228,7 @@ final class MenuStore: @unchecked Sendable {
         if fileManager.fileExists(atPath: fileURL.path) {
             let data = try Data(contentsOf: fileURL)
             menu = try JSONDecoder().decode(Menu.self, from: data)
+            Self.seedScanPitches(&menu)
             // Re-persist immediately so any fields defaulted during decode
             // (e.g. a stable id generated for a pre-existing item) become
             // durable rather than regenerating on every restart.
@@ -237,6 +241,34 @@ final class MenuStore: @unchecked Sendable {
             try persist()
         }
         loaded = true
+    }
+
+    /// The dishes and drinks to push in the QR scan popup (chosen by the
+    /// owner as the most profitable), keyed by menu section and exact item
+    /// name. Applied once; after that, edit them per item in the item editor.
+    static let initialScanPitches: [(section: String, name: String, pitch: String)] = [
+        ("drinks", "Blue Hawaiian", "Aloha in a glass! Rum, pineapple and blue curaçao, as blue as the water off Waikīkī. It's the one everyone snaps a photo of before the first sip, and that sweet tropical finish puts you right on island time."),
+        ("drinks", "Lychee Martini", "Shaka, this one's smooth! Sweet, floral lychee shaken ice-cold with vodka, light as a trade-wind breeze. Guests who try one usually order round two."),
+        ("happy_hour", "Blue Hawaiian", "Happy Hour aloha in a glass! Rum, pineapple and blue curaçao, as blue as the water off Waikīkī, at our Happy Hour price. Everyone snaps a photo before the first sip."),
+        ("happy_hour", "Lychee Martini", "Shaka, this one's smooth! Sweet, floral lychee shaken ice-cold with vodka, light as a trade-wind breeze, and even better at Happy Hour. One usually turns into two."),
+        ("menu", "Chicken Katsu", "Broke da mouth crunchy! Tender chicken in a golden panko crust with our homemade katsu sauce. It's the plate-lunch classic our regulars order again and again, because it's crispy every single time."),
+        ("menu", "Chicken Teriyaki", "Ono to the last bite! Chicken thighs marinated in our homemade teriyaki and caramelized on the grill: sweet, savory and juicy, just like a Honolulu plate lunch. A favorite for good reason."),
+        ("menu", "Kalua Pork", "A lūʻau on a plate! Pork slow-roasted for hours until it's smoky, tender and falls apart, with cabbage and rice. It's the taste of a backyard Hawaiian party, and the dish people come back for."),
+    ]
+
+    /// Applies `initialScanPitches` the first time a menu without
+    /// `scanPitchesSeeded` loads; an item that already has a pitch keeps it.
+    static func seedScanPitches(_ menu: inout Menu) {
+        guard !menu.scanPitchesSeeded else { return }
+        for seed in initialScanPitches {
+            for c in menu.categories.indices where menu.categories[c].section == seed.section {
+                for i in menu.categories[c].items.indices
+                where menu.categories[c].items[i].name == seed.name && menu.categories[c].items[i].scanPitch == nil {
+                    menu.categories[c].items[i].scanPitch = seed.pitch
+                }
+            }
+        }
+        menu.scanPitchesSeeded = true
     }
 
     private func persist() throws {

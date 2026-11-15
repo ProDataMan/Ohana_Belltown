@@ -57,9 +57,15 @@ struct MenuItem: Codable, Content {
     /// False for the vast majority of items, where every modifier really is
     /// optional. Meaningless without at least one modifier defined.
     var requiresModifierSelection: Bool
+    /// Set on the dishes and drinks to push when someone scans a QR code:
+    /// the line under "Try our <name>" in the scan popup (see
+    /// showScanFeaturePopup in menu-section.js). Nil for everything else.
+    /// Separate from `featured`, which means "today's special" on /specials.
+    var scanPitch: String?
 
     enum CodingKeys: String, CodingKey {
         case id, name, description, price, images, image, tags, featured, available, happyHour, modifiers, choiceGroups, requiresModifierSelection
+        case scanPitch
     }
 
     init(
@@ -74,7 +80,8 @@ struct MenuItem: Codable, Content {
         happyHour: Bool = false,
         modifiers: [MenuItemModifier] = [],
         choiceGroups: [MenuItemChoiceGroup] = [],
-        requiresModifierSelection: Bool = false
+        requiresModifierSelection: Bool = false,
+        scanPitch: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -88,6 +95,7 @@ struct MenuItem: Codable, Content {
         self.modifiers = modifiers
         self.choiceGroups = choiceGroups
         self.requiresModifierSelection = requiresModifierSelection
+        self.scanPitch = scanPitch
     }
 
     init(from decoder: Decoder) throws {
@@ -113,6 +121,9 @@ struct MenuItem: Codable, Content {
         modifiers = try container.decodeIfPresent([MenuItemModifier].self, forKey: .modifiers) ?? []
         choiceGroups = try container.decodeIfPresent([MenuItemChoiceGroup].self, forKey: .choiceGroups) ?? []
         requiresModifierSelection = try container.decodeIfPresent(Bool.self, forKey: .requiresModifierSelection) ?? false
+        // A blank pitch from an editor means "not featured on scan".
+        scanPitch = try container.decodeIfPresent(String.self, forKey: .scanPitch)
+            .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0.trimmingCharacters(in: .whitespacesAndNewlines) }
     }
 
     func encode(to encoder: Encoder) throws {
@@ -129,6 +140,7 @@ struct MenuItem: Codable, Content {
         try container.encode(modifiers, forKey: .modifiers)
         try container.encode(choiceGroups, forKey: .choiceGroups)
         try container.encode(requiresModifierSelection, forKey: .requiresModifierSelection)
+        try container.encodeIfPresent(scanPitch, forKey: .scanPitch)
     }
 }
 
@@ -162,9 +174,13 @@ struct Menu: Codable, Content {
     var lastUpdated: String
     var categories: [MenuCategory]
     var additionsCatalog: [AdditionCatalogItem]
+    /// Whether the starting scan-popup pitches (MenuStore.initialScanPitches)
+    /// have been applied, so they're added once and staff edits or removals
+    /// in the editors stick after that.
+    var scanPitchesSeeded: Bool = false
 
     enum CodingKeys: String, CodingKey {
-        case restaurant, lastUpdated, categories, additionsCatalog
+        case restaurant, lastUpdated, categories, additionsCatalog, scanPitchesSeeded
     }
 
     init(restaurant: String, lastUpdated: String, categories: [MenuCategory], additionsCatalog: [AdditionCatalogItem] = []) {
@@ -180,5 +196,6 @@ struct Menu: Codable, Content {
         lastUpdated = try container.decode(String.self, forKey: .lastUpdated)
         categories = try container.decode([MenuCategory].self, forKey: .categories)
         additionsCatalog = try container.decodeIfPresent([AdditionCatalogItem].self, forKey: .additionsCatalog) ?? []
+        scanPitchesSeeded = try container.decodeIfPresent(Bool.self, forKey: .scanPitchesSeeded) ?? false
     }
 }

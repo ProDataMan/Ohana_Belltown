@@ -236,6 +236,24 @@ function renderPos() {
     : '';
 }
 
+function renderScanFeatures() {
+  const rows = insights.scanFeatures.map((f) => {
+    const shownRate = f.visitsWithTicketWhenShown ? f.orderedWhenShown / f.visitsWithTicketWhenShown : null;
+    const baseRate = f.visitsWithTicketWhenNotShown ? f.orderedWhenNotShown / f.visitsWithTicketWhenNotShown : null;
+    return [
+      escapeHtmlInsights(f.itemName),
+      f.shown,
+      `${f.tapped} (${pct(f.shown ? f.tapped / f.shown : null)})`,
+      f.visitsWithTicketWhenShown ? `${f.orderedWhenShown} of ${f.visitsWithTicketWhenShown} (${pct(shownRate)})` : '—',
+      f.visitsWithTicketWhenNotShown ? `${f.orderedWhenNotShown} of ${f.visitsWithTicketWhenNotShown} (${pct(baseRate)})` : '—',
+    ];
+  });
+  document.getElementById('feature-table').innerHTML = table(
+    ['Featured item', 'Shown', 'Tapped', 'Ordered when featured', 'Ordered otherwise'],
+    rows
+  );
+}
+
 function renderItems() {
   const hasPos = Boolean(insights.pos);
   const rows = insights.items.map((i) => {
@@ -317,6 +335,7 @@ async function loadInsights() {
     renderTimes();
     renderHappyHour();
     renderPos();
+    renderScanFeatures();
     renderItems();
     renderSearches();
     renderPaths();

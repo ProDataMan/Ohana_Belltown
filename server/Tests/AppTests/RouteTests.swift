@@ -186,6 +186,38 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testItemEditorSetsKeepsAndClearsTheScanPitch() throws {
+        let (admin, _) = try makeAdminAndSecondAccount(username: "pitch", password: "password123", role: "employee")
+        try MenuStore.shared.save(Menu(restaurant: "Ohana", lastUpdated: "now", categories: [
+            MenuCategory(section: "menu", name: "Entrees", note: nil, items: [MenuItem(id: "katsu", name: "Chicken Katsu")]),
+        ]))
+        let headers: HTTPHeaders = ["Cookie": admin, "Content-Type": "application/json"]
+        func patch(_ extra: String) throws -> MenuItem {
+            var item: MenuItem?
+            let body = #"{"name":"Chicken Katsu","images":[],"tags":[],"featured":false,"available":true,"happyHour":false"# + extra + "}"
+            try app.test(.PATCH, "api/menu/items/katsu", headers: headers, body: ByteBuffer(string: body)) { res in
+                XCTAssertEqual(res.status, .ok)
+                item = try res.content.decode(MenuItem.self)
+            }
+            return try XCTUnwrap(item)
+        }
+        XCTAssertEqual(try patch(#","scanPitch":"Broke da mouth!""#).scanPitch, "Broke da mouth!")
+        XCTAssertEqual(try patch("").scanPitch, "Broke da mouth!", "an editor that doesn't send it leaves it alone")
+        XCTAssertNil(try patch(#","scanPitch":"""#).scanPitch)
+
+        // Popup events are accepted on QR visits.
+        let json: HTTPHeaders = ["Content-Type": "application/json"]
+        for type in ["feature-shown", "feature-tap"] {
+            let body = #"{"visitId":"visit-pitch-01","deviceId":"device-pitch-01","table":"30","type":"\#(type)","page":"/menu","itemName":"Chicken Katsu"}"#
+            try app.test(.POST, "api/analytics/qr-visit-event", headers: json, body: ByteBuffer(string: body)) { XCTAssertEqual($0.status, .ok) }
+        }
+        try app.test(.GET, "api/analytics/qr-visits", headers: ["Cookie": admin]) { res in
+            let visit = try res.content.decode([QRVisitSummary].self).first
+            XCTAssertEqual(visit?.featureShown, ["Chicken Katsu"])
+            XCTAssertEqual(visit?.featureTapped, ["Chicken Katsu"])
+        }
+    }
+
     func testSessionEndpointAnswersForGuestsStaffAndCustomers() throws {
         try app.test(.GET, "api/session") { res in
             XCTAssertEqual(res.status, .ok)

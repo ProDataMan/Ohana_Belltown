@@ -29,6 +29,22 @@ struct QRInsights: Content {
     /// From waitlist parties staff marked "Seated" at a table. Nil when none
     /// were in this range.
     var seating: QRInsightsSeating? = nil
+    /// The "Try our ___" scan popup, per featured item.
+    var scanFeatures: [QRInsightsFeature] = []
+}
+
+/// How the scan popup did for one featured item. The "ordered" counts need
+/// POS tickets (QRInsights.pos); `ordersWhenNotShown` is the same table's
+/// order rate on QR visits where the popup featured something else or
+/// nothing, as a baseline for whether featuring it moves orders.
+struct QRInsightsFeature: Content {
+    var itemName: String
+    var shown: Int
+    var tapped: Int
+    var visitsWithTicketWhenShown: Int
+    var orderedWhenShown: Int
+    var visitsWithTicketWhenNotShown: Int
+    var orderedWhenNotShown: Int
 }
 
 struct QRInsightsSeating: Content {
@@ -413,7 +429,32 @@ enum QRInsightsBuilder {
         var overallPhones: [String: Int] = [:]
         for visit in visits { overallPhones[phone(of: visit), default: 0] += 1 }
 
-        return QRInsights(
+        // Scan popup: per featured item, shown / tapped, and — for visits
+        // matched to a POS ticket — how often the table ordered it when it was
+        // featured vs. when it wasn't.
+        let featuredNames = Set(visits.flatMap(\.featureShown))
+        let scanFeatures = featuredNames.sorted().map { name -> QRInsightsFeature in
+            let shownVisits = visits.filter { $0.featureShown.contains(name) }
+            let withTicket = { (list: [QRVisitSummary]) in list.filter { !(ordersByVisit[$0.visitId] ?? []).isEmpty } }
+            let ordered = { (list: [QRVisitSummary]) in
+                list.filter { visit in
+                    (ordersByVisit[visit.visitId] ?? []).contains { order in order.items.contains { PosMatching.sameItem($0.name, name) } }
+                }.count
+            }
+            let shownWithTicket = withTicket(shownVisits)
+            let notShownWithTicket = withTicket(visits.filter { !$0.featureShown.contains(name) })
+            return QRInsightsFeature(
+                itemName: name,
+                shown: shownVisits.count,
+                tapped: shownVisits.filter { $0.featureTapped.contains(name) }.count,
+                visitsWithTicketWhenShown: shownWithTicket.count,
+                orderedWhenShown: ordered(shownWithTicket),
+                visitsWithTicketWhenNotShown: notShownWithTicket.count,
+                orderedWhenNotShown: ordered(notShownWithTicket)
+            )
+        }
+
+        var result = QRInsights(
             from: iso.string(from: from), to: iso.string(from: to), totalVisits: visits.count,
             tables: tables, sections: sections,
             byHour: buckets(hourCounts), byWeekday: buckets(weekdayCounts),
@@ -421,6 +462,8 @@ enum QRInsightsBuilder {
             returning: returning, parties: parties, deviceMix: ranked(overallPhones),
             pos: orders.isEmpty ? nil : posComparison(visits: visits, orders: orders, ordersByVisit: ordersByVisit, menu: menu)
         )
+        result.scanFeatures = scanFeatures
+        return result
     }
 
     private static func posComparison(

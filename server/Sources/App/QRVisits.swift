@@ -69,6 +69,9 @@ struct QRVisitSummary: Content {
     /// Searches that matched no menu items.
     var emptySearches: [String]
     var addedToOrder: [String]
+    /// Items the scan popup featured on this visit, and the ones tapped.
+    var featureShown: [String] = []
+    var featureTapped: [String] = []
     /// The page the scan landed on.
     var landingPage: String?
     /// Seconds from the scan to the first item detail open or photo tap;
@@ -98,6 +101,10 @@ final class QRVisitStore: @unchecked Sendable {
         case photo
         case search
         case addToOrder = "add-to-order"
+        /// The "Try our ___" popup was shown for this item (once per menu
+        /// page per visit), and tapped through to the item.
+        case featureShown = "feature-shown"
+        case featureTap = "feature-tap"
     }
 
     static let sources: Set<String> = ["table", "happy-hour-card", "front-door", "happy-hour"]
@@ -217,6 +224,8 @@ final class QRVisitStore: @unchecked Sendable {
                 searches: sorted.filter { $0.type == EventType.search.rawValue }.compactMap(\.query),
                 emptySearches: sorted.filter { $0.type == EventType.search.rawValue && $0.resultCount == 0 }.compactMap(\.query),
                 addedToOrder: sorted.filter { $0.type == EventType.addToOrder.rawValue }.compactMap(\.itemName),
+                featureShown: sorted.filter { $0.type == EventType.featureShown.rawValue }.compactMap(\.itemName),
+                featureTapped: sorted.filter { $0.type == EventType.featureTap.rawValue }.compactMap(\.itemName),
                 landingPage: start?.page ?? pageEvents.first?.page,
                 firstTapSeconds: sorted
                     .first { $0.type == EventType.details.rawValue || $0.type == EventType.photo.rawValue }

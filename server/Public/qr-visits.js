@@ -117,6 +117,8 @@ const TIMELINE_LABELS = {
   photo: 'Tapped photo',
   search: 'Searched',
   'add-to-order': 'Added to order',
+  'feature-shown': 'Saw "Try our" popup',
+  'feature-tap': 'Tapped "Try our" popup',
 };
 
 function timelineText(entry) {
@@ -144,6 +146,7 @@ function renderVisitList(visits) {
         <dt>Details opened</dt><dd>${v.detailViews.length ? itemList(v.detailViews) : '<span class="hint">none</span>'}</dd>
         ${v.photoTaps.length ? `<dt>Photos tapped</dt><dd>${itemList(v.photoTaps)}</dd>` : ''}
         ${v.searches.length ? `<dt>Searched</dt><dd>${v.searches.map((q) => `"${escapeHtmlVisits(q)}"${v.emptySearches.includes(q) ? ' <span class="hint">(no results)</span>' : ''}`).join(', ')}</dd>` : ''}
+        ${v.featureShown.length ? `<dt>"Try our" popup</dt><dd>${v.featureShown.map((name) => `${escapeHtmlVisits(name)}${v.featureTapped.includes(name) ? ' <span class="hint">(tapped)</span>' : ''}`).join(', ')}</dd>` : ''}
         ${v.addedToOrder.length ? `<dt>Added to order</dt><dd>${v.addedToOrder.map(escapeHtmlVisits).join(', ')}</dd>` : ''}
         ${v.posOrders.length ? `<dt>Ordered (POS)</dt><dd>${v.posOrders.map((o) => `${itemList(o.items)} <span class="hint">(ticket ${escapeHtmlVisits(o.ticketNumber || '?')}, ${formatTime(o.openedAt)}${o.netSales != null ? `, $${o.netSales.toFixed(2)}` : ''})</span>`).join('<br>')}</dd>` : ''}
         <dt>Pages</dt><dd>${v.pages.map(escapeHtmlVisits).join(' &rarr; ') || '<span class="hint">none</span>'}</dd>

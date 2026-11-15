@@ -222,6 +222,9 @@ struct MenuItemUpdateRequest: Content {
     var modifiers: [MenuItemModifier]?
     var choiceGroups: [MenuItemChoiceGroup]?
     var requiresModifierSelection: Bool?
+    /// Nil leaves the item's scan-popup pitch as it is (older editor
+    /// pages don't send it); an empty string clears it.
+    var scanPitch: String?
 }
 
 func routes(_ app: Application) throws {
@@ -333,6 +336,9 @@ func routes(_ app: Application) throws {
             item.happyHour = body.happyHour
             item.choiceGroups = body.choiceGroups ?? []
             item.requiresModifierSelection = body.requiresModifierSelection ?? false
+            if let pitch = body.scanPitch?.trimmingCharacters(in: .whitespacesAndNewlines) {
+                item.scanPitch = pitch.isEmpty ? nil : String(pitch.prefix(300))
+            }
         }
         StaffRewardsStore.shared.awardForMenuEdit(staffId: staff.id, before: before, after: updated)
         return updated

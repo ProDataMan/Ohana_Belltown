@@ -1299,6 +1299,89 @@ async function checkOrderSystemPhase() {
   }
 }
 
+/// "Try our ___" popup for guests who arrived by QR code: once per QR visit
+/// per menu page, it features one of this page's items that has a scan
+/// pitch (set per item in the item editor; chosen by the owner as the most
+/// profitable dishes), picked at random, with the others offered as "Also
+/// try" buttons. Shown/tapped are tracked on the QR visit, so QR Insights
+/// can show whether the popup turns into orders.
+function showScanFeaturePopup() {
+  let visit = null;
+  try {
+    visit = JSON.parse(sessionStorage.getItem('ohana_qr_visit') || 'null');
+  } catch {}
+  if (!visit || !visit.id) return;
+  const shownKey = `ohana_scan_feature_shown:${visit.id}:${window.MENU_SECTION}`;
+  try {
+    if (sessionStorage.getItem(shownKey)) return;
+  } catch {
+    return;
+  }
+  const featured = itemsByIndex
+    .map((entry, index) => ({ ...entry, index }))
+    .filter(({ item }) => item.scanPitch && item.available !== false);
+  if (!featured.length) return;
+  try {
+    sessionStorage.setItem(shownKey, '1');
+  } catch {}
+
+  const pick = featured[Math.floor(Math.random() * featured.length)];
+  const others = featured.filter((f) => f !== pick);
+  const { item } = pick;
+  const showPrice = item.price != null && (Boolean(getTableId()) || getPriceViewFlag() || customerLoggedIn);
+  const photo = (item.images || [])[0];
+
+  const overlay = document.createElement('div');
+  overlay.className = 'scan-feature-overlay';
+  overlay.innerHTML = `
+    <div class="scan-feature" role="dialog" aria-modal="true" aria-labelledby="scan-feature-title">
+      <button type="button" class="scan-feature-close" aria-label="Close">&times;</button>
+      ${photo ? `<img class="scan-feature-photo" src="${escapeHtml(sizedPhotoUrl(photo, 960))}" alt="${escapeHtml(item.name)}" fetchpriority="high" />` : ''}
+      <p class="scan-feature-eyebrow">Aloha! Before you order&hellip;</p>
+      <h2 id="scan-feature-title">Try our ${escapeHtml(item.name)}</h2>
+      <p class="scan-feature-pitch">${escapeHtml(item.scanPitch)}</p>
+      ${showPrice ? `<p class="scan-feature-price">$${Number(item.price).toFixed(2)}</p>` : ''}
+      <div class="scan-feature-actions">
+        <button type="button" class="cta-button scan-feature-see">See ${escapeHtml(item.name)}</button>
+        <button type="button" class="cta-button secondary scan-feature-dismiss">Maybe later</button>
+      </div>
+      ${
+        others.length
+          ? `<div class="scan-feature-others"><span>Also try:</span> ${others
+              .map((o) => `<button type="button" class="scan-feature-other" data-index="${o.index}">${escapeHtml(o.item.name)}</button>`)
+              .join(' ')}</div>`
+          : ''
+      }
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  trackVisit('feature-shown', { itemName: item.name });
+
+  const close = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onKey);
+  };
+  const onKey = (event) => {
+    if (event.key === 'Escape') close();
+  };
+  const open = (entry) => {
+    trackVisit('feature-tap', { itemName: entry.item.name });
+    close();
+    openItemModal(entry.index);
+  };
+  document.addEventListener('keydown', onKey);
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) close();
+  });
+  overlay.querySelector('.scan-feature-close').addEventListener('click', close);
+  overlay.querySelector('.scan-feature-dismiss').addEventListener('click', close);
+  overlay.querySelector('.scan-feature-see').addEventListener('click', () => open(pick));
+  overlay.querySelectorAll('.scan-feature-other').forEach((btn) => {
+    btn.addEventListener('click', () => open(featured.find((f) => f.index === Number(btn.dataset.index))));
+  });
+  overlay.querySelector('.scan-feature-see').focus();
+}
+
 async function loadMenu() {
   try {
     const [response] = await Promise.all([fetch('/api/menu'), checkCustomerLoggedIn(), checkOrderSystemPhase()]);
@@ -1309,6 +1392,7 @@ async function loadMenu() {
     const data = await response.json();
     renderMenu(data);
     revealStaffOnlyElementsIfLoggedIn();
+    showScanFeaturePopup();
   } catch (error) {
     menuContainer.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;
   }

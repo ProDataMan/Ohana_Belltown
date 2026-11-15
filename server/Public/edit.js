@@ -93,6 +93,10 @@ function itemRow(item) {
   // Modifiers (add-ons like "Yosh Size") aren't editable from this bulk
   // editor — stashed here just so a bulk save doesn't wipe them out.
   row.dataset.modifiers = JSON.stringify(item.modifiers || []);
+  // Same for every other field this editor doesn't show (choice groups,
+  // "requires an add-on", the scan-popup pitch, ...): a save replaces the
+  // whole menu, so anything left out of the saved item is erased.
+  row.dataset.original = JSON.stringify(item);
   const priceValue = item.price != null ? Number(item.price).toFixed(2) : '';
   row.innerHTML = `
     <div class="edit-item-photo">
@@ -400,7 +404,13 @@ function collectMenuData() {
       } catch {
         modifiers = [];
       }
-      items.push({ id: row.dataset.itemId, name: itemName, description, price, images, tags, featured, available, happyHour, modifiers });
+      let original = {};
+      try {
+        original = JSON.parse(row.dataset.original || '{}');
+      } catch {
+        original = {};
+      }
+      items.push({ ...original, id: row.dataset.itemId, name: itemName, description, price, images, tags, featured, available, happyHour, modifiers });
     }
 
     categories.push({ section, name, note, items });

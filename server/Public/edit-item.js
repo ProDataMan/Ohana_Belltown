@@ -312,6 +312,7 @@ async function loadItem() {
     document.getElementById('item-desc-input').value = item.description || '';
     document.getElementById('item-price-input').value = item.price != null ? Number(item.price).toFixed(2) : '';
     document.getElementById('item-featured-input').checked = Boolean(item.featured);
+    document.getElementById('item-scan-pitch-input').value = item.scanPitch || '';
     document.getElementById('item-sold-out-input').checked = item.available === false;
     document.getElementById('item-happy-hour-input').checked = Boolean(item.happyHour);
     document.getElementById('item-requires-modifier-input').checked = Boolean(item.requiresModifierSelection);
@@ -361,6 +362,7 @@ async function saveItem() {
     modifiers: currentModifiers,
     choiceGroups: currentChoiceGroups,
     requiresModifierSelection: document.getElementById('item-requires-modifier-input').checked,
+    scanPitch: document.getElementById('item-scan-pitch-input').value.trim(),
   };
 
   document.getElementById('save-btn').disabled = true;
