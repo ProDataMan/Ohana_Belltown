@@ -48,7 +48,9 @@ struct UpdateDisplayNameRequest: Content {
 }
 
 func currentUser(_ req: Request) throws -> StaffUser? {
-    guard let userId = req.session.data["userId"] else { return nil }
+    // See currentCustomer: don't create a session just to find out nobody
+    // is signed in.
+    guard req.hasSession, let userId = req.session.data["userId"] else { return nil }
     return try? UserStore.shared.find(id: userId)
 }
 

@@ -869,13 +869,15 @@ struct AnalyticsMiddleware: AsyncMiddleware {
            response.headers.contentType?.type == "text",
            response.headers.contentType?.subType == "html" {
             let path = request.url.path
-            let userAgent = request.headers[.userAgent].first
-            if !path.hasPrefix("/api/") && path != "/healthz" {
-                if AnalyticsStore.isBot(userAgent: userAgent) {
-                    AnalyticsStore.shared.recordBotView()
-                } else if !isStaffRequest(request) {
-                    AnalyticsStore.shared.recordView(path: path.isEmpty ? "/" : path, userAgent: userAgent)
-                }
+            // Page views themselves are counted when the page's own script
+            // reports them (POST /api/analytics/pageview from nav.js), which
+            // most bots never run — counting every server request let
+            // undetected scripts inflate the totals and the desktop share.
+            // Here only requests that identify as bots are tallied, so the
+            // report can still say how many were left out.
+            if !path.hasPrefix("/api/") && path != "/healthz",
+               AnalyticsStore.isBot(userAgent: request.headers[.userAgent].first) {
+                AnalyticsStore.shared.recordBotView()
             }
         }
 
@@ -892,7 +894,15 @@ func isStaffRequest(_ req: Request) -> Bool {
     return (try? currentUser(req)) != nil
 }
 
-/// What every public analytics endpoint skips: staff, and bots.
+/// Set on a phone or computer by /dont-count-this-device (and
+/// automatically whenever staff sign in on it), so the owner and staff
+/// testing QR cards without being signed in stay out of the reports.
+let noTrackCookieName = "ohana_no_track"
+
+/// What every public analytics endpoint skips: staff, devices marked "don't
+/// count", and bots.
 func shouldSkipAnalytics(_ req: Request) -> Bool {
-    isStaffRequest(req) || AnalyticsStore.isBot(userAgent: req.headers[.userAgent].first)
+    isStaffRequest(req)
+        || req.cookies[noTrackCookieName]?.string == "1"
+        || AnalyticsStore.isBot(userAgent: req.headers[.userAgent].first)
 }

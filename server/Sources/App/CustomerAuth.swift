@@ -47,7 +47,10 @@ struct GenericOK: Content {
 }
 
 func currentCustomer(_ req: Request) throws -> CustomerUser? {
-    guard let id = req.session.data["customerId"] else { return nil }
+    // Without a session cookie nobody is signed in, and reading
+    // `req.session` would create a new session (and a session file on the
+    // data volume) for every anonymous guest whose request asks.
+    guard req.hasSession, let id = req.session.data["customerId"] else { return nil }
     return try? CustomerUserStore.shared.find(id: id)
 }
 

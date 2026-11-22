@@ -16,6 +16,7 @@ final class QRInsightsTests: XCTestCase {
         added: [String] = [], previousVisits: Int = 0, firstTap: Double? = nil, phone: String = "iPhone · Safari"
     ) -> QRVisitSummary {
         let detailEvents = details.map { QRVisitTimelineEntry(type: "details", at: at(start + 1), page: pages.last, itemName: $0, query: nil, resultCount: nil) }
+            + emptySearches.map { QRVisitTimelineEntry(type: "search", at: at(start + 2), page: pages.last, itemName: nil, query: $0, resultCount: 0) }
         return QRVisitSummary(
             visitId: id, table: table, source: source, device: phone, deviceId: device, customerId: nil,
             customerName: nil, startedAt: at(start), lastSeenAt: at(start + minutes),
@@ -114,6 +115,7 @@ final class QRInsightsTests: XCTestCase {
         XCTAssertFalse(insights.items.first { $0.itemName == "Gone Dish" }!.onMenu)
 
         XCTAssertEqual(insights.searches.first { $0.query == "gyoza" }?.emptyCount, 1)
+        XCTAssertEqual(insights.searches.first { $0.query == "gyoza" }?.emptyOnPages, ["/menu"])
         XCTAssertEqual(insights.searches.first { $0.query == "poke" }?.emptyCount, 0)
         XCTAssertEqual(insights.paths.first { $0.pages == ["/happy-hour", "/menu"] }?.visits, 1)
 

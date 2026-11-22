@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Don't Count This Device — Ohana Belltown</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <p class="eyebrow">Ohana Belltown — Staff</p>
+        <h1>Don't count this device</h1>
+        <p>For the owner's and staff's own phones and computers: once this is on, nothing you do on the site from this device — scanning table cards to test them, browsing the menu, opening dishes — shows up in Analytics, QR Visits, or QR Insights. It's turned on automatically on any device where staff sign in.</p>
+      </header>
+      <section class="panel">
+        <p id="no-track-status" class="status"></p>
+        <div class="cta-row">
+          <button type="button" id="no-track-on" class="cta-button">Don't count this device</button>
+          <button type="button" id="no-track-off" class="cta-button secondary">Count it again</button>
+        </div>
+        <p class="hint">This only affects this browser on this device. Clearing the browser's cookies turns it off. Open this page in each browser you use (Safari and Chrome are separate).</p>
+        <p><a href="/">&larr; Back to the site</a></p>
+      </section>
+    </main>
+    <script>
+      const COOKIE = 'ohana_no_track';
+      function isOn() {
+        return document.cookie.split('; ').includes(`${COOKIE}=1`);
+      }
+      function render() {
+        const el = document.getElementById('no-track-status');
+        el.textContent = isOn()
+          ? 'This device is not being counted in the reports.'
+          : 'This device is being counted like any guest.';
+        el.className = `status ${isOn() ? 'status-ok' : ''}`;
+      }
+      document.getElementById('no-track-on').addEventListener('click', () => {
+        document.cookie = `${COOKIE}=1; path=/; max-age=157680000; SameSite=Lax`;
+        render();
+      });
+      document.getElementById('no-track-off').addEventListener('click', () => {
+        document.cookie = `${COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+        render();
+      });
+      render();
+    </script>
+  </body>
+</html>

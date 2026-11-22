@@ -23,6 +23,16 @@ document.getElementById('waitlist-form').addEventListener('submit', async (event
     });
     if (!response.ok) throw new Error(`Something went wrong (${response.status}). Please try again.`);
     setWaitlistStatus(statusEl, "You're on the list! We'll text you when your table's ready.", false);
+    // Same real-prices menu the front-door "While You Wait" QR opens (which
+    // only got 2 scans in its first weeks), tagged so these visits show up
+    // as their own source in Analytics.
+    if (!document.getElementById('waitlist-browse-menu')) {
+      const browse = document.createElement('p');
+      browse.id = 'waitlist-browse-menu';
+      browse.innerHTML =
+        '<a class="cta-button" href="/menu?prices=1&amp;utm_source=waitlist">Browse the menu while you wait &rarr;</a>';
+      statusEl.after(browse);
+    }
     event.target.reset();
     document.getElementById('waitlist-party-input').value = 2;
   } catch (error) {

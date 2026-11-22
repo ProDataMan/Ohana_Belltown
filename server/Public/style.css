@@ -3093,3 +3093,49 @@ button.floor-map-table {
     animation: none;
   }
 }
+
+/* Outside Happy Hour, on the Happy Hour page or after a Happy Hour card
+   scan (renderHappyHourNotices in menu-section.js). */
+.happy-hour-notice {
+  margin: 0 0 1rem;
+  padding: 0.8rem 1rem;
+  border-radius: 12px;
+  background: #fff4e0;
+  border: 1px solid var(--gold-bright);
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.happy-hour-notice a {
+  font-weight: 700;
+  color: var(--pink-text);
+  white-space: nowrap;
+}
+
+/* Matches from the other menus under a search (renderSearchElsewhere). */
+.search-elsewhere {
+  margin: 0 0 1rem;
+  padding: 0.7rem 1rem;
+  border-radius: 12px;
+  background: var(--paper);
+  border: 1px dashed var(--panel-border);
+}
+
+.search-elsewhere p {
+  margin: 0 0 0.3rem;
+  font-weight: 600;
+}
+
+.search-elsewhere ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.search-elsewhere li {
+  margin: 0.2rem 0;
+}
+
+.search-elsewhere a {
+  font-weight: 700;
+  color: var(--pink-text);
+}

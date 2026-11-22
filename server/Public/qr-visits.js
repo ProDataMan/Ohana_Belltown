@@ -119,6 +119,7 @@ const TIMELINE_LABELS = {
   'add-to-order': 'Added to order',
   'feature-shown': 'Saw "Try our" popup',
   'feature-tap': 'Tapped "Try our" popup',
+  leave: 'Left the page',
 };
 
 function timelineText(entry) {

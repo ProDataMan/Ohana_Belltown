@@ -105,6 +105,10 @@ final class QRVisitStore: @unchecked Sendable {
         /// page per visit), and tapped through to the item.
         case featureShown = "feature-shown"
         case featureTap = "feature-tap"
+        /// The guest left the page (closed the tab, switched apps, or went
+        /// to another page). Sent so a visit's length runs to when they
+        /// stopped reading, not just their last tap.
+        case leave
     }
 
     static let sources: Set<String> = ["table", "happy-hour-card", "front-door", "happy-hour"]

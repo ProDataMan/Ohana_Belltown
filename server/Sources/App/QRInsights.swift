@@ -154,6 +154,9 @@ struct QRInsightsSearch: Content {
     /// How many of those searches matched nothing (searches recorded before
     /// result counts were tracked count as neither).
     var emptyCount: Int
+    /// The pages those empty searches were made on — a dish searched for on
+    /// Happy Hour may simply be on the Food menu.
+    var emptyOnPages: [String] = []
 }
 
 struct QRInsightsPath: Content {
@@ -367,12 +370,21 @@ enum QRInsightsBuilder {
         // Searches.
         var searchCounts: [String: Int] = [:]
         var emptyCounts: [String: Int] = [:]
+        var emptyPages: [String: Set<String>] = [:]
         for visit in visits {
             for query in visit.searches { searchCounts[query, default: 0] += 1 }
             for query in visit.emptySearches { emptyCounts[query, default: 0] += 1 }
+            for entry in visit.timeline where entry.type == "search" && entry.resultCount == 0 {
+                if let query = entry.query, let page = entry.page { emptyPages[query, default: []].insert(page) }
+            }
         }
         let searches = searchCounts
-            .map { QRInsightsSearch(query: $0.key, count: $0.value, emptyCount: emptyCounts[$0.key] ?? 0) }
+            .map {
+                QRInsightsSearch(
+                    query: $0.key, count: $0.value, emptyCount: emptyCounts[$0.key] ?? 0,
+                    emptyOnPages: (emptyPages[$0.key] ?? []).sorted()
+                )
+            }
             .sorted { $0.count != $1.count ? $0.count > $1.count : $0.query < $1.query }
             .prefix(50)
 

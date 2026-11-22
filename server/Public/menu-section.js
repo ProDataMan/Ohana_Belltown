@@ -436,6 +436,7 @@ function renderControls(categories) {
   document.getElementById('menu-search').addEventListener('input', (event) => {
     const query = event.target.value.trim().toLowerCase();
     const resultCount = filterMenu(query);
+    renderSearchElsewhere(query, resultCount);
     queueSearchQueryTracking(query, resultCount);
   });
 
@@ -464,6 +465,70 @@ function queueSearchQueryTracking(query, resultCount) {
       body: JSON.stringify({ query }),
     }).catch(() => {});
   }, 800);
+}
+
+/// The whole menu as loaded (every section), so a search can point to a dish
+/// that's on another page. Guests on Happy Hour searched "nabeyaki udon",
+/// found nothing, and had to find the Food menu themselves.
+let fullMenuData = null;
+const SECTION_PAGES = {
+  menu: ['/menu', 'Food menu'],
+  sushi: ['/sushi', 'Sushi menu'],
+  drinks: ['/drinks', 'Drinks menu'],
+  happy_hour: ['/happy-hour', 'Happy Hour menu'],
+};
+
+/// When this page has fewer than 3 matches, lists matching dishes from the
+/// other menus, each linking to that page with the search filled in.
+function renderSearchElsewhere(query, resultCount) {
+  let box = document.getElementById('search-elsewhere');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'search-elsewhere';
+    box.className = 'search-elsewhere';
+    box.setAttribute('role', 'status');
+    menuContainer.before(box);
+  }
+  const matches = [];
+  if (fullMenuData && query.length >= 2 && resultCount < 3) {
+    for (const category of fullMenuData.categories || []) {
+      if (category.section === window.MENU_SECTION || !SECTION_PAGES[category.section]) continue;
+      for (const item of category.items || []) {
+        if (item.available === false) continue;
+        if (`${item.name} ${item.description || ''}`.toLowerCase().includes(query)) {
+          matches.push({ item, section: category.section });
+        }
+      }
+    }
+  }
+  if (!matches.length) {
+    box.hidden = true;
+    box.innerHTML = '';
+    return;
+  }
+  box.hidden = false;
+  box.innerHTML = `
+    <p>${resultCount === 0 ? 'Not on this page, but we have it on another menu:' : 'Also on our other menus:'}</p>
+    <ul>
+      ${matches
+        .slice(0, 6)
+        .map(({ item, section }) => {
+          const [path, label] = SECTION_PAGES[section];
+          return `<li><a href="${path}?q=${encodeURIComponent(query)}">${escapeHtml(item.name)}</a> <span class="hint">${label}</span></li>`;
+        })
+        .join('')}
+    </ul>
+  `;
+}
+
+/// A `?q=` on the URL (from a "found on another menu" link) fills in and
+/// runs the search on load.
+function applySearchFromUrl() {
+  const query = new URLSearchParams(window.location.search).get('q');
+  const input = document.getElementById('menu-search');
+  if (!query || !input) return;
+  input.value = query;
+  input.dispatchEvent(new Event('input'));
 }
 
 /// Returns how many items matched, so a search that found nothing can be
@@ -1299,6 +1364,45 @@ async function checkOrderSystemPhase() {
   }
 }
 
+/// Happy Hour runs Monday–Friday, 3–6pm restaurant time — same rule as
+/// HappyHourSchedule.isActive server-side.
+function isHappyHourNow() {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short', hour: 'numeric', hourCycle: 'h23' })
+      .formatToParts(new Date())
+      .map((p) => [p.type, p.value])
+  );
+  const hour = Number(parts.hour);
+  return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].includes(parts.weekday) && hour >= 15 && hour < 18;
+}
+
+/// Outside Happy Hour: a note on the Happy Hour page that these prices
+/// aren't on right now, and, for a Happy Hour table-card scan that /scan sent
+/// to the full menu instead (`hhClosed=1`), a note saying why. Most flip-card
+/// scans in the first weeks came late at night.
+function renderHappyHourNotices() {
+  const params = new URLSearchParams(window.location.search);
+  let html = null;
+  if (window.MENU_SECTION === 'happy_hour' && !isHappyHourNow()) {
+    html = 'Happy Hour is <strong>Monday&ndash;Friday, 3&ndash;6pm</strong>, so these prices aren\'t on right now. <a href="/menu">See our full menu &rarr;</a>';
+  } else if (params.get('hhClosed') === '1') {
+    html = 'Happy Hour is <strong>Monday&ndash;Friday, 3&ndash;6pm</strong>, so here\'s our full menu for now. <a href="/happy-hour">Peek at the Happy Hour menu &rarr;</a>';
+    params.delete('hhClosed');
+    const query = params.toString();
+    try {
+      history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : '') + window.location.hash);
+    } catch {}
+  }
+  if (!html) return;
+  const note = document.createElement('p');
+  note.className = 'happy-hour-notice';
+  note.setAttribute('role', 'status');
+  note.innerHTML = html;
+  const main = document.querySelector('main.page');
+  if (main) main.prepend(note);
+  else menuContainer.before(note);
+}
+
 /// "Try our ___" popup for guests who arrived by QR code: once per QR visit
 /// per menu page, it features one of this page's items that has a scan
 /// pitch (set per item in the item editor; chosen by the owner as the most
@@ -1311,6 +1415,8 @@ function showScanFeaturePopup() {
     visit = JSON.parse(sessionStorage.getItem('ohana_qr_visit') || 'null');
   } catch {}
   if (!visit || !visit.id) return;
+  // The Happy Hour pitches mention Happy Hour prices.
+  if (window.MENU_SECTION === 'happy_hour' && !isHappyHourNow()) return;
   const shownKey = `ohana_scan_feature_shown:${visit.id}:${window.MENU_SECTION}`;
   try {
     if (sessionStorage.getItem(shownKey)) return;
@@ -1390,7 +1496,10 @@ async function loadMenu() {
     }
 
     const data = await response.json();
+    fullMenuData = data;
     renderMenu(data);
+    applySearchFromUrl();
+    renderHappyHourNotices();
     revealStaffOnlyElementsIfLoggedIn();
     showScanFeaturePopup();
   } catch (error) {

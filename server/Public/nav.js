@@ -45,6 +45,16 @@ window.ohanaSession = window.ohanaSession || fetch('/api/session')
   .then((response) => (response.ok ? response.json() : {}))
   .catch(() => ({}));
 
+// Page views are counted here, by the page's own script, rather than by the
+// server for every request — most bots never run scripts, so they no longer
+// inflate the totals. Skipped on devices marked "don't count".
+(() => {
+  if (document.cookie.split('; ').includes('ohana_no_track=1')) return;
+  const payload = JSON.stringify({ path: window.location.pathname });
+  if (navigator.sendBeacon && navigator.sendBeacon('/api/analytics/pageview', new Blob([payload], { type: 'application/json' }))) return;
+  fetch('/api/analytics/pageview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).catch(() => {});
+})();
+
 (async () => {
   // #nav-login-link only exists on public pages (the header nav) — staff
   // admin pages have their own layout instead, but should still get the
@@ -70,6 +80,10 @@ window.ohanaSession = window.ohanaSession || fetch('/api/session')
       return;
     }
     if (session.staff) {
+      // A phone or computer staff sign in on is theirs or the restaurant's:
+      // keep it out of the reports from now on, even when signed out (see
+      // /dont-count-this-device.html to undo).
+      document.cookie = 'ohana_no_track=1; path=/; max-age=157680000; SameSite=Lax';
       makeLogoutLink('/api/auth/logout');
       insertStaffNavDropdown();
       enableSpeechPrimingForStaff();
@@ -931,6 +945,21 @@ function startStaffCompetitorPhotoAlerts() {
     send('start', { source: visit.source, page: window.location.pathname });
   }
   send('page', { page: window.location.pathname });
+
+  // When the guest stops looking (closes the tab, switches apps, or moves to
+  // another page), so the visit's length runs to then instead of stopping
+  // at their last tap. Once per time the page is hidden.
+  let leaveSent = false;
+  const sendLeave = () => {
+    if (leaveSent) return;
+    leaveSent = true;
+    send('leave', { page: window.location.pathname });
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') sendLeave();
+    else leaveSent = false;
+  });
+  window.addEventListener('pagehide', sendLeave);
 
   /// For menu-section.js: 'details', 'photo', 'search', 'add-to-order'.
   window.ohanaTrackVisit = (type, fields = {}) => send(type, { page: window.location.pathname, ...fields });

@@ -187,6 +187,10 @@ struct WaitlistSeatRequest: Content {
     var table: String
 }
 
+struct PageviewRequest: Content {
+    var path: String
+}
+
 struct SiteVisitRequest: Content {
     var source: String
     var landing: String
@@ -240,12 +244,15 @@ func routes(_ app: Application) throws {
     // menu page can show a per-item Order button tied to that table.
     app.get("scan") { req in
         var target = HappyHourSchedule.landingPath()
-        // The "flip the table card over" Happy Hour QR — always lands on
-        // Happy Hour regardless of the time-of-day check above, so a guest
-        // who deliberately scans that side sees it whenever they want,
-        // same as browsing there from the nav any other time.
-        if req.query[String.self, at: "hh"] == "1" {
-            target = "/happy-hour"
+        // The "flip the table card over" Happy Hour QR. During Happy Hour it
+        // lands on Happy Hour. Outside it, it lands on the full menu with a
+        // note (`hhClosed=1`, see renderHappyHourClosedNote in
+        // menu-section.js): 21 of the first 22 flip-card scans came outside
+        // Happy Hour, mostly late at night, and landed guests on prices that
+        // didn't apply.
+        let isHappyHourCard = req.query[String.self, at: "hh"] == "1"
+        if isHappyHourCard {
+            target = HappyHourSchedule.isActive() ? "/happy-hour" : "/menu"
         }
 
         // Recorded here, not on whatever page it redirects to — this fires
@@ -266,8 +273,11 @@ func routes(_ app: Application) throws {
         // fresh scan (it strips the flag from the address bar right away, so
         // a reload doesn't count as another scan).
         var queryParts: [String] = ["qr=1"]
-        if req.query[String.self, at: "hh"] == "1" {
+        if isHappyHourCard {
             queryParts.append("card=hh")
+            if target == "/menu" {
+                queryParts.append("hhClosed=1")
+            }
         }
         if let table = scannedTable, !table.isEmpty,
            let encoded = table.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
@@ -1444,6 +1454,16 @@ func routes(_ app: Application) throws {
         if shouldSkipAnalytics(req) { return .ok }
         let body = try req.content.decode(DwellRequest.self)
         AnalyticsStore.shared.recordDwell(path: body.path, seconds: body.seconds)
+        return .ok
+    }
+
+    // A page view, reported by the page's own script (nav.js) so bots that
+    // don't run JavaScript aren't counted. See AnalyticsMiddleware.
+    app.post("api", "analytics", "pageview") { req throws -> HTTPStatus in
+        if shouldSkipAnalytics(req) { return .ok }
+        let body = try req.content.decode(PageviewRequest.self)
+        guard let path = AnalyticsStore.cleanPath(body.path) else { return .ok }
+        AnalyticsStore.shared.recordView(path: path, userAgent: req.headers[.userAgent].first)
         return .ok
     }
 

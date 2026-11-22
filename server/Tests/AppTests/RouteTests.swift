@@ -218,6 +218,22 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testAnonymousGuestsDontGetASessionFromAnalyticsOrSessionChecks() throws {
+        let json: HTTPHeaders = ["Content-Type": "application/json"]
+        let calls: [(HTTPMethod, String, String?)] = [
+            (.GET, "api/session", nil),
+            (.POST, "api/analytics/qr-visit-event", #"{"visitId":"visit-nosess-1","deviceId":"device-nosess-1","table":"30","type":"start","source":"table","page":"/menu"}"#),
+            (.POST, "api/analytics/menu-item-engagement", #"{"itemName":"Poke","clickType":"details","deviceId":"device-nosess-1"}"#),
+            (.POST, "api/analytics/pageview", #"{"path":"/menu"}"#),
+        ]
+        for (method, path, body) in calls {
+            try app.test(method, path, headers: json, body: body.map { ByteBuffer(string: $0) }) { res in
+                XCTAssertEqual(res.status, .ok, path)
+                XCTAssertNil(res.headers.setCookie?["vapor-session"], "\(path) created a session for an anonymous guest")
+            }
+        }
+    }
+
     func testSessionEndpointAnswersForGuestsStaffAndCustomers() throws {
         try app.test(.GET, "api/session") { res in
             XCTAssertEqual(res.status, .ok)
@@ -233,16 +249,33 @@ final class RouteTests: XCTestCase {
 
     func testStaffAndBotsAreLeftOutOfAnalytics() throws {
         let (admin, _) = try makeAdminAndSecondAccount(username: "botcheck", password: "password123", role: "employee")
+        // Loading a page no longer counts it by itself — the page's script
+        // reports the view — but requests from bots are still tallied.
         try app.test(.GET, "about") { XCTAssertEqual($0.status, .ok) }
         try app.test(.GET, "about", headers: ["User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"]) { _ in }
         try app.test(.GET, "about", headers: ["User-Agent": "facebookexternalhit/1.1"]) { _ in }
-        try app.test(.GET, "about", headers: ["Cookie": admin]) { _ in }
+
+        let json: HTTPHeaders = ["Content-Type": "application/json"]
+        let view = ByteBuffer(string: #"{"path":"/about"}"#)
+        try app.test(.POST, "api/analytics/pageview", headers: json, body: view) { XCTAssertEqual($0.status, .ok) }
+        var bot = json
+        bot.replaceOrAdd(name: .userAgent, value: "Mozilla/5.0 HeadlessChrome/152.0")
+        try app.test(.POST, "api/analytics/pageview", headers: bot, body: view) { _ in }
+        var staff = json
+        staff.add(name: .cookie, value: admin)
+        try app.test(.POST, "api/analytics/pageview", headers: staff, body: view) { _ in }
+        var notCounted = json
+        notCounted.add(name: .cookie, value: "ohana_no_track=1")
+        try app.test(.POST, "api/analytics/pageview", headers: notCounted, body: view) { _ in }
+        try app.test(.POST, "api/analytics/pageview", headers: json, body: ByteBuffer(string: #"{"path":"https://evil.example"}"#)) { _ in }
+
         try app.test(.GET, "scan?table=30", headers: ["Cookie": admin]) { XCTAssertEqual($0.status, .seeOther) }
+        try app.test(.GET, "scan?table=28", headers: ["Cookie": "ohana_no_track=1"]) { XCTAssertEqual($0.status, .seeOther) }
         AnalyticsStore.shared.flush()
         let summary = try AnalyticsStore.shared.summary(days: 1)
         XCTAssertEqual(summary.topPages.first { $0.path == "/about" }?.count, 1)
         XCTAssertEqual(summary.botViews, 2)
-        XCTAssertTrue(summary.qrScans.isEmpty, "a staff member testing a card isn't a scan")
+        XCTAssertTrue(summary.qrScans.isEmpty, "staff, or a device marked don't-count, testing a card isn't a scan")
     }
 
     func testVisitSourcesActionsAndUniqueVisitors() throws {
@@ -393,18 +426,23 @@ final class RouteTests: XCTestCase {
         }
     }
 
-    // The "flip the table card over" Happy Hour QR — always lands on Happy
-    // Hour, unlike the plain table QR above which is time-of-day dependent
-    // (see testScanRedirectsToMenuOrHappyHour), and still carries the table
-    // id through so ordering/price-unlock behaves the same as the front card.
-    func testScanHappyHourFlagAlwaysLandsOnHappyHourRegardlessOfTime() throws {
+    // The "flip the table card over" Happy Hour QR — lands on Happy Hour only
+    // while it's on, and still carries the table id through so
+    // ordering/price-unlock behaves the same as the front card.
+    func testScanHappyHourCardLandsOnHappyHourOnlyDuringHappyHour() throws {
+        // During Happy Hour it lands there; outside it, on the full menu with
+        // the "Happy Hour is Mon–Fri 3–6pm" note.
+        let open = HappyHourSchedule.isActive()
         try app.test(.GET, "scan?hh=1") { res in
             XCTAssertEqual(res.status, .seeOther)
-            XCTAssertEqual(res.headers.first(name: .location), "/happy-hour?qr=1&card=hh")
+            XCTAssertEqual(res.headers.first(name: .location), open ? "/happy-hour?qr=1&card=hh" : "/menu?qr=1&card=hh&hhClosed=1")
         }
         try app.test(.GET, "scan?table=5&hh=1") { res in
             XCTAssertEqual(res.status, .seeOther)
-            XCTAssertEqual(res.headers.first(name: .location), "/happy-hour?qr=1&card=hh&table=5")
+            XCTAssertEqual(
+                res.headers.first(name: .location),
+                open ? "/happy-hour?qr=1&card=hh&table=5" : "/menu?qr=1&card=hh&hhClosed=1&table=5"
+            )
         }
     }
 

@@ -274,7 +274,10 @@ function renderSearches() {
   pills(
     document.getElementById('empty-searches'),
     empties.length
-      ? empties.map((s) => ({ label: `"${s.query}" found nothing ×${s.emptyCount}`, cls: 'pill-warning' }))
+      ? empties.map((s) => ({
+          label: `"${s.query}" found nothing ×${s.emptyCount}${s.emptyOnPages.length ? ` (on ${s.emptyOnPages.join(', ')})` : ''}`,
+          cls: 'pill-warning',
+        }))
       : [{ label: 'No empty searches.', cls: 'pill-approved' }]
   );
   document.getElementById('search-table').innerHTML = table(

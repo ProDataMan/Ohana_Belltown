@@ -39,6 +39,15 @@ final class QRVisitStoreTests: XCTestCase {
         XCTAssertEqual(visits[0].detailViews.map(\.itemName), ["Poke"])
     }
 
+    func testLeaveEventExtendsTheVisitToWhenTheGuestStoppedReading() {
+        let start = Date().addingTimeInterval(-600)
+        QRVisitStore.shared.record(event("start", at: start))
+        QRVisitStore.shared.record(event("page", at: start))
+        QRVisitStore.shared.record(event("leave", at: start.addingTimeInterval(240)))
+        let visit = QRVisitStore.shared.visits(from: wholeDay.0, to: wholeDay.1).first
+        XCTAssertEqual(visit?.durationSeconds ?? 0, 240, accuracy: 1)
+    }
+
     func testRejectsJunkIdsAndUnknownTypes() {
         XCTAssertFalse(QRVisitStore.shared.record(event("start", visit: "short")))
         XCTAssertFalse(QRVisitStore.shared.record(event("start", device: "has spaces in it")))
