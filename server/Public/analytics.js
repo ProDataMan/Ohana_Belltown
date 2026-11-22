@@ -693,38 +693,103 @@ async function loadFeedback() {
       ...(unacknowledged ? [{ label: `${unacknowledged} unread`, cls: 'pill-warning' }] : [{ label: 'All read', cls: 'pill-approved' }]),
     ]);
 
+    feedbackEntries = entries;
+    const recentEl = document.getElementById('feedback-recent');
     if (!entries.length) {
+      recentEl.innerHTML = '';
       listEl.innerHTML = '<p class="hint">No feedback yet.</p>';
       return;
     }
-    listEl.innerHTML = `
-      <div class="data-table">
-        <table>
-          <thead><tr><th>When</th><th>Category</th><th>Rating</th><th>Message</th><th>Page</th><th>Contact</th></tr></thead>
-          <tbody>
-            ${entries
-              .map(
-                (e) => `
-              <tr>
-                <td>${new Date(e.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</td>
-                <td><span class="pill ${e.acknowledged ? '' : 'pill-warning'}">${escapeHtmlAnalytics(categoryLabel(e.category))}</span></td>
-                <td>${e.rating != null ? `${e.rating}/5` : '—'}</td>
-                <td>${escapeHtmlAnalytics(e.message)}</td>
-                <td>${escapeHtmlAnalytics(e.page || '')}</td>
-                <td>${escapeHtmlAnalytics(e.contactEmail || '')}</td>
-              </tr>
-            `
-              )
-              .join('')}
-          </tbody>
-        </table>
-      </div>
-    `;
+    // On the card: unread first, then newest, so new feedback is what shows.
+    const recent = [...entries].sort((a, b) => Number(a.acknowledged) - Number(b.acknowledged) || b.createdAt.localeCompare(a.createdAt)).slice(0, 3);
+    recentEl.innerHTML =
+      recent.map(feedbackLine).join('') +
+      (entries.length > recent.length ? `<a class="feedback-see-all" href="?section=feedback">See all ${entries.length} &rarr;</a>` : '');
+    listEl.innerHTML = [...entries].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(feedbackLine).join('');
   } catch (error) {
     summaryEl.innerHTML = '';
     listEl.innerHTML = `<p class="status status-error">${escapeHtmlAnalytics(error.message)}</p>`;
   }
 }
+
+let feedbackEntries = [];
+
+function feedbackWhen(entry) {
+  return new Date(entry.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+/// One tappable feedback line: unread dot, category, rating, when, and the
+/// start of the message. Opens the full submission (openFeedbackDetail).
+function feedbackLine(entry) {
+  const preview = entry.message.length > 90 ? `${entry.message.slice(0, 90)}…` : entry.message;
+  return `
+    <button type="button" class="feedback-line${entry.acknowledged ? '' : ' unread'}" data-feedback-id="${escapeHtmlAnalytics(entry.id)}">
+      <span class="feedback-line-meta">
+        ${entry.acknowledged ? '' : '<span class="feedback-unread-dot" aria-label="Unread"></span>'}
+        <strong>${escapeHtmlAnalytics(categoryLabel(entry.category))}</strong>
+        ${entry.rating != null ? `<span>${'★'.repeat(entry.rating)}${'☆'.repeat(5 - entry.rating)}</span>` : ''}
+        <span class="hint">${escapeHtmlAnalytics(feedbackWhen(entry))}</span>
+      </span>
+      <span class="feedback-line-text">${escapeHtmlAnalytics(preview)}</span>
+    </button>
+  `;
+}
+
+function openFeedbackDetail(entry) {
+  const overlay = document.createElement('div');
+  overlay.className = 'feedback-detail-overlay';
+  overlay.innerHTML = `
+    <div class="feedback-detail" role="dialog" aria-modal="true" aria-labelledby="feedback-detail-title">
+      <button type="button" class="feedback-detail-close" aria-label="Close">&times;</button>
+      <p class="eyebrow">${escapeHtmlAnalytics(categoryLabel(entry.category))} feedback${entry.acknowledged ? '' : ' · <span class="pill pill-warning">Unread</span>'}</p>
+      <h2 id="feedback-detail-title">${entry.rating != null ? `${'★'.repeat(entry.rating)}${'☆'.repeat(5 - entry.rating)} <span class="hint">${entry.rating}/5</span>` : 'No rating'}</h2>
+      <p class="feedback-detail-message">${escapeHtmlAnalytics(entry.message)}</p>
+      <dl class="feedback-detail-facts">
+        <dt>When</dt><dd>${escapeHtmlAnalytics(feedbackWhen(entry))}</dd>
+        <dt>Page</dt><dd>${entry.page ? `<a href="${escapeHtmlAnalytics(entry.page)}">${escapeHtmlAnalytics(entry.page)}</a>` : '<span class="hint">not recorded</span>'}</dd>
+        <dt>Contact</dt><dd>${entry.contactEmail ? `<a href="mailto:${escapeHtmlAnalytics(entry.contactEmail)}">${escapeHtmlAnalytics(entry.contactEmail)}</a>` : '<span class="hint">none left</span>'}</dd>
+      </dl>
+      <div class="cta-row">
+        ${entry.contactEmail ? `<a class="cta-button" href="mailto:${escapeHtmlAnalytics(entry.contactEmail)}?subject=${encodeURIComponent('Your feedback for Ohana Belltown')}">Reply by email</a>` : ''}
+        ${entry.acknowledged ? '' : '<button type="button" class="cta-button secondary feedback-mark-read">Mark read</button>'}
+        <button type="button" class="cta-button secondary feedback-detail-done">Close</button>
+      </div>
+      <p class="status feedback-detail-status"></p>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  const close = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onKey);
+  };
+  const onKey = (event) => {
+    if (event.key === 'Escape') close();
+  };
+  document.addEventListener('keydown', onKey);
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) close();
+  });
+  overlay.querySelector('.feedback-detail-close').addEventListener('click', close);
+  overlay.querySelector('.feedback-detail-done').addEventListener('click', close);
+  overlay.querySelector('.feedback-mark-read')?.addEventListener('click', async () => {
+    const response = await staffFetch(`/api/feedback/${encodeURIComponent(entry.id)}/acknowledge`, { method: 'POST' });
+    if (!response.ok) {
+      overlay.querySelector('.feedback-detail-status').textContent = `Couldn't mark it read (${response.status}).`;
+      return;
+    }
+    close();
+    loadFeedback();
+  });
+  overlay.querySelector('.feedback-detail-close').focus();
+}
+
+// One listener for every feedback line, on the card and in the full list.
+document.getElementById('analytics-sections').addEventListener('click', (event) => {
+  const line = event.target.closest('[data-feedback-id]');
+  if (!line) return;
+  const entry = feedbackEntries.find((e) => e.id === line.dataset.feedbackId);
+  if (entry) openFeedbackDetail(entry);
+});
 
 document.getElementById('acknowledge-feedback-btn').addEventListener('click', async () => {
   await staffFetch('/api/feedback/acknowledge-all', { method: 'POST' });

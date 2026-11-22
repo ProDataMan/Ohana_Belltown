@@ -234,6 +234,26 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testOneFeedbackSubmissionCanBeMarkedRead() throws {
+        let (admin, employee) = try makeAdminAndSecondAccount(username: "fb", password: "password123", role: "employee")
+        let json: HTTPHeaders = ["Content-Type": "application/json"]
+        var ids: [String] = []
+        for message in ["The poke was amazing", "Website menu was slow"] {
+            try app.test(.POST, "api/feedback", headers: json, body: ByteBuffer(string: #"{"category":"food","rating":5,"message":"\#(message)","page":"/menu"}"#)) { res in
+                ids.append(try res.content.decode(FeedbackEntry.self).id)
+            }
+        }
+        try app.test(.POST, "api/feedback/\(ids[0])/acknowledge", headers: ["Cookie": employee]) { XCTAssertEqual($0.status, .forbidden) }
+        try app.test(.POST, "api/feedback/nope/acknowledge", headers: ["Cookie": admin]) { XCTAssertEqual($0.status, .notFound) }
+        try app.test(.POST, "api/feedback/\(ids[0])/acknowledge", headers: ["Cookie": admin]) { res in
+            XCTAssertEqual(res.status, .ok)
+            XCTAssertEqual(try res.content.decode(FeedbackEntry.self).acknowledged, true)
+        }
+        try app.test(.GET, "api/feedback/unacknowledged-count", headers: ["Cookie": admin]) { res in
+            XCTAssertEqual(try res.content.decode(FeedbackUnacknowledgedCount.self).count, 1)
+        }
+    }
+
     func testSessionEndpointAnswersForGuestsStaffAndCustomers() throws {
         try app.test(.GET, "api/session") { res in
             XCTAssertEqual(res.status, .ok)

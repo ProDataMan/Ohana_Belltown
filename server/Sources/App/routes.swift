@@ -1316,6 +1316,15 @@ func routes(_ app: Application) throws {
         return .ok
     }
 
+    app.post("api", "feedback", ":id", "acknowledge") { req throws -> FeedbackEntry in
+        try requireAdmin(req)
+        guard let id = req.parameters.get("id"),
+              let entry = try FeedbackStore.shared.acknowledge(id: id) else {
+            throw Abort(.notFound, reason: "That feedback no longer exists.")
+        }
+        return entry
+    }
+
     func serveStatic(_ req: Request, file: String) async throws -> Response {
         let path = req.application.directory.publicDirectory + file
         return try await req.fileio.asyncStreamFile(at: path)

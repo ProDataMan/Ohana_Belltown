@@ -110,6 +110,21 @@ final class FeedbackStore: @unchecked Sendable {
         try persist()
     }
 
+    /// Marks one submission read, from its detail view on the analytics page.
+    /// Returns nil when there's no submission with that id.
+    @discardableResult
+    func acknowledge(id: String) throws -> FeedbackEntry? {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard let idx = data.entries.firstIndex(where: { $0.id == id }) else { return nil }
+        if !data.entries[idx].acknowledged {
+            data.entries[idx].acknowledged = true
+            try persist()
+        }
+        return data.entries[idx]
+    }
+
     /// All feedback whose createdAt falls on the given Pacific-time calendar
     /// day (e.g. "yesterday", for the 9am digest).
     func entries(onDay dayKey: String) throws -> [FeedbackEntry] {

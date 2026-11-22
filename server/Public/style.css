@@ -3139,3 +3139,136 @@ button.floor-map-table {
   font-weight: 700;
   color: var(--pink-text);
 }
+
+/* Customer feedback on the analytics page: tappable lines (newest few on
+   the card, all of them when the section is open) and the detail popup. */
+.feedback-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.analytics-section.expanded #feedback-recent {
+  display: none;
+}
+
+.feedback-line {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.feedback-line:hover,
+.feedback-line:focus-visible {
+  border-color: var(--pink);
+}
+
+.feedback-line.unread {
+  background: #fff7ec;
+  border-color: var(--gold-bright);
+}
+
+.feedback-line-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+.feedback-line-text {
+  display: block;
+  margin-top: 0.25rem;
+  overflow-wrap: anywhere;
+}
+
+.feedback-unread-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--pink);
+}
+
+.feedback-see-all {
+  font-weight: 700;
+  color: var(--pink-text);
+  font-size: 0.9rem;
+}
+
+.feedback-detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(20, 16, 28, 0.6);
+}
+
+.feedback-detail {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 18px;
+  padding: 1.2rem 1.2rem 1rem;
+  box-shadow: 0 18px 50px rgba(20, 16, 28, 0.35);
+}
+
+.feedback-detail h2 {
+  margin: 0.2rem 0 0.6rem;
+  color: var(--gold-text);
+}
+
+.feedback-detail-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 2.2rem;
+  height: 2.2rem;
+  border: none;
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.feedback-detail-message {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  padding: 0.8rem;
+  border-radius: 12px;
+  background: var(--paper);
+}
+
+.feedback-detail-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.3rem 0.8rem;
+  margin: 0.8rem 0;
+}
+
+.feedback-detail-facts dt {
+  font-weight: 700;
+}
+
+.feedback-detail-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
