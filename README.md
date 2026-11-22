@@ -681,6 +681,7 @@ yet. Roughly ordered by expected impact for the effort involved.
 - `docs/oauth-setup.md` — step-by-step Google/Apple/Facebook Sign-In credential setup
 - `docs/loyalty-points-migration.md` — future plan for switching the customer punch card to a points system (to support variable rewards and sellable/giveaway swag) once the punch card has real launch feedback — not scheduled yet
 - `docs/uptime-monitoring.md` — how to point UptimeRobot (free) at the existing `/healthz` endpoint
+- `docs/late-night-proposal.md` — case for a Friday/Saturday 10pm-to-close "Late Night Aloha" deal from the first two weeks of QR data (46% of QR visits after 10pm, 32 of 38 on Fri/Sat, many reaching for the Happy Hour card), with a late-night menu tiered by who's still working after the kitchen leaves at 10–11pm — written for Yosh, not yet acted on
 - `docs/pricing-review-2026-08-06.md` — suggested menu price changes with reasoning, based on the real competitor data already gathered in the Competitor Pricing admin tool (`/competitor-pricing-admin.html`) plus general judgment where no local comparison data exists yet — not yet acted on
 - `docs/page-inventory.md`, `docs/migration-plan.md`, `docs/ohana-project-plan.md` — early planning docs from the static-site-capture phase, kept for history
 - `reference-site/` — the original Weebly site mirror this project was migrated from
