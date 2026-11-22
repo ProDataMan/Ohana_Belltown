@@ -49,6 +49,25 @@ final class ScanFeatureTests: XCTestCase {
         XCTAssertNil(try MenuStore.shared.get().categories[0].items[0].scanPitch)
     }
 
+    func testLycheeMartiniPhotoFixAppliesOnceToBothMenus() throws {
+        var menu = sampleMenu
+        menu.categories[1].items.append(MenuItem(id: "lm", name: "Lychee Martini", images: ["/uploads/olive.jpg"]))
+        menu.categories[2].items.append(MenuItem(id: "lm-hh", name: "Lychee Martini", images: ["/uploads/olive.jpg"]))
+        try writeMenu(menu)
+        let items = Dictionary(uniqueKeysWithValues: try MenuStore.shared.get().categories.flatMap(\.items).map { ($0.id, $0) })
+        XCTAssertEqual(items["lm"]?.images, ["/images/lychee-martini.jpg"])
+        XCTAssertEqual(items["lm-hh"]?.images, ["/images/lychee-martini.jpg"])
+
+        // A later edit (e.g. staff upload their own photo) survives a save
+        // and a restart.
+        var edited = try MenuStore.shared.get()
+        edited.appliedFixes = []
+        edited.categories[1].items[1].images = ["/uploads/our-own.jpg"]
+        try MenuStore.shared.save(edited)
+        MenuStore.shared.configure(dataDirectory: tempDir.path, resourcesDirectory: tempDir.path)
+        XCTAssertEqual(try MenuStore.shared.get().categories[1].items[1].images, ["/uploads/our-own.jpg"])
+    }
+
     func testBlankPitchDecodesAsNotFeatured() throws {
         let item = try JSONDecoder().decode(MenuItem.self, from: Data(#"{"name":"Poke","scanPitch":"   "}"#.utf8))
         XCTAssertNil(item.scanPitch)

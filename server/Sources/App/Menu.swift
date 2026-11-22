@@ -178,9 +178,12 @@ struct Menu: Codable, Content {
     /// have been applied, so they're added once and staff edits or removals
     /// in the editors stick after that.
     var scanPitchesSeeded: Bool = false
+    /// Ids of the one-time data fixes in MenuStore.oneTimeFixes already
+    /// applied, so each runs once and later edits in the editors stick.
+    var appliedFixes: [String] = []
 
     enum CodingKeys: String, CodingKey {
-        case restaurant, lastUpdated, categories, additionsCatalog, scanPitchesSeeded
+        case restaurant, lastUpdated, categories, additionsCatalog, scanPitchesSeeded, appliedFixes
     }
 
     init(restaurant: String, lastUpdated: String, categories: [MenuCategory], additionsCatalog: [AdditionCatalogItem] = []) {
@@ -197,5 +200,6 @@ struct Menu: Codable, Content {
         categories = try container.decode([MenuCategory].self, forKey: .categories)
         additionsCatalog = try container.decodeIfPresent([AdditionCatalogItem].self, forKey: .additionsCatalog) ?? []
         scanPitchesSeeded = try container.decodeIfPresent(Bool.self, forKey: .scanPitchesSeeded) ?? false
+        appliedFixes = try container.decodeIfPresent([String].self, forKey: .appliedFixes) ?? []
     }
 }

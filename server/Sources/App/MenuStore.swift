@@ -66,6 +66,7 @@ final class MenuStore: @unchecked Sendable {
         // Editors don't send this flag; keep it so a save never re-seeds
         // pitches staff have since changed or removed.
         updated.scanPitchesSeeded = updated.scanPitchesSeeded || menu.scanPitchesSeeded
+        updated.appliedFixes = Array(Set(updated.appliedFixes).union(menu.appliedFixes)).sorted()
         menu = updated
         try persist()
         return menu
@@ -229,6 +230,7 @@ final class MenuStore: @unchecked Sendable {
             let data = try Data(contentsOf: fileURL)
             menu = try JSONDecoder().decode(Menu.self, from: data)
             Self.seedScanPitches(&menu)
+            Self.applyOneTimeFixes(&menu)
             // Re-persist immediately so any fields defaulted during decode
             // (e.g. a stable id generated for a pre-existing item) become
             // durable rather than regenerating on every restart.
@@ -255,6 +257,31 @@ final class MenuStore: @unchecked Sendable {
         ("menu", "Chicken Teriyaki", "Ono to the last bite! Chicken thighs marinated in our homemade teriyaki and caramelized on the grill: sweet, savory and juicy, just like a Honolulu plate lunch. A favorite for good reason."),
         ("menu", "Kalua Pork", "A lūʻau on a plate! Pork slow-roasted for hours until it's smoky, tender and falls apart, with cabbage and rice. It's the taste of a backyard Hawaiian party, and the dish people come back for."),
     ]
+
+    /// Data changes the owner asked for that ship with a deploy instead of
+    /// needing someone to sign in and make them, each applied once (tracked
+    /// in `menu.appliedFixes`) so later edits in the editors aren't undone.
+    static let oneTimeFixes: [(id: String, apply: (inout Menu) -> Void)] = [
+        // The Lychee Martini's old photo was a plain martini with an olive.
+        // Replaced (on Drinks and Happy Hour) with a free Pexels photo of a
+        // pale martini on a plain background: "A Person Holding a Clear
+        // Martini Glass" by cottonbro studio, pexels.com/photo/8956533
+        // (Pexels License: free for commercial use, no attribution needed).
+        ("lychee-martini-photo-2026-11", { menu in
+            for c in menu.categories.indices where ["drinks", "happy_hour"].contains(menu.categories[c].section) {
+                for i in menu.categories[c].items.indices where menu.categories[c].items[i].name == "Lychee Martini" {
+                    menu.categories[c].items[i].images = ["/images/lychee-martini.jpg"]
+                }
+            }
+        }),
+    ]
+
+    static func applyOneTimeFixes(_ menu: inout Menu) {
+        for fix in oneTimeFixes where !menu.appliedFixes.contains(fix.id) {
+            fix.apply(&menu)
+            menu.appliedFixes.append(fix.id)
+        }
+    }
 
     /// Applies `initialScanPitches` the first time a menu without
     /// `scanPitchesSeeded` loads; an item that already has a pitch keeps it.
