@@ -274,6 +274,18 @@ final class MenuStore: @unchecked Sendable {
                 }
             }
         }),
+        // Mango Madness had no photo. Added (only if it still has none) a
+        // creamy mango drink on a plain dark background: "Close-up of a
+        // Cocktail on a Black Background" by Nadin Sh, pexels.com/photo/24038051
+        // (Pexels License: free for commercial use, no attribution needed).
+        ("mango-madness-photo-2026-11", { menu in
+            for c in menu.categories.indices {
+                for i in menu.categories[c].items.indices
+                where menu.categories[c].items[i].name == "Mango Madness" && menu.categories[c].items[i].images.isEmpty {
+                    menu.categories[c].items[i].images = ["/images/mango-madness.jpg"]
+                }
+            }
+        }),
     ]
 
     static func applyOneTimeFixes(_ menu: inout Menu) {

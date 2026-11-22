@@ -68,6 +68,16 @@ final class ScanFeatureTests: XCTestCase {
         XCTAssertEqual(try MenuStore.shared.get().categories[1].items[1].images, ["/uploads/our-own.jpg"])
     }
 
+    func testMangoMadnessPhotoOnlyFillsAnEmptyPhoto() throws {
+        var menu = sampleMenu
+        menu.categories[1].items.append(MenuItem(id: "mm", name: "Mango Madness"))
+        menu.categories[2].items.append(MenuItem(id: "mm-own", name: "Mango Madness", images: ["/uploads/ours.jpg"]))
+        try writeMenu(menu)
+        let items = Dictionary(uniqueKeysWithValues: try MenuStore.shared.get().categories.flatMap(\.items).map { ($0.id, $0) })
+        XCTAssertEqual(items["mm"]?.images, ["/images/mango-madness.jpg"])
+        XCTAssertEqual(items["mm-own"]?.images, ["/uploads/ours.jpg"], "a photo staff already added is kept")
+    }
+
     func testBlankPitchDecodesAsNotFeatured() throws {
         let item = try JSONDecoder().decode(MenuItem.self, from: Data(#"{"name":"Poke","scanPitch":"   "}"#.utf8))
         XCTAssertNil(item.scanPitch)
