@@ -10,6 +10,9 @@ full website: marketing pages, the complete food/sushi/drinks/happy-hour menu,
 a staff editor, a digital punch card, a walk-in waitlist, and an events calendar
 — deployed on Azure Container Apps.
 
+> **Quick links to share**
+> - [Late-night deal proposal (for Yosh)](https://github.com/ProDataMan/Ohana_Belltown/blob/migration/react-cms/docs/late-night-proposal.md): the case for a Friday/Saturday "Late Night Aloha" deal from the QR menu data. Long-press the link to copy it, then paste it into a text.
+
 This started as a static-site capture of the old Weebly site (see
 `docs/migration-plan.md` and `docs/ohana-project-plan.md` for that history);
 it has since been rebuilt as a real server-backed app and those early docs are
