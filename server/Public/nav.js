@@ -123,6 +123,7 @@ function insertStaffNavDropdown() {
       <a href="/qr-visits.html">QR Visits</a>
       <a href="/qr-insights.html">QR Insights</a>
       <a href="/pos-orders.html">POS Orders</a>
+      <a href="/hours-admin.html">Hours</a>
       <a href="/staff-rewards-admin.html">Staff Rewards</a>
       <a href="/competitor-pricing-admin.html">Competitor Pricing</a>
       <a href="/swag-admin.html">Swag</a>
@@ -963,4 +964,105 @@ function startStaffCompetitorPhotoAlerts() {
 
   /// For menu-section.js: 'details', 'photo', 'search', 'add-to-order'.
   window.ohanaTrackVisit = (type, fields = {}) => send(type, { page: window.location.pathname, ...fields });
+})();
+
+// Opening hours, from the staff Hours page (GET /api/hours, which also works
+// out "open now", the kitchen, and Happy Hour for this moment). Fills in the
+// footer on every page, a status line on the phone's bottom bar, and any
+// [data-hours] placeholder: "hero" / "today" on the home page, "week" on
+// Contact and the FAQ, "happy-hour" wherever the Happy Hour times are shown.
+// Also adds the hours to the home page's structured data for search engines.
+// window.ohanaHours is shared, e.g. with the Happy Hour notes in menu-section.js.
+window.ohanaHours = window.ohanaHours || fetch('/api/hours')
+  .then((response) => (response.ok ? response.json() : null))
+  .catch(() => null);
+
+(async () => {
+  const hours = await window.ohanaHours;
+  if (!hours) return;
+  const esc = (value) => String(value)
+    .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+  const now = hours.now;
+  const statusClass = now.open ? 'hours-open' : 'hours-closed';
+  const weekLines = hours.week.map((line) => `<li><span>${esc(line.label)}</span> <span>${esc(line.hours)}</span></li>`).join('');
+  const upcoming = hours.upcoming.length
+    ? `<p class="hours-upcoming"><strong>Coming up:</strong> ${hours.upcoming.map((u) => `${esc(u.label)}: ${esc(u.hours)}`).join(' · ')}</p>`
+    : '';
+
+  // Footer, every page.
+  const footerColumn = document.querySelector('.site-footer-inner > div');
+  if (footerColumn) {
+    const block = document.createElement('div');
+    block.className = 'footer-hours';
+    block.innerHTML = `
+      <p class="footer-brand">${esc(hours.seasonLabel || 'Hours')}</p>
+      <p class="hours-status ${statusClass}">${esc(now.label)}</p>
+      <ul class="hours-week">${weekLines}</ul>
+      ${hours.kitchenSummary ? `<p class="hours-note">${esc(hours.kitchenSummary)}</p>` : ''}
+      ${hours.happyHourSummary ? `<p class="hours-note">Happy Hour ${esc(hours.happyHourSummary)}</p>` : ''}
+      ${upcoming}
+    `;
+    footerColumn.after(block);
+  }
+
+  // Phone bottom bar: one line over Call / Order / Directions.
+  const bar = document.querySelector('.mobile-cta-bar');
+  if (bar && !bar.querySelector('.mobile-cta-status')) {
+    const line = document.createElement('div');
+    line.className = `mobile-cta-status ${statusClass}`;
+    line.textContent = [now.label, now.happyHourLabel].filter(Boolean).join(' · ');
+    bar.prepend(line);
+    document.body.classList.add('has-mobile-cta-status');
+  }
+
+  // Home page banner and "Today at Ohana" strip.
+  document.querySelectorAll('[data-hours="hero"]').forEach((el) => {
+    el.innerHTML = [now.label, now.happyHourLabel].filter(Boolean).map(esc).join(' · ');
+    el.classList.add(statusClass);
+    el.hidden = false;
+  });
+  document.querySelectorAll('[data-hours="today"]').forEach((el) => {
+    const facts = [
+      `<li><strong>${esc(now.today)}</strong></li>`,
+      now.kitchenLabel ? `<li>${esc(now.kitchenLabel)}</li>` : '',
+      `<li>${now.happyHourNow ? `<strong>${esc(now.happyHourLabel)}</strong> · ` : ''}<a href="/happy-hour">Happy Hour</a> ${esc(hours.happyHourSummary || '')}</li>`,
+      hours.todaySpecials.length
+        ? `<li><a href="/specials">Today's special${hours.todaySpecials.length === 1 ? '' : 's'}</a>: ${hours.todaySpecials.slice(0, 3).map(esc).join(', ')}</li>`
+        : '',
+    ];
+    el.innerHTML = `<div class="today-strip-inner"><p class="today-strip-title ${statusClass}">${esc(now.label)}</p><ul>${facts.join('')}</ul></div>`;
+    el.hidden = false;
+  });
+
+  // The full week (Contact, FAQ).
+  document.querySelectorAll('[data-hours="week"]').forEach((el) => {
+    el.innerHTML = `
+      <p class="hours-status ${statusClass}">${esc(now.label)}</p>
+      ${hours.seasonLabel ? `<p class="hours-season">${esc(hours.seasonLabel)}</p>` : ''}
+      <ul class="hours-week">${weekLines}</ul>
+      ${hours.kitchenSummary ? `<p class="hours-note">${esc(hours.kitchenSummary)}</p>` : ''}
+      ${hours.happyHourSummary ? `<p class="hours-note">Happy Hour ${esc(hours.happyHourSummary)}</p>` : ''}
+      ${upcoming}
+      ${hours.holidayNote ? `<p class="hours-note">${esc(hours.holidayNote)}</p>` : ''}
+    `;
+  });
+
+  // Happy Hour times, worked out against the opening hours.
+  if (hours.happyHourSummary) {
+    document.querySelectorAll('[data-hours="happy-hour"]').forEach((el) => {
+      el.textContent = hours.happyHourSummary;
+    });
+  }
+
+  // Search engines: add the hours to the home page's Restaurant data.
+  if (hours.openingHoursSpecification.length) {
+    document.querySelectorAll('script[type="application/ld+json"]').forEach((script) => {
+      try {
+        const data = JSON.parse(script.textContent);
+        if (data['@type'] !== 'Restaurant') return;
+        data.openingHoursSpecification = hours.openingHoursSpecification;
+        script.textContent = JSON.stringify(data);
+      } catch {}
+    });
+  }
 })();

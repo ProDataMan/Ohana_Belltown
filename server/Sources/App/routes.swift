@@ -293,6 +293,26 @@ func routes(_ app: Application) throws {
         return req.redirect(to: target, redirectType: .normal)
     }
 
+    // The restaurant's hours, worked out for right now — see BusinessHours.swift.
+    app.get("api", "hours") { _ throws -> BusinessHoursPublic in
+        let specials = (try? MenuStore.shared.get().categories.flatMap(\.items).filter { $0.featured && $0.available != false }.map(\.name)) ?? []
+        var seen = Set<String>()
+        return BusinessHoursCalculator.build(
+            data: BusinessHoursStore.shared.get(), specials: specials.filter { seen.insert($0).inserted }
+        )
+    }
+
+    // What /hours-admin.html edits.
+    app.get("api", "hours", "edit") { req throws -> BusinessHoursData in
+        try requireAdmin(req)
+        return BusinessHoursStore.shared.get()
+    }
+
+    app.put("api", "hours") { req throws -> BusinessHoursData in
+        try requireAdmin(req)
+        return try BusinessHoursStore.shared.save(try req.content.decode(BusinessHoursData.self))
+    }
+
     app.get("api", "menu") { _ throws -> Menu in
         try MenuStore.shared.get()
     }
@@ -1386,6 +1406,7 @@ func routes(_ app: Application) throws {
         ("qr-visits.html", "staff/qr-visits.html", true),
         ("qr-insights.html", "staff/qr-insights.html", true),
         ("pos-orders.html", "staff/pos-orders.html", true),
+        ("hours-admin.html", "staff/hours-admin.html", true),
         ("staff-rewards-admin.html", "staff/staff-rewards-admin.html", true),
         ("competitor-pricing-admin.html", "staff/competitor-pricing-admin.html", true),
         ("competitor-pricing-upload.html", "staff/competitor-pricing-upload.html", true),

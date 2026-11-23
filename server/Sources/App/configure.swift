@@ -49,6 +49,7 @@ func configure(_ app: Application) throws {
     MenuItemEngagementStore.shared.configure(dataDirectory: dataDirectory)
     QRVisitStore.shared.configure(dataDirectory: dataDirectory)
     PosOrderStore.shared.configure(dataDirectory: dataDirectory)
+    BusinessHoursStore.shared.configure(dataDirectory: dataDirectory)
 
     app.routes.defaultMaxBodySize = "10mb"
 

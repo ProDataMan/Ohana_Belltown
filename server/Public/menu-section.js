@@ -1380,13 +1380,33 @@ function isHappyHourNow() {
 /// aren't on right now, and, for a Happy Hour table-card scan that /scan sent
 /// to the full menu instead (`hhClosed=1`), a note saying why. Most flip-card
 /// scans in the first weeks came late at night.
-function renderHappyHourNotices() {
+/// Whether Happy Hour is on right now, from the hours the server works out
+/// (window.ohanaHours, in nav.js), which also knows we're closed at 3pm
+/// Monday–Thursday; falls back to the plain Mon–Fri 3–6pm rule.
+async function happyHourStatus() {
+  const hours = window.ohanaHours ? await window.ohanaHours : null;
+  if (hours && hours.now) {
+    return { on: hours.now.happyHourNow, label: hours.now.happyHourLabel, when: hours.happyHourSummary };
+  }
+  return { on: isHappyHourNow(), label: null, when: null };
+}
+
+async function renderHappyHourNotices() {
   const params = new URLSearchParams(window.location.search);
+  const hh = await happyHourStatus();
+  const when = hh.when ? escapeHtml(hh.when) : 'Monday&ndash;Friday, 3&ndash;6pm';
   let html = null;
-  if (window.MENU_SECTION === 'happy_hour' && !isHappyHourNow()) {
-    html = 'Happy Hour is <strong>Monday&ndash;Friday, 3&ndash;6pm</strong>, so these prices aren\'t on right now. <a href="/menu">See our full menu &rarr;</a>';
+  if (hh.on) {
+    const until = hh.label ? escapeHtml(hh.label.replace(/^Happy Hour /, '')) : 'until 6pm';
+    html = window.MENU_SECTION === 'happy_hour'
+      ? `<strong>Happy Hour is on now</strong>, ${until}.`
+      : `<strong>Happy Hour is on now</strong>, ${until}. <a href="/happy-hour">See the Happy Hour menu &rarr;</a>`;
+  } else if (window.MENU_SECTION === 'happy_hour') {
+    html = `Happy Hour is <strong>${when}</strong>, so these prices aren't on right now. <a href="/menu">See our full menu &rarr;</a>`;
   } else if (params.get('hhClosed') === '1') {
-    html = 'Happy Hour is <strong>Monday&ndash;Friday, 3&ndash;6pm</strong>, so here\'s our full menu for now. <a href="/happy-hour">Peek at the Happy Hour menu &rarr;</a>';
+    html = `Happy Hour is <strong>${when}</strong>, so here's our full menu for now. <a href="/happy-hour">Peek at the Happy Hour menu &rarr;</a>`;
+  }
+  if (params.get('hhClosed') === '1') {
     params.delete('hhClosed');
     const query = params.toString();
     try {
@@ -1409,14 +1429,14 @@ function renderHappyHourNotices() {
 /// profitable dishes), picked at random, with the others offered as "Also
 /// try" buttons. Shown/tapped are tracked on the QR visit, so QR Insights
 /// can show whether the popup turns into orders.
-function showScanFeaturePopup() {
+async function showScanFeaturePopup() {
   let visit = null;
   try {
     visit = JSON.parse(sessionStorage.getItem('ohana_qr_visit') || 'null');
   } catch {}
   if (!visit || !visit.id) return;
   // The Happy Hour pitches mention Happy Hour prices.
-  if (window.MENU_SECTION === 'happy_hour' && !isHappyHourNow()) return;
+  if (window.MENU_SECTION === 'happy_hour' && !(await happyHourStatus()).on) return;
   const shownKey = `ohana_scan_feature_shown:${visit.id}:${window.MENU_SECTION}`;
   try {
     if (sessionStorage.getItem(shownKey)) return;

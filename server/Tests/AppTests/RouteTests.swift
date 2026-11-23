@@ -43,6 +43,7 @@ final class RouteTests: XCTestCase {
         MenuItemEngagementStore.shared.configure(dataDirectory: tempDir.path)
         QRVisitStore.shared.configure(dataDirectory: tempDir.path)
         PosOrderStore.shared.configure(dataDirectory: tempDir.path)
+        BusinessHoursStore.shared.configure(dataDirectory: tempDir.path)
     }
 
     override func tearDown() async throws {
@@ -231,6 +232,35 @@ final class RouteTests: XCTestCase {
                 XCTAssertEqual(res.status, .ok, path)
                 XCTAssertNil(res.headers.setCookie?["vapor-session"], "\(path) created a session for an anonymous guest")
             }
+        }
+    }
+
+    func testHoursArePublicButOnlyAdminsCanEditThem() throws {
+        let (admin, employee) = try makeAdminAndSecondAccount(username: "hrs", password: "password123", role: "employee")
+        try app.test(.GET, "api/hours") { res in
+            XCTAssertEqual(res.status, .ok)
+            let hours = try res.content.decode(BusinessHoursPublic.self)
+            XCTAssertEqual(hours.week.map(\.label), ["Mon–Thu", "Fri–Sun"])
+            XCTAssertEqual(hours.happyHourSummary, "Mon–Thu 4:30–6pm · Fri 3–6pm")
+        }
+        try app.test(.GET, "api/hours/edit", headers: ["Cookie": employee]) { XCTAssertEqual($0.status, .forbidden) }
+        var data = BusinessHoursData.initial
+        data.seasonLabel = "Winter hours"
+        data.exceptions = [HoursException(date: "2099-12-25", closed: true, note: "Christmas")]
+        let body = try JSONEncoder().encode(data)
+        try app.test(.PUT, "api/hours", headers: ["Cookie": employee, "Content-Type": "application/json"], body: ByteBuffer(data: body)) {
+            XCTAssertEqual($0.status, .forbidden)
+        }
+        try app.test(.PUT, "api/hours", headers: ["Cookie": admin, "Content-Type": "application/json"], body: ByteBuffer(data: body)) {
+            XCTAssertEqual($0.status, .ok)
+        }
+        var bad = data
+        bad.week[0].close = "1am"
+        try app.test(.PUT, "api/hours", headers: ["Cookie": admin, "Content-Type": "application/json"], body: ByteBuffer(data: try JSONEncoder().encode(bad))) {
+            XCTAssertEqual($0.status, .badRequest)
+        }
+        try app.test(.GET, "api/hours") { res in
+            XCTAssertEqual(try res.content.decode(BusinessHoursPublic.self).seasonLabel, "Winter hours")
         }
     }
 

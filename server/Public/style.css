@@ -3272,3 +3272,184 @@ button.floor-map-table {
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+/* Opening hours (the hours code in nav.js): footer, phone bottom bar, home
+   banner + "Today at Ohana" strip, and the Contact / FAQ week. */
+.hours-status {
+  font-weight: 700;
+}
+
+.hours-open {
+  color: #1a7f43;
+}
+
+.hours-closed {
+  color: var(--text-muted);
+}
+
+.hours-week {
+  list-style: none;
+  margin: 0.3rem 0;
+  padding: 0;
+}
+
+.hours-week li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 260px;
+}
+
+.hours-week li span:first-child {
+  font-weight: 600;
+}
+
+.hours-note,
+.hours-season,
+.hours-upcoming {
+  font-size: 0.9rem;
+  margin: 0.25rem 0;
+}
+
+.hours-season {
+  color: var(--pink-text);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.75rem;
+}
+
+.hours-block {
+  margin: 0.8rem 0;
+}
+
+.location-card .hours-week li {
+  margin: 0 auto;
+}
+
+/* On the dark footer, status colors that still read. */
+.site-footer .hours-open {
+  color: #7be0a0;
+}
+
+.site-footer .hours-closed {
+  color: #cbbfd6;
+}
+
+.site-footer .hours-week li {
+  color: #fff;
+}
+
+.hours-hero {
+  display: inline-block;
+  margin: 0.6rem 0 0;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(20, 16, 28, 0.55);
+  color: #fff;
+  font-weight: 700;
+}
+
+.hours-hero.hours-open,
+.hours-hero.hours-closed {
+  color: #fff;
+}
+
+.today-strip {
+  max-width: 1100px;
+  margin: 1.5rem auto 0;
+  padding: 0 1.25rem;
+}
+
+.today-strip-inner {
+  padding: 1rem 1.2rem;
+  border-radius: 16px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 6px 18px rgba(36, 20, 45, 0.06);
+}
+
+.today-strip-title {
+  margin: 0 0 0.4rem;
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+
+.today-strip ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.4rem;
+}
+
+.today-strip a {
+  color: var(--pink-text);
+  font-weight: 700;
+}
+
+/* One line of status across the top of the phone bottom bar. */
+.mobile-cta-status {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  .mobile-cta-bar {
+    flex-wrap: wrap;
+  }
+
+  .mobile-cta-status {
+    display: block;
+    flex-basis: 100%;
+    padding: 0.3rem 0.75rem;
+    font-family: var(--font-ui);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .mobile-cta-status.hours-open {
+    color: #7be0a0;
+  }
+
+  .mobile-cta-status.hours-closed {
+    color: #cbbfd6;
+  }
+
+  body.has-mobile-cta-status {
+    padding-bottom: 84px;
+  }
+}
+
+/* Staff Hours editor (staff/hours-admin.html). */
+.hours-admin-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0.8rem 0;
+}
+
+.hours-admin-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 1rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+}
+
+.hours-admin-row > strong {
+  min-width: 6.5rem;
+}
+
+.hours-admin-row label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.9rem;
+}

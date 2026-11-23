@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hours — Ohana Belltown</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="stylesheet" href="../style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <p class="eyebrow">Ohana Belltown — Staff</p>
+        <h1>Hours</h1>
+        <p>The one place the site's hours come from: the footer on every page, the "Open now" line, the home page, the Contact page, the FAQ, Happy Hour times, and the hours Google sees. Change them here and every page follows. Keep your Google Business Profile hours matching.</p>
+        <div class="staff-tools-nav">
+          <a href="/edit.html">Menu Editor</a>
+          <a href="/waitlist-admin.html">Waitlist</a>
+          <a href="/table-orders-admin.html">Table Orders</a>
+          <a href="/analytics.html">Analytics</a>
+          <a href="/hours-admin.html" class="active">Hours</a>
+          <a href="/help.html">Help</a>
+        </div>
+      </header>
+
+      <section class="panel">
+        <h2>Right now</h2>
+        <div id="hours-preview" class="hours-block"><span class="hint">Loading...</span></div>
+      </section>
+
+      <form id="hours-form">
+        <section class="panel">
+          <h2>Weekly hours</h2>
+          <label for="season-label">Label <span class="hint">(optional, e.g. "Fall hours")</span></label>
+          <input type="text" id="season-label" maxlength="40" />
+          <p class="hint">A closing time at or before the opening time means after midnight (open 4:30 PM, close 1:00 AM). "Kitchen closes" is when food orders stop; leave it blank if the kitchen is open until close.</p>
+          <div id="week-rows" class="hours-admin-rows"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Holidays &amp; special days</h2>
+          <p class="hint">A date here replaces that day's regular hours (for example, closed for Thanksgiving). Past dates drop off automatically.</p>
+          <div id="exception-rows" class="hours-admin-rows"></div>
+          <button type="button" id="add-exception-btn" class="cta-button secondary">Add a date</button>
+          <label for="holiday-note" style="margin-top: 1rem;">Note shown under the hours <span class="hint">(optional)</span></label>
+          <input type="text" id="holiday-note" maxlength="140" />
+        </section>
+
+        <div class="cta-row">
+          <button type="submit" class="cta-button">Save hours</button>
+          <span id="hours-save-status" class="status"></span>
+        </div>
+      </form>
+    </main>
+
+    <script src="/nav.js"></script>
+    <script src="../staff-auth.js"></script>
+    <script src="../hours-admin.js"></script>
+  </body>
+</html>
