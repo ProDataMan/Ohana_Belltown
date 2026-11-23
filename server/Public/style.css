@@ -1330,10 +1330,33 @@ select {
     align-items: flex-start;
     padding: 1rem 1.25rem 1.5rem;
     gap: 0.9rem;
+    /* Fit between the pinned header and the bottom bar, and scroll inside
+       (height set by fitMobileNav in nav.js; the fallback assumes a ~64px
+       header and the ~84px bottom bar). */
+    max-height: var(--nav-max-height, calc(100vh - 148px));
+    /* Desktop lets the links wrap; here that would push whatever doesn't
+       fit into a second column off the right edge instead of scrolling. */
+    flex-wrap: nowrap;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   .site-nav.open {
     display: flex;
+  }
+
+  /* While the menu is open, the floating buttons would cover its links. */
+  body.nav-open .feedback-tab-btn,
+  body.nav-open .staff-alert-mute-toggle,
+  body.nav-open .staff-alerts-container,
+  body.nav-open #last-updated-badge {
+    display: none;
+  }
+
+  /* Keep each link full height so the menu scrolls instead of squeezing. */
+  .site-nav > * {
+    flex-shrink: 0;
   }
 
   .nav-dropdown {

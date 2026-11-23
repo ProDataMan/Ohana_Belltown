@@ -14,16 +14,49 @@
   document.head.appendChild(link);
 });
 
+// On phones the open menu hangs below the pinned header; without a height
+// limit, a long submenu (Staff) ran off the bottom of the screen with no way
+// to scroll to it, and the Call / Order / Directions bar covered the last
+// links. This fits the menu between the header and that bar, and the menu
+// scrolls inside itself (see .site-nav in style.css).
+function fitMobileNav() {
+  const nav = document.getElementById('site-nav');
+  const header = document.querySelector('.site-header');
+  if (!nav || !header) return;
+  const bar = document.querySelector('.mobile-cta-bar');
+  const barHeight = bar && getComputedStyle(bar).display !== 'none' ? bar.offsetHeight : 0;
+  const available = window.innerHeight - header.getBoundingClientRect().bottom - barHeight;
+  nav.style.setProperty('--nav-max-height', `${Math.max(available, 160)}px`);
+}
+
+/// After a submenu opens, scroll the menu so the submenu is in view.
+function revealDropdown(dropdown) {
+  const nav = document.getElementById('site-nav');
+  if (!nav || !nav.classList.contains('open') || !dropdown) return;
+  requestAnimationFrame(() => {
+    const menu = dropdown.querySelector('.nav-dropdown-menu') || dropdown;
+    const overflow = menu.getBoundingClientRect().bottom - nav.getBoundingClientRect().bottom;
+    if (overflow > 0) nav.scrollBy({ top: overflow + 12, behavior: 'smooth' });
+  });
+}
+
 document.getElementById('nav-toggle')?.addEventListener('click', () => {
-  document.getElementById('site-nav')?.classList.toggle('open');
+  fitMobileNav();
+  const open = document.getElementById('site-nav')?.classList.toggle('open');
+  // The floating Feedback / staff alert buttons would sit over the menu.
+  document.body.classList.toggle('nav-open', Boolean(open));
 });
+window.addEventListener('resize', fitMobileNav);
 
 document.querySelectorAll('.nav-dropdown-toggle').forEach((btn) => {
   btn.addEventListener('click', () => {
     const dropdown = btn.parentElement;
     const willOpen = !dropdown?.classList.contains('open');
     document.querySelectorAll('.nav-dropdown.open').forEach((d) => d.classList.remove('open'));
-    if (willOpen) dropdown?.classList.add('open');
+    if (willOpen) {
+      dropdown?.classList.add('open');
+      revealDropdown(dropdown);
+    }
   });
 });
 
@@ -136,7 +169,10 @@ function insertStaffNavDropdown() {
   dropdown.querySelector('.nav-dropdown-toggle').addEventListener('click', () => {
     const willOpen = !dropdown.classList.contains('open');
     document.querySelectorAll('.nav-dropdown.open').forEach((d) => d.classList.remove('open'));
-    if (willOpen) dropdown.classList.add('open');
+    if (willOpen) {
+      dropdown.classList.add('open');
+      revealDropdown(dropdown);
+    }
   });
 
   const loginLink = document.getElementById('nav-login-link');
