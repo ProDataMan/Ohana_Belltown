@@ -3476,3 +3476,142 @@ button.floor-map-table {
   margin: 0;
   font-size: 0.9rem;
 }
+
+/* Day-of-week deals (Musubi Monday…): card badge, highlight when the popup
+   sends guests to them, the popup's deal block, and the /specials list. */
+.deal-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--gradient-brand);
+  color: #fff;
+  margin: 0 0.3rem 0.35rem 0;
+  font-family: var(--font-ui);
+}
+
+.item.deal-highlight {
+  outline: 3px solid var(--pink);
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+
+.scan-deal {
+  margin: 0.9rem 1.2rem 0.2rem;
+  padding: 0.9rem 1rem;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #fff0f7, #fff7e6);
+  border: 2px solid var(--pink);
+}
+
+.scan-deal-eyebrow {
+  margin: 0;
+  color: var(--pink-text);
+  font-family: var(--font-ui);
+  font-weight: 800;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.scan-deal h2 {
+  margin: 0.15rem 0 0.1rem;
+  font-size: 1.6rem;
+}
+
+.scan-deal-price {
+  margin: 0 0 0.4rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--gold-text);
+}
+
+.scan-deal-details {
+  margin: 0 0 0.6rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.scan-feature-divider {
+  margin: 1rem 1.2rem 0.6rem;
+  border: none;
+  border-top: 1px solid var(--panel-border);
+}
+
+h3.scan-feature-try {
+  margin: 0 1.2rem 0.4rem;
+  font-size: 1.15rem;
+}
+
+/* The bold "View the ___ menu" link for the QR card the guest scanned
+   (renderScanCardNotice in menu-section.js). */
+.scan-card-notice p {
+  margin: 0 0 0.6rem;
+}
+
+.scan-card-notice .scan-card-button {
+  display: inline-block;
+  font-size: 1.05rem;
+  font-weight: 800;
+  padding: 0.75rem 1.4rem;
+  color: #fff;
+  white-space: normal;
+}
+
+.daily-deals {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.daily-deals li {
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+}
+
+.daily-deals li.today {
+  border: 2px solid var(--pink);
+  background: #fff0f7;
+}
+
+.daily-deals .hint {
+  display: block;
+  margin-top: 0.2rem;
+}
+
+.daily-deal-day {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--pink-text);
+}
+
+/* Staff Daily Specials editor. */
+.daily-special-rows label {
+  display: block;
+  margin: 0.4rem 0;
+}
+
+.sp-items {
+  max-height: 260px;
+  overflow-y: auto;
+  margin-top: 0.4rem;
+  padding: 0.4rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+}
+
+.sp-items .sp-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.15rem 0;
+  font-size: 0.92rem;
+}

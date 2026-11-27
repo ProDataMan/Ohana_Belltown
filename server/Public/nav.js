@@ -157,6 +157,7 @@ function insertStaffNavDropdown() {
       <a href="/qr-insights.html">QR Insights</a>
       <a href="/pos-orders.html">POS Orders</a>
       <a href="/hours-admin.html">Hours</a>
+      <a href="/daily-specials-admin.html">Daily Specials</a>
       <a href="/staff-rewards-admin.html">Staff Rewards</a>
       <a href="/competitor-pricing-admin.html">Competitor Pricing</a>
       <a href="/swag-admin.html">Swag</a>
@@ -1060,6 +1061,7 @@ window.ohanaHours = window.ohanaHours || fetch('/api/hours')
   document.querySelectorAll('[data-hours="today"]').forEach((el) => {
     const facts = [
       `<li><strong>${esc(now.today)}</strong></li>`,
+      ...(hours.todayDeals || []).map((deal) => `<li class="today-deal"><a href="/specials">${esc(deal.title)}</a>: <strong>${esc(deal.deal)}</strong></li>`),
       now.kitchenLabel ? `<li>${esc(now.kitchenLabel)}</li>` : '',
       `<li>${now.happyHourNow ? `<strong>${esc(now.happyHourLabel)}</strong> · ` : ''}<a href="/happy-hour">Happy Hour</a> ${esc(hours.happyHourSummary || '')}</li>`,
       hours.todaySpecials.length

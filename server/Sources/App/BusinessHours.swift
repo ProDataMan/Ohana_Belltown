@@ -74,6 +74,9 @@ struct BusinessHoursPublic: Content {
     /// schema.org OpeningHoursSpecification objects for the home page's
     /// structured data, so search engines and assistants know the hours.
     var openingHoursSpecification: [OpeningHoursSpec]
+    /// Today's day-of-week deal(s) (DailySpecialsStore), filled in by the
+    /// /api/hours route.
+    var todayDeals: [DailySpecial] = []
 }
 
 struct HoursLine: Content, Equatable {

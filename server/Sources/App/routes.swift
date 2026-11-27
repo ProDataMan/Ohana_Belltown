@@ -243,17 +243,17 @@ func routes(_ app: Application) throws {
     // also carries a `table` id, which rides along on the redirect so the
     // menu page can show a per-item Order button tied to that table.
     app.get("scan") { req in
-        var target = HappyHourSchedule.landingPath()
-        // The "flip the table card over" Happy Hour QR. During Happy Hour it
-        // lands on Happy Hour. Outside it, it lands on the full menu with a
-        // note (`hhClosed=1`, see renderHappyHourClosedNote in
-        // menu-section.js): 21 of the first 22 flip-card scans came outside
-        // Happy Hour, mostly late at night, and landed guests on prices that
-        // didn't apply.
+        // Every QR card lands on the menu that's actually on: Happy Hour
+        // while it's running (by the opening hours, so not at 3pm on a day
+        // we open at 4:30), the regular menu otherwise — the table side and
+        // the "flip the card over" Happy Hour side alike. Each page then
+        // links boldly to the menu of the card the guest scanned (`card=hh`
+        // marks the Happy Hour side; see renderScanCardNotice in
+        // menu-section.js). Before this, 21 of the first 22 Happy Hour-side
+        // scans came outside Happy Hour and landed on prices that didn't apply.
         let isHappyHourCard = req.query[String.self, at: "hh"] == "1"
-        if isHappyHourCard {
-            target = HappyHourSchedule.isActive() ? "/happy-hour" : "/menu"
-        }
+        let happyHourNow = BusinessHoursCalculator.build(data: BusinessHoursStore.shared.get()).now.happyHourNow
+        var target = happyHourNow ? "/happy-hour" : "/menu"
 
         // Recorded here, not on whatever page it redirects to — this fires
         // on every real QR scan regardless of what the guest does next
@@ -275,9 +275,6 @@ func routes(_ app: Application) throws {
         var queryParts: [String] = ["qr=1"]
         if isHappyHourCard {
             queryParts.append("card=hh")
-            if target == "/menu" {
-                queryParts.append("hhClosed=1")
-            }
         }
         if let table = scannedTable, !table.isEmpty,
            let encoded = table.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
@@ -297,9 +294,26 @@ func routes(_ app: Application) throws {
     app.get("api", "hours") { _ throws -> BusinessHoursPublic in
         let specials = (try? MenuStore.shared.get().categories.flatMap(\.items).filter { $0.featured && $0.available != false }.map(\.name)) ?? []
         var seen = Set<String>()
-        return BusinessHoursCalculator.build(
+        var hours = BusinessHoursCalculator.build(
             data: BusinessHoursStore.shared.get(), specials: specials.filter { seen.insert($0).inserted }
         )
+        hours.todayDeals = DailySpecialsStore.shared.publicView().today
+        return hours
+    }
+
+    // Day-of-week deals (Musubi Monday, Taco Tuesday) — see DailySpecials.swift.
+    app.get("api", "daily-specials") { _ -> DailySpecialsPublic in
+        DailySpecialsStore.shared.publicView()
+    }
+
+    app.get("api", "daily-specials", "edit") { req throws -> DailySpecialsData in
+        try requireAdmin(req)
+        return DailySpecialsStore.shared.get()
+    }
+
+    app.put("api", "daily-specials") { req throws -> DailySpecialsData in
+        try requireAdmin(req)
+        return try DailySpecialsStore.shared.save(try req.content.decode(DailySpecialsData.self))
     }
 
     // What /hours-admin.html edits.
@@ -1407,6 +1421,7 @@ func routes(_ app: Application) throws {
         ("qr-insights.html", "staff/qr-insights.html", true),
         ("pos-orders.html", "staff/pos-orders.html", true),
         ("hours-admin.html", "staff/hours-admin.html", true),
+        ("daily-specials-admin.html", "staff/daily-specials-admin.html", true),
         ("staff-rewards-admin.html", "staff/staff-rewards-admin.html", true),
         ("competitor-pricing-admin.html", "staff/competitor-pricing-admin.html", true),
         ("competitor-pricing-upload.html", "staff/competitor-pricing-upload.html", true),

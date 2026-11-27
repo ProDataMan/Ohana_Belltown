@@ -44,6 +44,7 @@ final class RouteTests: XCTestCase {
         QRVisitStore.shared.configure(dataDirectory: tempDir.path)
         PosOrderStore.shared.configure(dataDirectory: tempDir.path)
         BusinessHoursStore.shared.configure(dataDirectory: tempDir.path)
+        DailySpecialsStore.shared.configure(dataDirectory: tempDir.path)
     }
 
     override func tearDown() async throws {
@@ -264,6 +265,32 @@ final class RouteTests: XCTestCase {
         }
     }
 
+    func testDailySpecialsArePublicAndEditableByAdmins() throws {
+        let (admin, employee) = try makeAdminAndSecondAccount(username: "deals", password: "password123", role: "employee")
+        try app.test(.GET, "api/daily-specials") { res in
+            XCTAssertEqual(res.status, .ok)
+            let deals = try res.content.decode(DailySpecialsPublic.self)
+            XCTAssertEqual(deals.week.map(\.title), ["Musubi Monday", "Taco Tuesday"])
+        }
+        var data = DailySpecialsData.initial
+        data.specials.append(DailySpecial(id: "", weekday: 4, title: "Wing Wednesday", deal: "$1 wings", details: nil, itemNames: ["Spicy Teriyaki Wings"], active: true))
+        let headers = { (cookie: String) -> HTTPHeaders in ["Cookie": cookie, "Content-Type": "application/json"] }
+        try app.test(.PUT, "api/daily-specials", headers: headers(employee), body: ByteBuffer(data: try JSONEncoder().encode(data))) {
+            XCTAssertEqual($0.status, .forbidden)
+        }
+        try app.test(.PUT, "api/daily-specials", headers: headers(admin), body: ByteBuffer(data: try JSONEncoder().encode(data))) { res in
+            XCTAssertEqual(res.status, .ok)
+            let saved = try res.content.decode(DailySpecialsData.self)
+            XCTAssertFalse(saved.specials[2].id.isEmpty, "a new special gets an id")
+        }
+        var bad = data
+        bad.specials[0].deal = "  "
+        try app.test(.PUT, "api/daily-specials", headers: headers(admin), body: ByteBuffer(data: try JSONEncoder().encode(bad))) {
+            XCTAssertEqual($0.status, .badRequest)
+        }
+        try app.test(.GET, "api/daily-specials/edit", headers: ["Cookie": employee]) { XCTAssertEqual($0.status, .forbidden) }
+    }
+
     func testOneFeedbackSubmissionCanBeMarkedRead() throws {
         let (admin, employee) = try makeAdminAndSecondAccount(username: "fb", password: "password123", role: "employee")
         let json: HTTPHeaders = ["Content-Type": "application/json"]
@@ -479,20 +506,20 @@ final class RouteTests: XCTestCase {
     // The "flip the table card over" Happy Hour QR — lands on Happy Hour only
     // while it's on, and still carries the table id through so
     // ordering/price-unlock behaves the same as the front card.
-    func testScanHappyHourCardLandsOnHappyHourOnlyDuringHappyHour() throws {
-        // During Happy Hour it lands there; outside it, on the full menu with
-        // the "Happy Hour is Mon–Fri 3–6pm" note.
-        let open = HappyHourSchedule.isActive()
-        try app.test(.GET, "scan?hh=1") { res in
-            XCTAssertEqual(res.status, .seeOther)
-            XCTAssertEqual(res.headers.first(name: .location), open ? "/happy-hour?qr=1&card=hh" : "/menu?qr=1&card=hh&hhClosed=1")
+    // Both QR cards land on whichever menu is on — Happy Hour while it's
+    // running by the opening hours, the regular menu otherwise — and the
+    // Happy Hour side is marked `card=hh` so each page can link back to it.
+    func testBothQRCardsLandOnTheMenuThatIsOn() throws {
+        let page = BusinessHoursCalculator.build(data: BusinessHoursStore.shared.get()).now.happyHourNow ? "/happy-hour" : "/menu"
+        try app.test(.GET, "scan?table=5") { res in
+            XCTAssertEqual(res.headers.first(name: .location), "\(page)?qr=1&table=5")
         }
         try app.test(.GET, "scan?table=5&hh=1") { res in
             XCTAssertEqual(res.status, .seeOther)
-            XCTAssertEqual(
-                res.headers.first(name: .location),
-                open ? "/happy-hour?qr=1&card=hh&table=5" : "/menu?qr=1&card=hh&hhClosed=1&table=5"
-            )
+            XCTAssertEqual(res.headers.first(name: .location), "\(page)?qr=1&card=hh&table=5")
+        }
+        try app.test(.GET, "scan?hh=1") { res in
+            XCTAssertEqual(res.headers.first(name: .location), "\(page)?qr=1&card=hh")
         }
     }
 

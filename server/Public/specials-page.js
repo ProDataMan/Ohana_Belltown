@@ -85,5 +85,33 @@ async function loadPopularItems() {
   }
 }
 
+/// The week's day-of-week deals (Musubi Monday, Taco Tuesday…), today's
+/// highlighted. Edited on the staff Daily Specials page.
+async function loadDailyDeals() {
+  const section = document.getElementById('daily-deals-section');
+  const list = document.getElementById('daily-deals-list');
+  try {
+    const response = await fetch('/api/daily-specials');
+    if (!response.ok) return;
+    const data = await response.json();
+    if (!data.week.length) return;
+    const days = ['', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const esc = (v) => String(v ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+    list.innerHTML = data.week
+      .map(
+        (deal) => `
+        <li class="${deal.weekday === data.todayWeekday ? 'today' : ''}">
+          <span class="daily-deal-day">${days[deal.weekday]}${deal.weekday === data.todayWeekday ? ' &middot; today' : ''}</span>
+          <strong>${esc(deal.title)}</strong>: ${esc(deal.deal)}
+          ${deal.details ? `<span class="hint">${esc(deal.details)}</span>` : ''}
+        </li>
+      `
+      )
+      .join('');
+    section.hidden = false;
+  } catch {}
+}
+
+loadDailyDeals();
 loadSpecialsPage();
 loadPopularItems();

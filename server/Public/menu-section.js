@@ -720,6 +720,8 @@ function renderMenu(data) {
             ? `<div class="item-tags">${tags.map((t) => `<span class="item-tag-badge">${escapeHtml(TAG_LABELS[t] || t)}</span>`).join('')}</div>`
             : '';
           const specialBadge = item.featured ? '<span class="special-badge">&#9733; Today\'s Special</span>' : '';
+          const deal = todayDealFor(item.name);
+          const dealBadge = deal ? `<span class="deal-badge">${escapeHtml(deal.title)} &middot; ${escapeHtml(deal.deal)}</span>` : '';
           const soldOut = item.available === false;
           const soldOutBadge = soldOut ? '<span class="sold-out-badge">Sold Out Today</span>' : '';
           const editLink = item.id
@@ -766,7 +768,7 @@ function renderMenu(data) {
             <article class="item${soldOut ? ' item-sold-out' : ''}" data-search="${escapeHtml(searchText)}" data-index="${index}" data-tags="${escapeHtml(tags.join(','))}" role="button" tabindex="0" aria-label="View details for ${escapeHtml(item.name)}">
               ${imageMarkup}
               <div class="item-body">
-                ${soldOutBadge}${specialBadge}
+                ${soldOutBadge}${specialBadge}${dealBadge}
                 <h3>${escapeHtml(item.name)}</h3>
                 ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ''}
                 ${tagsMarkup}
@@ -1376,10 +1378,6 @@ function isHappyHourNow() {
   return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].includes(parts.weekday) && hour >= 15 && hour < 18;
 }
 
-/// Outside Happy Hour: a note on the Happy Hour page that these prices
-/// aren't on right now, and, for a Happy Hour table-card scan that /scan sent
-/// to the full menu instead (`hhClosed=1`), a note saying why. Most flip-card
-/// scans in the first weeks came late at night.
 /// Whether Happy Hour is on right now, from the hours the server works out
 /// (window.ohanaHours, in nav.js), which also knows we're closed at 3pm
 /// Monday–Thursday; falls back to the plain Mon–Fri 3–6pm rule.
@@ -1391,36 +1389,102 @@ async function happyHourStatus() {
   return { on: isHappyHourNow(), label: null, when: null };
 }
 
-async function renderHappyHourNotices() {
-  const params = new URLSearchParams(window.location.search);
+/// The QR visit this tab is in (see the visit tracker in nav.js), if any.
+function currentQrVisit() {
+  try {
+    const visit = JSON.parse(sessionStorage.getItem('ohana_qr_visit') || 'null');
+    return visit && visit.id ? visit : null;
+  } catch {
+    return null;
+  }
+}
+
+/// The note at the top of each menu page. Both QR cards land on whichever
+/// menu is on (Happy Hour during Happy Hour, the regular menu otherwise), so
+/// this always shows, big and bold, a link to the menu of the card the guest
+/// actually scanned when they're on a different page: the "flip the card
+/// over" Happy Hour side → the Happy Hour menu; the table side → the full
+/// menu. It also says whether Happy Hour prices are on.
+async function renderScanCardNotice() {
   const hh = await happyHourStatus();
   const when = hh.when ? escapeHtml(hh.when) : 'Monday&ndash;Friday, 3&ndash;6pm';
-  let html = null;
-  if (hh.on) {
-    const until = hh.label ? escapeHtml(hh.label.replace(/^Happy Hour /, '')) : 'until 6pm';
-    html = window.MENU_SECTION === 'happy_hour'
+  const until = hh.label ? escapeHtml(hh.label.replace(/^Happy Hour /, '')) : 'until 6pm';
+  const visit = currentQrVisit();
+  const scanned = visit
+    ? visit.source === 'happy-hour-card' ? 'happy_hour' : ['table', 'front-door'].includes(visit.source) ? 'menu' : null
+    : null;
+  const onPage = window.MENU_SECTION;
+
+  const lines = [];
+  let button = null;
+  if (scanned === 'happy_hour' && onPage !== 'happy_hour') {
+    lines.push(hh.on
+      ? `You scanned the <strong>Happy Hour</strong> card, and <strong>Happy Hour is on now</strong>, ${until}.`
+      : `You scanned the <strong>Happy Hour</strong> card. Happy Hour prices are <strong>${when}</strong>, so this is our regular menu for now.`);
+    button = '<a class="cta-button scan-card-button" href="/happy-hour">View the Happy Hour menu &rarr;</a>';
+  } else if (scanned === 'menu' && onPage !== 'menu') {
+    lines.push(onPage === 'happy_hour' && hh.on
+      ? `<strong>Happy Hour is on now</strong>, ${until}, so you're on the Happy Hour menu. You scanned the <strong>menu</strong> card:`
+      : 'You scanned the <strong>menu</strong> card:');
+    button = '<a class="cta-button scan-card-button" href="/menu">View the full menu &rarr;</a>';
+  } else if (onPage === 'happy_hour') {
+    lines.push(hh.on
       ? `<strong>Happy Hour is on now</strong>, ${until}.`
-      : `<strong>Happy Hour is on now</strong>, ${until}. <a href="/happy-hour">See the Happy Hour menu &rarr;</a>`;
-  } else if (window.MENU_SECTION === 'happy_hour') {
-    html = `Happy Hour is <strong>${when}</strong>, so these prices aren't on right now. <a href="/menu">See our full menu &rarr;</a>`;
-  } else if (params.get('hhClosed') === '1') {
-    html = `Happy Hour is <strong>${when}</strong>, so here's our full menu for now. <a href="/happy-hour">Peek at the Happy Hour menu &rarr;</a>`;
+      : `Happy Hour is <strong>${when}</strong>, so these prices aren't on right now. <a href="/menu">See our full menu &rarr;</a>`);
+  } else if (hh.on) {
+    lines.push(`<strong>Happy Hour is on now</strong>, ${until}. <a href="/happy-hour">See the Happy Hour menu &rarr;</a>`);
   }
-  if (params.get('hhClosed') === '1') {
-    params.delete('hhClosed');
-    const query = params.toString();
-    try {
-      history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : '') + window.location.hash);
-    } catch {}
-  }
-  if (!html) return;
-  const note = document.createElement('p');
-  note.className = 'happy-hour-notice';
+  if (!lines.length && !button) return;
+
+  const note = document.createElement('div');
+  note.className = `happy-hour-notice${button ? ' scan-card-notice' : ''}`;
   note.setAttribute('role', 'status');
-  note.innerHTML = html;
+  note.innerHTML = `<p>${lines.join(' ')}</p>${button || ''}`;
   const main = document.querySelector('main.page');
   if (main) main.prepend(note);
   else menuContainer.before(note);
+}
+
+/// Today's day-of-week deal(s) (Musubi Monday, Taco Tuesday), from the hours
+/// response nav.js already fetched (window.ohanaHours → todayDeals).
+let todayDeals = [];
+async function loadTodayDeals() {
+  const hours = window.ohanaHours ? await window.ohanaHours : null;
+  todayDeals = (hours && hours.todayDeals) || [];
+}
+
+/// The deal a dish is part of today, if any (for its card badge).
+function todayDealFor(itemName) {
+  return todayDeals.find((deal) => deal.itemNames.includes(itemName)) || null;
+}
+
+/// A `?deal=<id>` on the URL (the popup's "See" button from another page)
+/// scrolls to and highlights that deal's first dish on this page.
+function revealDealFromUrl() {
+  const id = new URLSearchParams(window.location.search).get('deal');
+  const deal = id && todayDeals.find((d) => d.id === id);
+  if (deal) highlightDealItems(deal);
+}
+
+function highlightDealItems(deal) {
+  const cards = Array.from(menuContainer.querySelectorAll('article.item')).filter((card) => {
+    const entry = itemsByIndex[Number(card.dataset.index)];
+    return entry && deal.itemNames.includes(entry.item.name);
+  });
+  cards.forEach((card) => card.classList.add('deal-highlight'));
+  if (cards[0]) cards[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+  return cards.length > 0;
+}
+
+/// Which menu page has a deal's dishes (for the popup's "See" button when
+/// they aren't on this page).
+function pageForDeal(deal) {
+  for (const category of (fullMenuData && fullMenuData.categories) || []) {
+    if ((category.items || []).some((item) => deal.itemNames.includes(item.name)) && SECTION_PAGES[category.section]) {
+      return SECTION_PAGES[category.section][0];
+    }
+  }
+  return '/menu';
 }
 
 /// "Try our ___" popup for guests who arrived by QR code: once per QR visit
@@ -1430,45 +1494,87 @@ async function renderHappyHourNotices() {
 /// try" buttons. Shown/tapped are tracked on the QR visit, so QR Insights
 /// can show whether the popup turns into orders.
 async function showScanFeaturePopup() {
-  let visit = null;
-  try {
-    visit = JSON.parse(sessionStorage.getItem('ohana_qr_visit') || 'null');
-  } catch {}
-  if (!visit || !visit.id) return;
-  // The Happy Hour pitches mention Happy Hour prices.
-  if (window.MENU_SECTION === 'happy_hour' && !(await happyHourStatus()).on) return;
-  const shownKey = `ohana_scan_feature_shown:${visit.id}:${window.MENU_SECTION}`;
-  try {
-    if (sessionStorage.getItem(shownKey)) return;
-  } catch {
-    return;
-  }
-  const featured = itemsByIndex
-    .map((entry, index) => ({ ...entry, index }))
-    .filter(({ item }) => item.scanPitch && item.available !== false);
-  if (!featured.length) return;
-  try {
-    sessionStorage.setItem(shownKey, '1');
-  } catch {}
+  const visit = currentQrVisit();
+  if (!visit) return;
+  let storageWorks = true;
+  const seen = (key) => {
+    try {
+      return Boolean(sessionStorage.getItem(key));
+    } catch {
+      storageWorks = false;
+      return true;
+    }
+  };
+  const mark = (key) => {
+    try {
+      sessionStorage.setItem(key, '1');
+    } catch {}
+  };
 
-  const pick = featured[Math.floor(Math.random() * featured.length)];
-  const others = featured.filter((f) => f !== pick);
-  const { item } = pick;
-  const showPrice = item.price != null && (Boolean(getTableId()) || getPriceViewFlag() || customerLoggedIn);
-  const photo = (item.images || [])[0];
+  // Today's deal (Musubi Monday…): once per QR visit, on whichever menu page
+  // the guest sees first.
+  const dealKey = `ohana_deal_shown:${visit.id}`;
+  const deal = !seen(dealKey) && todayDeals.length ? todayDeals[0] : null;
+
+  // The "Try our ___" pitch: once per QR visit per menu page. The Happy Hour
+  // pitches mention Happy Hour prices, so not on that page outside it.
+  const shownKey = `ohana_scan_feature_shown:${visit.id}:${window.MENU_SECTION}`;
+  const pitchAllowed = !(window.MENU_SECTION === 'happy_hour' && !(await happyHourStatus()).on);
+  const featured = pitchAllowed && !seen(shownKey)
+    ? itemsByIndex.map((entry, index) => ({ ...entry, index })).filter(({ item }) => item.scanPitch && item.available !== false)
+    : [];
+  if (!storageWorks || (!deal && !featured.length)) return;
+  if (deal) mark(dealKey);
+  if (featured.length) mark(shownKey);
+
+  const pick = featured.length ? featured[Math.floor(Math.random() * featured.length)] : null;
+  const others = pick ? featured.filter((f) => f !== pick) : [];
+  const item = pick ? pick.item : null;
+  const showPrice = item && item.price != null && (Boolean(getTableId()) || getPriceViewFlag() || customerLoggedIn);
+  let photo = item ? (item.images || [])[0] : null;
+  let photoAlt = item ? item.name : '';
+  if (deal) {
+    const dealItem = ((fullMenuData && fullMenuData.categories) || [])
+      .flatMap((c) => c.items || [])
+      .find((i) => deal.itemNames.includes(i.name) && (i.images || []).length);
+    if (dealItem) {
+      photo = dealItem.images[0];
+      photoAlt = dealItem.name;
+    }
+  }
+
+  const dealMarkup = deal
+    ? `
+      <div class="scan-deal">
+        <p class="scan-deal-eyebrow">Today only</p>
+        <h2 id="scan-feature-title">${escapeHtml(deal.title)}</h2>
+        <p class="scan-deal-price">${escapeHtml(deal.deal)}</p>
+        ${deal.details ? `<p class="scan-deal-details">${escapeHtml(deal.details)}</p>` : ''}
+        <button type="button" class="cta-button scan-deal-see">See the ${escapeHtml(deal.title)} dishes</button>
+      </div>
+    `
+    : '';
+  const pitchMarkup = item
+    ? `
+      ${deal ? '<hr class="scan-feature-divider" />' : '<p class="scan-feature-eyebrow">Aloha! Before you order&hellip;</p>'}
+      <${deal ? 'h3' : 'h2'} ${deal ? '' : 'id="scan-feature-title"'} class="scan-feature-try">Try our ${escapeHtml(item.name)}</${deal ? 'h3' : 'h2'}>
+      <p class="scan-feature-pitch">${escapeHtml(item.scanPitch)}</p>
+      ${showPrice ? `<p class="scan-feature-price">$${Number(item.price).toFixed(2)}</p>` : ''}
+      <div class="scan-feature-actions">
+        <button type="button" class="cta-button ${deal ? 'secondary ' : ''}scan-feature-see">See ${escapeHtml(item.name)}</button>
+      </div>
+    `
+    : '';
 
   const overlay = document.createElement('div');
   overlay.className = 'scan-feature-overlay';
   overlay.innerHTML = `
     <div class="scan-feature" role="dialog" aria-modal="true" aria-labelledby="scan-feature-title">
       <button type="button" class="scan-feature-close" aria-label="Close">&times;</button>
-      ${photo ? `<img class="scan-feature-photo" src="${escapeHtml(sizedPhotoUrl(photo, 960))}" alt="${escapeHtml(item.name)}" fetchpriority="high" />` : ''}
-      <p class="scan-feature-eyebrow">Aloha! Before you order&hellip;</p>
-      <h2 id="scan-feature-title">Try our ${escapeHtml(item.name)}</h2>
-      <p class="scan-feature-pitch">${escapeHtml(item.scanPitch)}</p>
-      ${showPrice ? `<p class="scan-feature-price">$${Number(item.price).toFixed(2)}</p>` : ''}
+      ${photo ? `<img class="scan-feature-photo" src="${escapeHtml(sizedPhotoUrl(photo, 960))}" alt="${escapeHtml(photoAlt)}" fetchpriority="high" />` : ''}
+      ${dealMarkup}
+      ${pitchMarkup}
       <div class="scan-feature-actions">
-        <button type="button" class="cta-button scan-feature-see">See ${escapeHtml(item.name)}</button>
         <button type="button" class="cta-button secondary scan-feature-dismiss">Maybe later</button>
       </div>
       ${
@@ -1481,7 +1587,12 @@ async function showScanFeaturePopup() {
     </div>
   `;
   document.body.appendChild(overlay);
-  trackVisit('feature-shown', { itemName: item.name });
+  // A photo that fails to load is hidden rather than shown as a broken box.
+  overlay.querySelector('.scan-feature-photo')?.addEventListener('error', (event) => {
+    event.target.hidden = true;
+  });
+  if (deal) trackVisit('feature-shown', { itemName: `${deal.title} (daily special)` });
+  if (item) trackVisit('feature-shown', { itemName: item.name });
 
   const close = () => {
     overlay.remove();
@@ -1501,16 +1612,23 @@ async function showScanFeaturePopup() {
   });
   overlay.querySelector('.scan-feature-close').addEventListener('click', close);
   overlay.querySelector('.scan-feature-dismiss').addEventListener('click', close);
-  overlay.querySelector('.scan-feature-see').addEventListener('click', () => open(pick));
+  overlay.querySelector('.scan-feature-see')?.addEventListener('click', () => open(pick));
+  overlay.querySelector('.scan-deal-see')?.addEventListener('click', () => {
+    trackVisit('feature-tap', { itemName: `${deal.title} (daily special)` });
+    close();
+    if (!highlightDealItems(deal)) {
+      window.location.href = `${pageForDeal(deal)}?deal=${encodeURIComponent(deal.id)}`;
+    }
+  });
   overlay.querySelectorAll('.scan-feature-other').forEach((btn) => {
     btn.addEventListener('click', () => open(featured.find((f) => f.index === Number(btn.dataset.index))));
   });
-  overlay.querySelector('.scan-feature-see').focus();
+  (overlay.querySelector('.scan-deal-see') || overlay.querySelector('.scan-feature-see'))?.focus();
 }
 
 async function loadMenu() {
   try {
-    const [response] = await Promise.all([fetch('/api/menu'), checkCustomerLoggedIn(), checkOrderSystemPhase()]);
+    const [response] = await Promise.all([fetch('/api/menu'), checkCustomerLoggedIn(), checkOrderSystemPhase(), loadTodayDeals()]);
     if (!response.ok) {
       throw new Error('Unable to load the menu data.');
     }
@@ -1519,7 +1637,8 @@ async function loadMenu() {
     fullMenuData = data;
     renderMenu(data);
     applySearchFromUrl();
-    renderHappyHourNotices();
+    revealDealFromUrl();
+    renderScanCardNotice();
     revealStaffOnlyElementsIfLoggedIn();
     showScanFeaturePopup();
   } catch (error) {

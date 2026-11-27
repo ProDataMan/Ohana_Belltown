@@ -102,3 +102,28 @@ final class BusinessHoursTests: XCTestCase {
         XCTAssertEqual(BusinessHoursStore.shared.get().seasonLabel, "Winter hours")
     }
 }
+
+final class DailySpecialsTests: XCTestCase {
+    private let iso = ISO8601DateFormatter()
+
+    func testTodaysDealFollowsTheWeekdayAndSkipsOffDeals() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        DailySpecialsStore.shared.configure(dataDirectory: dir.path)
+
+        let monday = iso.date(from: "2026-11-30T12:00:00-08:00")!
+        let tuesday = iso.date(from: "2026-12-01T12:00:00-08:00")!
+        let wednesday = iso.date(from: "2026-12-02T12:00:00-08:00")!
+        XCTAssertEqual(DailySpecialsStore.shared.publicView(now: monday).today.map(\.title), ["Musubi Monday"])
+        XCTAssertEqual(DailySpecialsStore.shared.publicView(now: tuesday).today.first?.itemNames, ["Fish Tacos", "Kalua Pork Tacos"])
+        XCTAssertTrue(DailySpecialsStore.shared.publicView(now: wednesday).today.isEmpty)
+
+        var data = DailySpecialsStore.shared.get()
+        data.specials[0].active = false
+        try DailySpecialsStore.shared.save(data)
+        DailySpecialsStore.shared.configure(dataDirectory: dir.path)
+        XCTAssertTrue(DailySpecialsStore.shared.publicView(now: monday).today.isEmpty, "a deal switched off doesn't show")
+        XCTAssertEqual(DailySpecialsStore.shared.publicView(now: monday).week.map(\.title), ["Taco Tuesday"])
+    }
+}

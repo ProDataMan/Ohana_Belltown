@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Daily Specials — Ohana Belltown</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="stylesheet" href="../style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <p class="eyebrow">Ohana Belltown — Staff</p>
+        <h1>Daily Specials</h1>
+        <p>Day-of-week deals like Musubi Monday. On its day, a deal pops up when guests scan a QR code, shows on the home page, and badges the dishes it covers. The Specials page lists the whole week.</p>
+        <div class="staff-tools-nav">
+          <a href="/edit.html">Menu Editor</a>
+          <a href="/hours-admin.html">Hours</a>
+          <a href="/daily-specials-admin.html" class="active">Daily Specials</a>
+          <a href="/analytics.html">Analytics</a>
+          <a href="/help.html">Help</a>
+        </div>
+      </header>
+
+      <form id="specials-form">
+        <div id="special-rows" class="daily-special-rows"></div>
+        <div class="cta-row">
+          <button type="button" id="add-special-btn" class="cta-button secondary">Add a daily special</button>
+          <button type="submit" class="cta-button">Save</button>
+          <span id="specials-save-status" class="status"></span>
+        </div>
+      </form>
+    </main>
+
+    <script src="/nav.js"></script>
+    <script src="../staff-auth.js"></script>
+    <script src="../daily-specials-admin.js"></script>
+  </body>
+</html>
