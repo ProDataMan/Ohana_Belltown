@@ -167,6 +167,7 @@ typeRadios.forEach((radio) => {
   radio.addEventListener('change', () => {
     const type = document.querySelector('input[name="bonus-type"]:checked').value;
     photoLabel.hidden = type === 'social';
+    document.getElementById('bonus-consent-label').hidden = type !== 'photo';
     socialLabel.hidden = type !== 'social';
     menuItemLabel.hidden = type === 'receipt';
     menuItemHint.textContent = type === 'photo' ? '(required for a photo)' : '(optional)';
@@ -268,6 +269,7 @@ document.getElementById('bonus-form').addEventListener('submit', async (event) =
         note,
         menuItemId: type === 'photo' && menuItem ? menuItem.id : null,
         menuItemName: type === 'photo' && menuItem ? menuItem.name : null,
+        featureConsent: type === 'photo' && document.getElementById('bonus-consent-input').checked,
       }),
     });
     if (!response.ok) {
@@ -285,6 +287,7 @@ document.getElementById('bonus-form').addEventListener('submit', async (event) =
     );
     event.target.reset();
     photoLabel.hidden = false;
+    document.getElementById('bonus-consent-label').hidden = false;
     socialLabel.hidden = true;
     menuItemLabel.hidden = false;
     menuItemHint.textContent = '(required for a photo)';

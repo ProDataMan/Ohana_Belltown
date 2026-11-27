@@ -82,16 +82,26 @@ struct BonusRequest: Codable, Content {
     /// the item could be renamed or deleted before anyone reviews this.
     var menuItemId: String?
     var menuItemName: String?
+    /// The guest ticked "OK to show my photo on Ohana's website" when they
+    /// submitted it. Staff can only post a photo to the guest photo wall
+    /// (Gallery and home page) when this is set.
+    var featureConsent: Bool
+    /// Staff ticked "Post on page" for this photo (see setOnWall).
+    var onWall: Bool
 
     enum CodingKeys: String, CodingKey {
         case id, phone, type, content, note, status, createdAt, reviewedAt, pointsAwarded, menuItemId, menuItemName
+        case featureConsent, onWall
     }
 
     init(
         id: String, phone: String, type: String, content: String, note: String?,
         status: String, createdAt: String, reviewedAt: String?, pointsAwarded: Int = 0,
-        menuItemId: String? = nil, menuItemName: String? = nil
+        menuItemId: String? = nil, menuItemName: String? = nil,
+        featureConsent: Bool = false, onWall: Bool = false
     ) {
+        self.featureConsent = featureConsent
+        self.onWall = onWall
         self.id = id
         self.phone = phone
         self.type = type
@@ -118,7 +128,17 @@ struct BonusRequest: Codable, Content {
         pointsAwarded = try container.decodeIfPresent(Int.self, forKey: .pointsAwarded) ?? 0
         menuItemId = try container.decodeIfPresent(String.self, forKey: .menuItemId)
         menuItemName = try container.decodeIfPresent(String.self, forKey: .menuItemName)
+        featureConsent = try container.decodeIfPresent(Bool.self, forKey: .featureConsent) ?? false
+        onWall = try container.decodeIfPresent(Bool.self, forKey: .onWall) ?? false
     }
+}
+
+/// A photo on the guest photo wall, as the public sees it: no phone number,
+/// no name, just the photo and which dish it is.
+struct GuestWallPhoto: Content {
+    var url: String
+    var dish: String?
+    var postedAt: String
 }
 
 struct LoyaltyData: Codable, Content {
@@ -440,7 +460,7 @@ final class LoyaltyStore: @unchecked Sendable {
     @discardableResult
     func submitBonusRequest(
         phone rawPhone: String, type: String, content: String, note: String?,
-        menuItemId: String? = nil, menuItemName: String? = nil
+        menuItemId: String? = nil, menuItemName: String? = nil, featureConsent: Bool = false
     ) throws -> BonusRequest {
         lock.lock()
         defer { lock.unlock() }
@@ -455,11 +475,48 @@ final class LoyaltyStore: @unchecked Sendable {
             createdAt: now(),
             reviewedAt: nil,
             menuItemId: menuItemId,
-            menuItemName: menuItemName
+            menuItemName: menuItemName,
+            featureConsent: type == "photo" && featureConsent
         )
         data.bonusRequests.append(request)
         try persist()
         return request
+    }
+
+    /// Staff's "Post on page" checkbox. Only an approved dish photo whose
+    /// guest agreed to have it shown can go on the wall.
+    @discardableResult
+    func setOnWall(id: String, show: Bool) throws -> BonusRequest {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        guard let idx = data.bonusRequests.firstIndex(where: { $0.id == id }) else {
+            throw LoyaltyError.bonusRequestNotFound
+        }
+        if show {
+            let request = data.bonusRequests[idx]
+            guard request.type == "photo", request.status == "approved" else {
+                throw Abort(.badRequest, reason: "Only approved dish photos can go on the page.")
+            }
+            guard request.featureConsent else {
+                throw Abort(.badRequest, reason: "This guest didn't agree to have their photo shown on the website.")
+            }
+        }
+        data.bonusRequests[idx].onWall = show
+        try persist()
+        return data.bonusRequests[idx]
+    }
+
+    /// The guest photo wall, newest first.
+    func wallPhotos(limit: Int = 24) throws -> [GuestWallPhoto] {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadIfNeeded()
+        return data.bonusRequests
+            .filter { $0.onWall && $0.featureConsent && $0.status == "approved" && $0.type == "photo" }
+            .sorted { ($0.reviewedAt ?? $0.createdAt) > ($1.reviewedAt ?? $1.createdAt) }
+            .prefix(limit)
+            .map { GuestWallPhoto(url: $0.content, dish: $0.menuItemName, postedAt: $0.reviewedAt ?? $0.createdAt) }
     }
 
     func allBonusRequests() throws -> [BonusRequest] {

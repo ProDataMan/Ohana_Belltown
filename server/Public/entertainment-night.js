@@ -146,6 +146,10 @@ async function initEntertainmentNightPage() {
             : ''
         }
         ${b.videoURL ? `<video controls preload="metadata" src="${escapeHtmlEntertainmentNight(b.videoURL)}"></video>` : ''}
+        <div class="event-actions">
+          <a class="cta-button secondary event-calendar" href="/event/${encodeURIComponent(b.id)}/calendar.ics">Add to calendar</a>
+          <button type="button" class="cta-button secondary event-share" data-id="${escapeHtmlEntertainmentNight(b.id)}" data-title="${escapeHtmlEntertainmentNight(`${config.title}: ${b.performerName} at Ohana Belltown`)}">Share</button>
+        </div>
       </div>
     `
       )
@@ -154,6 +158,15 @@ async function initEntertainmentNightPage() {
     bookingsList.querySelectorAll('.gallery-item').forEach((el) => {
       el.addEventListener('click', () => {
         window.openLightbox(el.dataset.src, el.dataset.caption);
+      });
+    });
+
+    bookingsList.querySelectorAll('.event-calendar').forEach((link) => {
+      link.addEventListener('click', () => window.ohanaCountAction?.('add-to-calendar'));
+    });
+    bookingsList.querySelectorAll('.event-share').forEach((button) => {
+      button.addEventListener('click', () => {
+        window.ohanaShare?.({ title: button.dataset.title, url: `/event/${encodeURIComponent(button.dataset.id)}`, campaign: 'event', button });
       });
     });
 

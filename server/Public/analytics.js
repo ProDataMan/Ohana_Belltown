@@ -136,6 +136,9 @@ const ACTION_LABELS = {
   call: 'Call',
   directions: 'Directions',
   email: 'Email',
+  share: 'Shared a link',
+  'add-to-calendar': 'Added to calendar',
+  review: 'Opened Google review',
 };
 
 function actionLabel(action) {

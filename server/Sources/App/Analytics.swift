@@ -282,7 +282,7 @@ final class AnalyticsStore: @unchecked Sendable {
         "baidu", "bytespider", "petalbot", "google-inspectiontool", "mediapartners", "feedfetcher", "httpclient",
     ]
 
-    static let actions: Set<String> = ["order-online", "call", "directions", "email"]
+    static let actions: Set<String> = ["order-online", "call", "directions", "email", "share", "add-to-calendar", "review"]
     static let socialSites: Set<String> = ["instagram", "facebook", "tiktok", "yelp", "x", "google-reviews", "tripadvisor"]
 
     static func isKnownAction(_ action: String) -> Bool {

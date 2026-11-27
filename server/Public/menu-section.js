@@ -523,6 +523,25 @@ function renderSearchElsewhere(query, resultCount) {
 
 /// A `?q=` on the URL (from a "found on another menu" link) fills in and
 /// runs the search on load.
+/// A `?item=<id>` on the URL (a shared dish link, via /dish/<id>) opens that
+/// dish's details on load.
+function openItemFromUrl() {
+  const id = new URLSearchParams(window.location.search).get('item');
+  if (!id) return false;
+  const index = itemsByIndex.findIndex((entry) => entry.item.id === id);
+  if (index === -1) return false;
+  openItemModal(index);
+  return true;
+}
+
+// share.js (the share sheet / copy-link helper) isn't on every menu page's
+// script list, so load it once here.
+if (!window.ohanaShare && !document.querySelector('script[src="/share.js"]')) {
+  const shareScript = document.createElement('script');
+  shareScript.src = '/share.js';
+  document.head.appendChild(shareScript);
+}
+
 function applySearchFromUrl() {
   const query = new URLSearchParams(window.location.search).get('q');
   const input = document.getElementById('menu-search');
@@ -841,6 +860,10 @@ function ensureItemModal() {
       <div class="item-modifiers item-modal-modifiers" hidden></div>
       <div class="item-modal-choice-groups"></div>
       <button type="button" class="order-btn item-modal-order-btn" hidden></button>
+      <div class="item-modal-social">
+        <button type="button" class="cta-button secondary item-modal-share">Share this dish</button>
+        <p class="tag-us-line">Post your plate and tag <strong>@ohanabelltown</strong>, then <a href="/rewards">send it to us for a bonus punch</a>.</p>
+      </div>
       <div class="item-modal-google-section" hidden>
         <p class="item-modal-google-label"></p>
         <div class="item-modal-google-strip"></div>
@@ -928,6 +951,11 @@ async function openItemModal(index) {
   modal.querySelector('.item-modal-sold-out').hidden = item.available !== false;
   modal.querySelector('.item-modal-name').textContent = item.name;
   modal.querySelector('.item-modal-desc').textContent = item.description || '';
+  const shareBtn = modal.querySelector('.item-modal-share');
+  shareBtn.hidden = !item.id;
+  shareBtn.onclick = () =>
+    window.ohanaShare &&
+    window.ohanaShare({ title: `${item.name} at Ohana Belltown`, url: `/dish/${encodeURIComponent(item.id)}`, campaign: 'dish', button: shareBtn });
 
   const priceEl = modal.querySelector('.item-modal-price');
   const showPrice = item.price != null && (Boolean(getTableId()) || staffLoggedIn || getPriceViewFlag() || customerLoggedIn);
@@ -1487,6 +1515,108 @@ function pageForDeal(deal) {
   return '/menu';
 }
 
+/// `?yoshi=preview` shows Yoshi whatever the time, for staff to see him.
+function yoshiPreviewRequested() {
+  return new URLSearchParams(window.location.search).get('yoshi') === 'preview';
+}
+
+/// Yoshi, our cartoon mascot: when a guest scans the Happy Hour card
+/// outside Happy Hour, he pops up first to say "It's not Happy Hour, brah!"
+/// and when it is, then hands over to the usual popup. Once per QR visit.
+/// Resolves when the guest closes him.
+async function showYoshiNotHappyHour(visit) {
+  const preview = yoshiPreviewRequested();
+  if (!preview) {
+    if (!visit || visit.source !== 'happy-hour-card') return;
+    const key = `ohana_yoshi_shown:${visit.id}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, '1');
+    } catch {
+      return;
+    }
+  }
+  const hh = await happyHourStatus();
+  if (hh.on && !preview) return;
+  const when = hh.when ? escapeHtml(hh.when) : 'Monday&ndash;Friday, 3&ndash;6pm';
+
+  const overlay = document.createElement('div');
+  overlay.className = 'yoshi-overlay';
+  overlay.innerHTML = `
+    <div class="yoshi-card" role="dialog" aria-modal="true" aria-labelledby="yoshi-says">
+      <div class="yoshi-stage">
+        <p class="yoshi-bubble" id="yoshi-says">It's not Happy Hour, brah!</p>
+        ${YOSHI_SVG}
+      </div>
+      <p class="yoshi-when">Happy Hour is <strong>${when}</strong>. Come back then for the Happy Hour prices. Until then, here's our regular menu.</p>
+      <button type="button" class="cta-button yoshi-ok">Shoots, show me the menu</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  trackVisit('feature-shown', { itemName: "Yoshi: it's not Happy Hour" });
+  const button = overlay.querySelector('.yoshi-ok');
+  button.focus({ preventScroll: true });
+
+  await new Promise((resolve) => {
+    const close = () => {
+      overlay.classList.add('yoshi-leaving');
+      document.removeEventListener('keydown', onKey);
+      setTimeout(() => {
+        overlay.remove();
+        resolve();
+      }, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 250);
+    };
+    const onKey = (event) => {
+      if (event.key === 'Escape') close();
+    };
+    document.addEventListener('keydown', onKey);
+    button.addEventListener('click', close);
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) close();
+    });
+  });
+}
+
+/// Yoshi: a round, friendly guy in an aloha shirt and sunglasses throwing a
+/// shaka. Drawn here (no image to load) so he appears instantly; the
+/// animation (bounce in, waving shaka, head shake) is in style.css.
+const YOSHI_SVG = `
+  <svg class="yoshi" viewBox="0 0 200 220" role="img" aria-label="Yoshi, the Ohana mascot, shaking his head and throwing a shaka">
+    <g class="yoshi-body">
+      <path d="M40 220 C40 160 70 140 100 140 C130 140 160 160 160 220 Z" fill="#e8467c"/>
+      <circle cx="68" cy="178" r="7" fill="#ffd166"/><circle cx="74" cy="173" r="4" fill="#fff"/>
+      <circle cx="128" cy="195" r="8" fill="#ffd166"/><circle cx="135" cy="189" r="4" fill="#fff"/>
+      <circle cx="95" cy="205" r="5" fill="#7bdff2"/>
+      <path d="M85 140 L100 165 L115 140 Z" fill="#fff"/>
+      <path d="M86 141 L100 160 L90 167 Z M114 141 L100 160 L110 167 Z" fill="#c2185b"/>
+    </g>
+    <g class="yoshi-arm">
+      <path d="M150 168 C168 150 172 130 168 112" stroke="#e8467c" stroke-width="18" stroke-linecap="round" fill="none"/>
+      <g class="yoshi-shaka">
+        <ellipse cx="168" cy="100" rx="13" ry="12" fill="#c98b5e"/>
+        <rect x="174" y="72" width="9" height="26" rx="4.5" fill="#c98b5e" transform="rotate(28 178 92)"/>
+        <rect x="138" y="94" width="24" height="10" rx="5" fill="#c98b5e" transform="rotate(-28 160 100)"/>
+        <path d="M160 96 H174 M160 102 H174" stroke="#b87a4f" stroke-width="2" stroke-linecap="round"/>
+      </g>
+    </g>
+    <g class="yoshi-head">
+      <circle cx="100" cy="88" r="52" fill="#c98b5e"/>
+      <path d="M50 78 C52 40 80 30 100 30 C125 30 150 42 150 78 C140 60 120 52 100 54 C80 52 60 60 50 78 Z" fill="#2b1d16"/>
+      <ellipse cx="48" cy="92" rx="7" ry="10" fill="#b87a4f"/>
+      <ellipse cx="152" cy="92" rx="7" ry="10" fill="#b87a4f"/>
+      <path d="M62 82 H138 L134 98 C132 106 116 108 110 100 L104 90 H96 L90 100 C84 108 68 106 66 98 Z" fill="#14213d"/>
+      <path d="M70 86 L80 86" stroke="#7bdff2" stroke-width="3" stroke-linecap="round"/>
+      <path d="M112 86 L122 86" stroke="#7bdff2" stroke-width="3" stroke-linecap="round"/>
+      <path class="yoshi-mouth" d="M82 118 Q100 132 118 118" stroke="#5a2e1a" stroke-width="5" stroke-linecap="round" fill="none"/>
+      <g class="yoshi-flower">
+        <circle cx="138" cy="50" r="7" fill="#ff8fab"/><circle cx="150" cy="56" r="7" fill="#ff8fab"/>
+        <circle cx="146" cy="68" r="7" fill="#ff8fab"/><circle cx="132" cy="66" r="7" fill="#ff8fab"/>
+        <circle cx="130" cy="54" r="7" fill="#ff8fab"/><circle cx="140" cy="59" r="5" fill="#ffd166"/>
+      </g>
+    </g>
+  </svg>
+`;
+
 /// "Try our ___" popup for guests who arrived by QR code: once per QR visit
 /// per menu page, it features one of this page's items that has a scan
 /// pitch (set per item in the item editor; chosen by the owner as the most
@@ -1495,6 +1625,8 @@ function pageForDeal(deal) {
 /// can show whether the popup turns into orders.
 async function showScanFeaturePopup() {
   const visit = currentQrVisit();
+  if (!visit && !yoshiPreviewRequested()) return;
+  await showYoshiNotHappyHour(visit);
   if (!visit) return;
   let storageWorks = true;
   const seen = (key) => {
@@ -1577,6 +1709,7 @@ async function showScanFeaturePopup() {
       <div class="scan-feature-actions">
         <button type="button" class="cta-button secondary scan-feature-dismiss">Maybe later</button>
       </div>
+      <p class="tag-us-line">Post your plate and tag <strong>@ohanabelltown</strong> for a <a href="/rewards">bonus punch</a>.</p>
       ${
         others.length
           ? `<div class="scan-feature-others"><span>Also try:</span> ${others
@@ -1640,7 +1773,8 @@ async function loadMenu() {
     revealDealFromUrl();
     renderScanCardNotice();
     revealStaffOnlyElementsIfLoggedIn();
-    showScanFeaturePopup();
+    // A shared dish link opens that dish; the scan popup would cover it.
+    if (!openItemFromUrl()) showScanFeaturePopup();
   } catch (error) {
     menuContainer.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;
   }

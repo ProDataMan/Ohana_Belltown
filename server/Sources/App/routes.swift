@@ -29,6 +29,12 @@ struct BonusClaimRequest: Content {
     var note: String?
     var menuItemId: String?
     var menuItemName: String?
+    /// "OK to show my photo on Ohana's website."
+    var featureConsent: Bool?
+}
+
+struct WallToggleRequest: Content {
+    var show: Bool
 }
 
 struct BonusReviewRequest: Content {
@@ -299,6 +305,40 @@ func routes(_ app: Application) throws {
         )
         hours.todayDeals = DailySpecialsStore.shared.publicView().today
         return hours
+    }
+
+    // Shareable dish and deal pages with link previews — see SharePages.swift.
+    app.get("dish", ":id") { req throws -> Response in
+        guard let id = req.parameters.get("id"), let location = try? MenuStore.shared.findItem(id: id) else {
+            return req.redirect(to: "/menu")
+        }
+        return SharePages.dish(location, id: id, query: req.url.query)
+    }
+
+    app.get("deal", ":id") { req throws -> Response in
+        guard let id = req.parameters.get("id"),
+              let deal = DailySpecialsStore.shared.get().specials.first(where: { $0.id == id && $0.active }) else {
+            return req.redirect(to: "/specials")
+        }
+        return SharePages.deal(deal, menu: try? MenuStore.shared.get())
+    }
+
+    // A performer's night: share preview and .ics calendar entry.
+    app.get("event", ":id") { req throws -> Response in
+        guard let id = req.parameters.get("id"),
+              let booking = try EntertainmentStore.shared.all().first(where: { $0.id == id }) else {
+            return req.redirect(to: "/entertainment")
+        }
+        return SharePages.event(booking, query: req.url.query)
+    }
+
+    app.get("event", ":id", "calendar.ics") { req throws -> Response in
+        guard let id = req.parameters.get("id"),
+              let booking = try EntertainmentStore.shared.all().first(where: { $0.id == id }),
+              let response = SharePages.calendar(booking) else {
+            throw Abort(.notFound)
+        }
+        return response
     }
 
     // Day-of-week deals (Musubi Monday, Taco Tuesday) — see DailySpecials.swift.
@@ -1067,8 +1107,22 @@ func routes(_ app: Application) throws {
         }
         return try LoyaltyStore.shared.submitBonusRequest(
             phone: body.phone, type: body.type, content: body.content, note: body.note,
-            menuItemId: body.menuItemId, menuItemName: body.menuItemName
+            menuItemId: body.menuItemId, menuItemName: body.menuItemName,
+            featureConsent: body.featureConsent ?? false
         )
+    }
+
+    // Staff's "Post on page" checkbox for an approved guest photo.
+    app.post("api", "loyalty", "bonus-requests", ":id", "wall") { req throws -> BonusRequest in
+        try requireStaffAccess(req)
+        guard let id = req.parameters.get("id") else { throw Abort(.badRequest) }
+        return try LoyaltyStore.shared.setOnWall(id: id, show: try req.content.decode(WallToggleRequest.self).show)
+    }
+
+    // The guest photo wall (Gallery and home page) — photos and dish names
+    // only, never who sent them.
+    app.get("api", "guest-photos") { _ throws -> [GuestWallPhoto] in
+        try LoyaltyStore.shared.wallPhotos()
     }
 
     app.post("api", "loyalty", "punch") { req throws -> LoyaltyStatus in

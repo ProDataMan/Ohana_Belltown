@@ -15,6 +15,21 @@ function escapeHtmlSpecials(value) {
     .replaceAll('"', '&quot;');
 }
 
+/// Links to paste into a post about a deal: each opens its /deal/<id> page
+/// (with a photo preview) and is tagged, so Analytics shows which network
+/// the visits came from.
+const POST_NETWORKS = [['instagram', 'Instagram'], ['facebook', 'Facebook'], ['google-business', 'Google']];
+function postLinks(id) {
+  const base = `${window.location.origin}/deal/${encodeURIComponent(id)}`;
+  return `
+    <div class="post-links">
+      <span class="hint">Link to post:</span>
+      ${POST_NETWORKS.map(([source, label]) => `<button type="button" class="secondary copy-post-link" data-link="${escapeHtmlSpecials(`${base}?utm_source=${source}&utm_campaign=${encodeURIComponent(id)}`)}">Copy for ${label}</button>`).join('')}
+      <a href="${escapeHtmlSpecials(base)}" target="_blank" rel="noopener">Preview</a>
+    </div>
+  `;
+}
+
 function specialRow(special = { id: '', weekday: 2, title: '', deal: '', details: '', itemNames: [], active: true }) {
   const picked = new Set(special.itemNames);
   return `
@@ -31,6 +46,7 @@ function specialRow(special = { id: '', weekday: 2, title: '', deal: '', details
       <label>Name <input type="text" class="sp-title" maxlength="40" placeholder="Musubi Monday" value="${escapeHtmlSpecials(special.title)}" required /></label>
       <label>Deal <input type="text" class="sp-deal" maxlength="40" placeholder="$5.50 musubis" value="${escapeHtmlSpecials(special.deal)}" required /></label>
       <label>Fine print <span class="hint">(optional)</span> <input type="text" class="sp-details" maxlength="120" value="${escapeHtmlSpecials(special.details || '')}" /></label>
+      ${special.id ? postLinks(special.id) : ''}
       <details ${special.itemNames.length ? '' : 'open'}>
         <summary>Dishes it covers (${special.itemNames.length} picked)</summary>
         <input type="search" class="sp-filter" placeholder="Filter dishes..." />
@@ -81,7 +97,19 @@ document.getElementById('add-special-btn').addEventListener('click', () => {
   document.getElementById('special-rows').insertAdjacentHTML('beforeend', specialRow());
 });
 
-document.getElementById('special-rows').addEventListener('click', (event) => {
+document.getElementById('special-rows').addEventListener('click', async (event) => {
+  const copy = event.target.closest('.copy-post-link');
+  if (copy) {
+    const label = copy.textContent;
+    try {
+      await navigator.clipboard.writeText(copy.dataset.link);
+      copy.textContent = 'Copied!';
+    } catch {
+      window.prompt('Copy this link:', copy.dataset.link);
+    }
+    setTimeout(() => { copy.textContent = label; }, 2000);
+    return;
+  }
   const remove = event.target.closest('.sp-remove');
   if (remove) remove.closest('.daily-special-row').outerHTML = '';
 });

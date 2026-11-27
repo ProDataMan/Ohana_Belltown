@@ -3615,3 +3615,346 @@ h3.scan-feature-try {
   margin: 0.15rem 0;
   font-size: 0.92rem;
 }
+
+/* ---------- Sharing: /dish, /deal and /event preview pages (SharePages.swift) ---------- */
+.share-page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1.2rem 16px 3rem;
+}
+
+.share-brand {
+  margin: 0 0 1rem;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+}
+
+.share-brand a {
+  color: var(--pink-text);
+  text-decoration: none;
+}
+
+.share-photo {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  object-fit: cover;
+  border-radius: 18px;
+  margin: 0 0 1rem;
+  background: var(--panel-border);
+}
+
+.share-deal {
+  margin: 0.2rem 0 0.6rem;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--pink-text);
+}
+
+.share-when {
+  display: inline-block;
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  background: #fff4e0;
+  border: 1px solid var(--gold-bright);
+  font-weight: 700;
+}
+
+.share-dishes {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.share-dishes a {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.share-dishes img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 12px;
+  background: var(--panel-border);
+}
+
+/* Share button and "tag us" line in the dish window (menu-section.js). */
+.item-modal-social {
+  margin: 1rem 0 0;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--panel-border);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.item-modal-share {
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--pink);
+  background: transparent;
+  color: var(--pink-text);
+  font-family: var(--font-ui);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tag-us-line {
+  margin: 0.8rem 1.2rem 0;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.item-modal-social .tag-us-line {
+  margin: 0;
+  flex: 1 1 200px;
+}
+
+.tag-us-line a {
+  color: var(--pink-text);
+  font-weight: 700;
+}
+
+/* Approved guest photos staff chose to post (guest-wall.js). */
+.guest-wall {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.6rem;
+  margin: 1rem 0;
+}
+
+.guest-wall-photo {
+  position: relative;
+  padding: 0;
+  border: none;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--panel-border);
+  cursor: pointer;
+  aspect-ratio: 1;
+}
+
+.guest-wall-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.guest-wall-photo span {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 1.2rem 0.5rem 0.4rem;
+  background: linear-gradient(transparent, rgba(20, 16, 28, 0.75));
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: left;
+}
+
+/* Event cards: Add to calendar / Share (entertainment-night.js). */
+.event-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+
+/* Staff Daily Specials: copyable links to post. */
+.post-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.4rem 0 0.6rem;
+}
+
+.post-links button {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+/* The Google review nudge, 25 minutes into a QR visit (nav.js). */
+.review-prompt {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 1100;
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 1rem 1.1rem;
+  border-radius: 16px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 12px 36px rgba(20, 16, 28, 0.25);
+  animation: scan-feature-pop 0.3s ease;
+}
+
+.review-prompt[hidden] {
+  display: none;
+}
+
+.review-prompt p {
+  margin: 0 0 0.7rem;
+  line-height: 1.45;
+}
+
+.review-prompt-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Yoshi, "It's not Happy Hour, brah!" (showYoshiNotHappyHour in menu-section.js). */
+.yoshi-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1250;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(20, 16, 28, 0.6);
+  animation: scan-feature-fade 0.25s ease;
+  transition: opacity 0.25s ease;
+}
+
+.yoshi-overlay.yoshi-leaving {
+  opacity: 0;
+}
+
+.yoshi-card {
+  width: 100%;
+  max-width: 380px;
+  padding: 1.2rem 1.2rem 1.3rem;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #7bdff2 0%, #fff4e0 70%);
+  box-shadow: 0 18px 50px rgba(20, 16, 28, 0.35);
+  text-align: center;
+  overflow: hidden;
+}
+
+.yoshi-stage {
+  position: relative;
+  padding-top: 4.2rem;
+}
+
+.yoshi-bubble {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 1;
+  width: max-content;
+  max-width: 92%;
+  margin: 0;
+  padding: 0.6rem 1rem;
+  border-radius: 18px;
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  line-height: 1.2;
+  box-shadow: 0 4px 14px rgba(20, 16, 28, 0.18);
+  transform: translateX(-50%);
+  animation: yoshi-bubble-in 0.4s 0.55s cubic-bezier(0.3, 1.6, 0.6, 1) both;
+}
+
+.yoshi-bubble::after {
+  content: "";
+  position: absolute;
+  bottom: -10px;
+  left: 44%;
+  border: 10px solid transparent;
+  border-top-color: #fff;
+  border-bottom: 0;
+}
+
+.yoshi {
+  display: block;
+  width: 190px;
+  height: auto;
+  margin: 0 auto -1.3rem;
+  animation: yoshi-pop-up 0.6s cubic-bezier(0.3, 1.5, 0.6, 1) both;
+}
+
+.yoshi-head {
+  transform-origin: 100px 130px;
+  animation: yoshi-head-shake 0.9s 0.9s ease-in-out 2;
+}
+
+.yoshi-arm {
+  transform-origin: 150px 168px;
+  animation: yoshi-shaka-wave 0.5s 0.6s ease-in-out infinite alternate;
+}
+
+.yoshi-flower {
+  transform-origin: 140px 59px;
+  animation: yoshi-spin 6s linear infinite;
+}
+
+.yoshi-when {
+  position: relative;
+  margin: 0 0 0.9rem;
+  padding: 0.9rem 0.8rem 0;
+  border-radius: 14px;
+  background: #fff4e0;
+  line-height: 1.45;
+}
+
+.yoshi-ok {
+  width: 100%;
+}
+
+@keyframes yoshi-pop-up {
+  from { transform: translateY(90px) scale(0.8); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+@keyframes yoshi-bubble-in {
+  from { transform: translateX(-50%) scale(0.3); opacity: 0; }
+  to { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+
+@keyframes yoshi-head-shake {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(-9deg); }
+  45% { transform: rotate(8deg); }
+  70% { transform: rotate(-6deg); }
+}
+
+@keyframes yoshi-shaka-wave {
+  from { transform: rotate(-8deg); }
+  to { transform: rotate(14deg); }
+}
+
+@keyframes yoshi-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yoshi-overlay,
+  .yoshi,
+  .yoshi-head,
+  .yoshi-arm,
+  .yoshi-flower,
+  .yoshi-bubble,
+  .review-prompt {
+    animation: none;
+  }
+  .yoshi-overlay {
+    transition: none;
+  }
+}

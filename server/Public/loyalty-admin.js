@@ -142,7 +142,7 @@ async function loadBonusRequests() {
       <div class="data-table">
         <table>
           <thead>
-            <tr><th>Phone</th><th>Type</th><th>Dish</th><th>Content</th><th>Note</th><th>Status</th><th>Points</th><th></th></tr>
+            <tr><th>Phone</th><th>Type</th><th>Dish</th><th>Content</th><th>Note</th><th>Status</th><th>Points</th><th>Post on page</th><th></th></tr>
           </thead>
           <tbody>
             ${requests
@@ -162,6 +162,11 @@ async function loadBonusRequests() {
                       ? (r.type === 'receipt' ? '+1 punch' : '+1/10')
                       : '<span class="hint">0 (daily cap)</span>')
                   : ''}</td>
+                <td>${r.type === 'photo'
+                  ? r.featureConsent
+                    ? `<label class="featured-toggle"><input type="checkbox" class="wall-toggle" ${r.onWall ? 'checked' : ''} ${r.status === 'approved' ? '' : 'disabled title="Approve it first"'} /> Post on page</label>`
+                    : '<span class="hint">Guest didn\'t OK it</span>'
+                  : ''}</td>
                 <td>
                   ${r.status === 'pending'
                     ? `<button type="button" class="approve-btn">Approve</button> <button type="button" class="secondary deny-btn">Deny</button>`
@@ -180,6 +185,23 @@ async function loadBonusRequests() {
     );
     bonusListEl.querySelectorAll('.deny-btn').forEach((btn) =>
       btn.addEventListener('click', (e) => reviewBonus(e.target.closest('tr').dataset.id, false))
+    );
+    // "Post on page": put an approved guest photo on the Gallery / home page
+    // photo wall (only offered when the guest agreed to it).
+    bonusListEl.querySelectorAll('.wall-toggle').forEach((box) =>
+      box.addEventListener('change', async (e) => {
+        const id = e.target.closest('tr').dataset.id;
+        const response = await staffFetch(`/api/loyalty/bonus-requests/${id}/wall`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ show: e.target.checked }),
+        });
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          e.target.checked = !e.target.checked;
+          bonusListEl.insertAdjacentHTML('afterbegin', `<p class="status status-error">${escapeHtmlLoyalty(body.reason || `Couldn't update (${response.status}).`)}</p>`);
+        }
+      })
     );
   } catch (error) {
     bonusListEl.innerHTML = `<p class="status status-error">${escapeHtmlLoyalty(error.message)}</p>`;

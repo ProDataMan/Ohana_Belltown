@@ -946,7 +946,7 @@ function startStaffCompetitorPhotoAlerts() {
     // A re-scan of the same table within an active visit (or an old printed
     // ?table= link reloaded) continues it rather than starting another.
     if (!visit || params.get('qr') === '1' || visit.table !== table) {
-      visit = { id: randomId(), table, source, lastAt: Date.now(), started: false };
+      visit = { id: randomId(), table, source, firstAt: Date.now(), lastAt: Date.now(), started: false };
     }
   }
   if (params.get('qr') === '1') {
@@ -983,6 +983,66 @@ function startStaffCompetitorPhotoAlerts() {
     send('start', { source: visit.source, page: window.location.pathname });
   }
   send('page', { page: window.location.pathname });
+  if (!visit.firstAt) {
+    visit.firstAt = Date.now();
+    saveVisit(visit);
+  }
+  scheduleReviewPrompt();
+
+  // A Google review nudge, at the moment a guest is most likely happy to
+  // leave one: 25 minutes into a QR visit (their food has come). Once per
+  // visit, and not again on this phone for 30 days after it's shown, or
+  // ever once they've tapped through to leave one.
+  function scheduleReviewPrompt() {
+    const REVIEW_AFTER_MS = 25 * 60 * 1000;
+    const REVIEW_URL = 'https://search.google.com/local/writereview?placeid=ChIJXUznpU0VkFQRcc35QzkAM7w';
+    try {
+      if (localStorage.getItem('ohana_reviewed')) return;
+      const lastAsked = Number(localStorage.getItem('ohana_review_asked_at') || 0);
+      if (Date.now() - lastAsked < 30 * 24 * 60 * 60 * 1000) return;
+    } catch {
+      return;
+    }
+    if (visit.reviewAsked) return;
+    const wait = Math.max(0, visit.firstAt + REVIEW_AFTER_MS - Date.now());
+    setTimeout(() => {
+      if (document.visibilityState === 'hidden' || document.querySelector('.scan-feature-overlay, .yoshi-overlay, #item-modal-overlay:not([hidden])')) {
+        // Try again shortly rather than cover a popup or a dish.
+        setTimeout(scheduleReviewPrompt, 60 * 1000);
+        return;
+      }
+      if (readVisit()?.reviewAsked) return;
+      visit.reviewAsked = true;
+      saveVisit(visit);
+      try {
+        localStorage.setItem('ohana_review_asked_at', String(Date.now()));
+      } catch {}
+      const toast = document.createElement('div');
+      toast.className = 'review-prompt';
+      toast.setAttribute('role', 'status');
+      toast.innerHTML = `
+        <p><strong>Enjoying your meal?</strong> A quick Google review helps our little ohana a lot. Mahalo!</p>
+        <div class="review-prompt-actions">
+          <a class="cta-button review-prompt-go" href="${REVIEW_URL}" target="_blank" rel="noopener">Leave a review</a>
+          <button type="button" class="cta-button secondary review-prompt-close">Not now</button>
+        </div>
+      `;
+      document.body.appendChild(toast);
+      send('feature-shown', { page: window.location.pathname, itemName: 'Google review prompt' });
+      toast.querySelector('.review-prompt-go').addEventListener('click', () => {
+        try {
+          localStorage.setItem('ohana_reviewed', '1');
+        } catch {}
+        send('feature-tap', { page: window.location.pathname, itemName: 'Google review prompt' });
+        const payload = JSON.stringify({ action: 'review', page: window.location.pathname, source: 'qr-review-prompt' });
+        if (navigator.sendBeacon) navigator.sendBeacon('/api/analytics/action', new Blob([payload], { type: 'application/json' }));
+        toast.hidden = true;
+      });
+      toast.querySelector('.review-prompt-close').addEventListener('click', () => {
+        toast.hidden = true;
+      });
+    }, wait);
+  }
 
   // When the guest stops looking (closes the tab, switches apps, or moves to
   // another page), so the visit's length runs to then instead of stopping

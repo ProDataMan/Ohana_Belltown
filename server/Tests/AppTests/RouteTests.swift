@@ -2460,6 +2460,128 @@ final class RouteTests: XCTestCase {
 
     /// Bootstraps an admin, creates one more account with the given role,
     /// logs both in, and returns their session cookies.
+    func testDishShareLinkHasAPreviewAndSendsGuestsToTheDish() throws {
+        try MenuStore.shared.save(Menu(restaurant: "Ohana", lastUpdated: "now", categories: [
+            MenuCategory(section: "sushi", name: "Rolls", note: nil, items: [
+                MenuItem(id: "volcano", name: "Volcano Roll", description: "Baked & spicy", images: ["/uploads/volcano.jpg"]),
+            ]),
+        ]))
+        try app.test(.GET, "dish/volcano?utm_source=share&utm_campaign=dish") { res in
+            XCTAssertEqual(res.status, .ok)
+            let html = res.body.string
+            XCTAssertTrue(html.contains(#"<meta property="og:title" content="Volcano Roll at Ohana Belltown" />"#))
+            XCTAssertTrue(html.contains(#"og:description" content="Baked &amp; spicy""#))
+            XCTAssertTrue(html.contains("/uploads/volcano.jpg\" />"), "the preview image is the dish photo, as an absolute URL")
+            XCTAssertTrue(html.contains(#"location.replace("\/sushi?item=volcano&utm_source=share&utm_campaign=dish")"#)
+                          || html.contains(#"location.replace("/sushi?item=volcano&utm_source=share&utm_campaign=dish")"#),
+                          "a person is sent to the dish on its own menu page, keeping the share tags")
+        }
+        try app.test(.GET, "dish/not-a-dish") { res in
+            XCTAssertEqual(res.status, .seeOther)
+            XCTAssertEqual(res.headers.first(name: .location), "/menu")
+        }
+    }
+
+    func testDealPageShowsTheDealAndItsDishes() throws {
+        try MenuStore.shared.save(Menu(restaurant: "Ohana", lastUpdated: "now", categories: [
+            MenuCategory(section: "menu", name: "Pupus", note: nil, items: [MenuItem(id: "spam-musubi", name: "Spam Musubi")]),
+        ]))
+        var data = DailySpecialsStore.shared.get()
+        let musubi = try XCTUnwrap(data.specials.first { $0.title == "Musubi Monday" })
+        data.specials = data.specials.map { special in
+            var special = special
+            if special.id == musubi.id { special.itemNames = ["Spam Musubi"] }
+            return special
+        }
+        try DailySpecialsStore.shared.save(data)
+        try app.test(.GET, "deal/\(musubi.id)") { res in
+            XCTAssertEqual(res.status, .ok)
+            let html = res.body.string
+            XCTAssertTrue(html.contains("<h1>Musubi Monday</h1>"))
+            XCTAssertTrue(html.contains("Every Monday"))
+            XCTAssertTrue(html.contains(#"href="/dish/spam-musubi""#))
+            XCTAssertTrue(html.contains("og:title"))
+        }
+        try app.test(.GET, "deal/nope") { res in
+            XCTAssertEqual(res.headers.first(name: .location), "/specials")
+        }
+    }
+
+    func testEventPreviewAndCalendarFile() throws {
+        let booking = try EntertainmentStore.shared.create(EntertainmentBookingRequest(
+            date: "2026-12-02", startTime: "21:00", performerName: "Kimo & Friends", bio: "Slack key, ukulele", photos: ["/uploads/kimo.jpg"]
+        ))
+        try app.test(.GET, "event/\(booking.id)") { res in
+            XCTAssertEqual(res.status, .ok)
+            let html = res.body.string
+            XCTAssertTrue(html.contains("Island Nights: Kimo &amp; Friends at Ohana Belltown"), "a Wednesday booking is an Island Night")
+            XCTAssertTrue(html.contains("Wednesday, December 2 at 9:00pm"))
+            XCTAssertTrue(html.contains("/uploads/kimo.jpg"))
+            XCTAssertTrue(html.contains("/entertainment/wednesday"))
+        }
+        try app.test(.GET, "event/\(booking.id)/calendar.ics") { res in
+            XCTAssertEqual(res.status, .ok)
+            XCTAssertEqual(res.headers.contentType?.description.hasPrefix("text/calendar"), true)
+            let ics = res.body.string
+            XCTAssertTrue(ics.contains("DTSTART:20261203T050000Z"), "9pm Pacific (PST) is 5am UTC the next day")
+            XCTAssertTrue(ics.contains("DTEND:20261203T080000Z"))
+            XCTAssertTrue(ics.contains("SUMMARY:Island Nights: Kimo & Friends at Ohana Belltown"))
+            XCTAssertTrue(ics.contains("DESCRIPTION:Slack key\\, ukulele"), "commas are escaped in .ics text")
+            XCTAssertTrue(ics.contains("\r\nEND:VCALENDAR\r\n"))
+        }
+        try app.test(.GET, "event/nope/calendar.ics") { XCTAssertEqual($0.status, .notFound) }
+        try app.test(.GET, "event/nope") { XCTAssertEqual($0.headers.first(name: .location), "/entertainment") }
+    }
+
+    func testGuestPhotoWallNeedsApprovalConsentAndStaff() throws {
+        let (admin, _) = try makeAdminAndSecondAccount(username: "wall", password: "password123", role: "employee")
+        let json: HTTPHeaders = ["Content-Type": "application/json"]
+        func claim(consent: Bool) throws -> String {
+            var id: String?
+            let body = #"{"phone":"2065550300","type":"photo","content":"/uploads/plate.jpg","menuItemId":"x","menuItemName":"Loco Moco","featureConsent":\#(consent)}"#
+            try app.test(.POST, "api/loyalty/bonus-request", headers: json, body: ByteBuffer(string: body)) { res in
+                XCTAssertEqual(res.status, .ok)
+                id = try res.content.decode(BonusRequest.self).id
+            }
+            return try XCTUnwrap(id)
+        }
+        let consented = try claim(consent: true)
+        let declined = try claim(consent: false)
+        let staff: HTTPHeaders = ["Content-Type": "application/json", "Cookie": admin]
+        let show = ByteBuffer(string: #"{"show":true}"#)
+
+        try app.test(.POST, "api/loyalty/bonus-requests/\(consented)/wall", headers: json, body: show) { res in
+            XCTAssertEqual(res.status, .unauthorized, "only staff choose what goes on the page")
+        }
+        try app.test(.POST, "api/loyalty/bonus-requests/\(consented)/wall", headers: staff, body: show) { res in
+            XCTAssertEqual(res.status, .badRequest, "not before it's approved")
+        }
+        for id in [consented, declined] {
+            try app.test(.POST, "api/loyalty/bonus-requests/\(id)/review", headers: staff, body: ByteBuffer(string: #"{"approve":true}"#)) {
+                XCTAssertEqual($0.status, .ok)
+            }
+        }
+        try app.test(.POST, "api/loyalty/bonus-requests/\(declined)/wall", headers: staff, body: show) { res in
+            XCTAssertEqual(res.status, .badRequest, "not without the guest's OK")
+        }
+        try app.test(.POST, "api/loyalty/bonus-requests/\(consented)/wall", headers: staff, body: show) { res in
+            XCTAssertEqual(res.status, .ok)
+        }
+        try app.test(.GET, "api/guest-photos") { res in
+            XCTAssertEqual(res.status, .ok)
+            let photos = try res.content.decode([GuestWallPhoto].self)
+            XCTAssertEqual(photos.map(\.url), ["/uploads/plate.jpg"])
+            XCTAssertEqual(photos.first?.dish, "Loco Moco")
+            XCTAssertFalse(res.body.string.contains("2065550300"), "the public wall never shows the guest's phone")
+        }
+        try app.test(.POST, "api/loyalty/bonus-requests/\(consented)/wall", headers: staff, body: ByteBuffer(string: #"{"show":false}"#)) {
+            XCTAssertEqual($0.status, .ok)
+        }
+        try app.test(.GET, "api/guest-photos") { res in
+            XCTAssertEqual(try res.content.decode([GuestWallPhoto].self).count, 0)
+        }
+    }
+
     private func makeAdminAndSecondAccount(username: String, password: String, role: String) throws -> (admin: String, other: String) {
         var adminCookie: String?
         try app.test(.POST, "api/auth/bootstrap", headers: ["Content-Type": "application/json"],

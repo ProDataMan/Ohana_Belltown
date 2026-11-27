@@ -102,7 +102,7 @@ async function loadDailyDeals() {
         (deal) => `
         <li class="${deal.weekday === data.todayWeekday ? 'today' : ''}">
           <span class="daily-deal-day">${days[deal.weekday]}${deal.weekday === data.todayWeekday ? ' &middot; today' : ''}</span>
-          <strong>${esc(deal.title)}</strong>: ${esc(deal.deal)}
+          <a href="/deal/${encodeURIComponent(deal.id)}"><strong>${esc(deal.title)}</strong></a>: ${esc(deal.deal)}
           ${deal.details ? `<span class="hint">${esc(deal.details)}</span>` : ''}
         </li>
       `
