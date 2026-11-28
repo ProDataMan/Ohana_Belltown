@@ -1577,49 +1577,48 @@ async function showYoshiNotHappyHour(visit) {
   });
 }
 
-/// Yoshi: a cartoon of Ohana's founder Kyle "Yosh" Yoshimura (see the
-/// about page photo): purple Ohana hat, glasses, goatee, a flower lei and
-/// an aloha shirt, throwing a shaka. Drawn here (no image to load) so he appears instantly; the
+/// Yoshi: a cartoon of Ohana's founder Kyle "Yosh" Yoshimura (drawn from
+/// photos of him): purple OHANA cap, clear-framed glasses, gray stubble
+/// beard, big grin, white tee and a flower lei, throwing a shaka. Drawn here (no image to load) so he appears instantly; the
 /// animation (bounce in, waving shaka, head shake) is in style.css.
 const YOSHI_SVG = `
-  <svg class="yoshi" viewBox="0 0 200 220" role="img" aria-label="Yoshi in his purple Ohana hat, shaking his head and throwing a shaka">
+  <svg class="yoshi" viewBox="0 0 200 220" role="img" aria-label="Yoshi in his purple Ohana hat and glasses, grinning, shaking his head and throwing a shaka">
     <g class="yoshi-body">
-      <path d="M40 220 C40 160 70 140 100 140 C130 140 160 160 160 220 Z" fill="#e8467c"/>
-      <circle cx="68" cy="178" r="7" fill="#ffd166"/><circle cx="74" cy="173" r="4" fill="#fff"/>
-      <circle cx="128" cy="195" r="8" fill="#ffd166"/><circle cx="135" cy="189" r="4" fill="#fff"/>
-      <circle cx="95" cy="205" r="5" fill="#7bdff2"/>
-      <path d="M85 140 L100 165 L115 140 Z" fill="#fff"/>
-      <path d="M86 141 L100 160 L90 167 Z M114 141 L100 160 L110 167 Z" fill="#c2185b"/>
-      <g class="yoshi-lei"><circle cx="70" cy="146" r="7" fill="#fff" stroke="#e6e0d4" stroke-width="1.5"/><circle cx="78" cy="155" r="7" fill="#fff" stroke="#e6e0d4" stroke-width="1.5"/><circle cx="87" cy="162" r="7" fill="#fff" stroke="#e6e0d4" stroke-width="1.5"/><circle cx="97" cy="166" r="7" fill="#fff" stroke="#e6e0d4" stroke-width="1.5"/><circle cx="107" cy="165" r="7" fill="#fff" stroke="#e6e0d4" stroke-width="1.5"/><circle cx="116" cy="160" r="7" fill="#fff" stroke="#e6e0d4" stroke-width="1.5"/><circle cx="125" cy="153" r="7" fill="#fff" stroke="#e6e0d4" stroke-width="1.5"/><circle cx="132" cy="145" r="7" fill="#fff" stroke="#e6e0d4" stroke-width="1.5"/></g>
+      <path d="M38 220 C38 160 70 140 100 140 C130 140 162 160 162 220 Z" fill="#f6f6f4" stroke="#d9d6cf" stroke-width="2"/>
+      <path d="M84 141 Q100 152 116 141" stroke="#d9d6cf" stroke-width="3" fill="none"/>
+      <g class="yoshi-lei"><circle cx="68" cy="148" r="7" fill="#fff" stroke="#d8cfc0" stroke-width="1.5"/><circle cx="68" cy="148" r="2.2" fill="#ffd166"/><circle cx="76" cy="157" r="7" fill="#fff" stroke="#d8cfc0" stroke-width="1.5"/><circle cx="76" cy="157" r="2.2" fill="#ffd166"/><circle cx="86" cy="164" r="7" fill="#fff" stroke="#d8cfc0" stroke-width="1.5"/><circle cx="86" cy="164" r="2.2" fill="#ffd166"/><circle cx="97" cy="168" r="7" fill="#fff" stroke="#d8cfc0" stroke-width="1.5"/><circle cx="97" cy="168" r="2.2" fill="#ffd166"/><circle cx="108" cy="167" r="7" fill="#fff" stroke="#d8cfc0" stroke-width="1.5"/><circle cx="108" cy="167" r="2.2" fill="#ffd166"/><circle cx="118" cy="162" r="7" fill="#fff" stroke="#d8cfc0" stroke-width="1.5"/><circle cx="118" cy="162" r="2.2" fill="#ffd166"/><circle cx="127" cy="155" r="7" fill="#fff" stroke="#d8cfc0" stroke-width="1.5"/><circle cx="127" cy="155" r="2.2" fill="#ffd166"/><circle cx="134" cy="147" r="7" fill="#fff" stroke="#d8cfc0" stroke-width="1.5"/><circle cx="134" cy="147" r="2.2" fill="#ffd166"/></g>
     </g>
     <g class="yoshi-arm">
-      <path d="M150 168 C168 150 172 130 168 112" stroke="#e8467c" stroke-width="18" stroke-linecap="round" fill="none"/>
+      <path d="M150 168 C168 150 172 130 168 112" stroke="#d9d6cf" stroke-width="22" stroke-linecap="round" fill="none"/>
+      <path d="M150 168 C168 150 172 130 168 112" stroke="#f6f6f4" stroke-width="18" stroke-linecap="round" fill="none"/>
+      <path d="M166 126 C170 118 170 112 168 106" stroke="#dba67c" stroke-width="15" stroke-linecap="round" fill="none"/>
       <g class="yoshi-shaka">
-        <ellipse cx="168" cy="100" rx="13" ry="12" fill="#c98b5e"/>
-        <rect x="174" y="72" width="9" height="26" rx="4.5" fill="#c98b5e" transform="rotate(28 178 92)"/>
-        <rect x="138" y="94" width="24" height="10" rx="5" fill="#c98b5e" transform="rotate(-28 160 100)"/>
-        <path d="M160 96 H174 M160 102 H174" stroke="#b87a4f" stroke-width="2" stroke-linecap="round"/>
+        <ellipse cx="168" cy="100" rx="13" ry="12" fill="#dba67c"/>
+        <rect x="174" y="72" width="9" height="26" rx="4.5" fill="#dba67c" transform="rotate(28 178 92)"/>
+        <rect x="138" y="94" width="24" height="10" rx="5" fill="#dba67c" transform="rotate(-28 160 100)"/>
+        <path d="M160 96 H174 M160 102 H174" stroke="#b9845b" stroke-width="2" stroke-linecap="round"/>
       </g>
     </g>
     <g class="yoshi-head">
-      <circle cx="100" cy="88" r="52" fill="#c98b5e"/>
+      <ellipse cx="100" cy="92" rx="54" ry="52" fill="#dba67c"/>
+      <ellipse cx="46" cy="96" rx="7" ry="10" fill="#c99168"/>
+      <ellipse cx="154" cy="96" rx="7" ry="10" fill="#c99168"/>
+      <path d="M50 104 C52 132 72 146 100 146 C128 146 148 132 150 104 C144 122 128 128 120 124 C110 132 90 132 80 124 C72 128 56 122 50 104 Z" fill="#9c9a96" fill-opacity="0.55"/>
+      <path d="M78 116 Q100 104 122 116 Q110 112 100 114 Q90 112 78 116 Z" fill="#8f8c87"/>
+      <path class="yoshi-mouth" d="M76 118 Q100 146 124 118 Z" fill="#7a2e22"/>
+      <path d="M79 119 Q100 124 121 119 L119 125 Q100 129 81 125 Z" fill="#ffffff"/>
+      <path d="M78 92 Q85 86 92 92 M108 92 Q115 86 122 92" stroke="#2b1d16" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+      <rect x="64" y="80" width="32" height="24" rx="8" fill="#ffffff" fill-opacity="0.3" stroke="#bfc3c7" stroke-width="3.5"/>
+      <rect x="104" y="80" width="32" height="24" rx="8" fill="#ffffff" fill-opacity="0.3" stroke="#bfc3c7" stroke-width="3.5"/>
+      <path d="M96 88 Q100 85 104 88 M64 86 L48 84 M136 86 L152 84" stroke="#bfc3c7" stroke-width="3.5" stroke-linecap="round" fill="none"/>
       <g class="yoshi-hat">
-        <path d="M49 70 C49 20 151 20 151 70 Z" fill="#4b2e83"/>
-        <path d="M100 28 V70 M72 34 Q80 50 78 70 M128 34 Q120 50 122 70" stroke="#3a2266" stroke-width="2" fill="none"/>
-        <circle cx="100" cy="27" r="4.5" fill="#3a2266"/>
-        <text x="100" y="60" text-anchor="middle" font-family="Bungee, Arial Black, sans-serif" font-size="15" font-weight="700" fill="#fff" letter-spacing="1">OHANA</text>
-        <path d="M44 70 Q100 62 156 70 Q158 80 100 80 Q42 80 44 70 Z" fill="#3a2266"/>
+        <path d="M46 72 C46 18 154 18 154 72 Z" fill="#7a3fc6"/>
+        <path d="M100 26 V72 M70 32 Q80 50 76 72 M130 32 Q120 50 124 72" stroke="#6431a8" stroke-width="2" fill="none"/>
+        <circle cx="100" cy="24" r="4.5" fill="#6431a8"/>
+        <circle cx="56" cy="57" r="6" fill="none" stroke="#fff" stroke-width="2.5"/>
+        <text x="106" y="62" text-anchor="middle" font-family="'Brush Script MT', 'Segoe Script', cursive" font-style="italic" font-size="22" font-weight="700" fill="#fff">OHANA</text>
+        <path d="M40 72 Q100 62 160 72 Q162 82 100 82 Q38 82 40 72 Z" fill="#6431a8"/>
       </g>
-      <ellipse cx="48" cy="92" rx="7" ry="10" fill="#b87a4f"/>
-      <ellipse cx="152" cy="92" rx="7" ry="10" fill="#b87a4f"/>
-      <circle cx="80" cy="94" r="5" fill="#2b1d16"/>
-      <circle cx="120" cy="94" r="5" fill="#2b1d16"/>
-      <circle cx="80" cy="94" r="14" fill="#ffffff" fill-opacity="0.25" stroke="#2b1d16" stroke-width="4"/>
-      <circle cx="120" cy="94" r="14" fill="#ffffff" fill-opacity="0.25" stroke="#2b1d16" stroke-width="4"/>
-      <path d="M94 92 Q100 88 106 92 M66 92 L50 88 M134 92 L150 88" stroke="#2b1d16" stroke-width="4" stroke-linecap="round" fill="none"/>
-      <path d="M78 118 Q100 108 122 118 Q112 114 100 116 Q88 114 78 118 Z" fill="#6b6b6b"/>
-      <path class="yoshi-mouth" d="M84 122 Q100 134 116 122" stroke="#5a2e1a" stroke-width="5" stroke-linecap="round" fill="none"/>
-      <path d="M86 132 Q100 152 114 132 Q100 140 86 132 Z" fill="#8a8a8a"/>
     </g>
   </svg>
 `;
