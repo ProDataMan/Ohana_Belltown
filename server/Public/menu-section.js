@@ -1577,11 +1577,12 @@ async function showYoshiNotHappyHour(visit) {
   });
 }
 
-/// Yoshi: a round, friendly guy in an aloha shirt and sunglasses throwing a
-/// shaka. Drawn here (no image to load) so he appears instantly; the
+/// Yoshi: a cartoon of Ohana's founder Kyle "Yosh" Yoshimura (see the
+/// about page photo): purple Ohana hat, glasses, goatee, a flower lei and
+/// an aloha shirt, throwing a shaka. Drawn here (no image to load) so he appears instantly; the
 /// animation (bounce in, waving shaka, head shake) is in style.css.
 const YOSHI_SVG = `
-  <svg class="yoshi" viewBox="0 0 200 220" role="img" aria-label="Yoshi, the Ohana mascot, shaking his head and throwing a shaka">
+  <svg class="yoshi" viewBox="0 0 200 220" role="img" aria-label="Yoshi in his purple Ohana hat, shaking his head and throwing a shaka">
     <g class="yoshi-body">
       <path d="M40 220 C40 160 70 140 100 140 C130 140 160 160 160 220 Z" fill="#e8467c"/>
       <circle cx="68" cy="178" r="7" fill="#ffd166"/><circle cx="74" cy="173" r="4" fill="#fff"/>
@@ -1589,6 +1590,7 @@ const YOSHI_SVG = `
       <circle cx="95" cy="205" r="5" fill="#7bdff2"/>
       <path d="M85 140 L100 165 L115 140 Z" fill="#fff"/>
       <path d="M86 141 L100 160 L90 167 Z M114 141 L100 160 L110 167 Z" fill="#c2185b"/>
+      <g class="yoshi-lei"><circle cx="70" cy="146" r="7" fill="#fff" stroke="#e6e0d4" stroke-width="1.5"/><circle cx="78" cy="155" r="7" fill="#fff" stroke="#e6e0d4" stroke-width="1.5"/><circle cx="87" cy="162" r="7" fill="#fff" stroke="#e6e0d4" stroke-width="1.5"/><circle cx="97" cy="166" r="7" fill="#fff" stroke="#e6e0d4" stroke-width="1.5"/><circle cx="107" cy="165" r="7" fill="#fff" stroke="#e6e0d4" stroke-width="1.5"/><circle cx="116" cy="160" r="7" fill="#fff" stroke="#e6e0d4" stroke-width="1.5"/><circle cx="125" cy="153" r="7" fill="#fff" stroke="#e6e0d4" stroke-width="1.5"/><circle cx="132" cy="145" r="7" fill="#fff" stroke="#e6e0d4" stroke-width="1.5"/></g>
     </g>
     <g class="yoshi-arm">
       <path d="M150 168 C168 150 172 130 168 112" stroke="#e8467c" stroke-width="18" stroke-linecap="round" fill="none"/>
@@ -1601,18 +1603,23 @@ const YOSHI_SVG = `
     </g>
     <g class="yoshi-head">
       <circle cx="100" cy="88" r="52" fill="#c98b5e"/>
-      <path d="M50 78 C52 40 80 30 100 30 C125 30 150 42 150 78 C140 60 120 52 100 54 C80 52 60 60 50 78 Z" fill="#2b1d16"/>
+      <g class="yoshi-hat">
+        <path d="M49 70 C49 20 151 20 151 70 Z" fill="#4b2e83"/>
+        <path d="M100 28 V70 M72 34 Q80 50 78 70 M128 34 Q120 50 122 70" stroke="#3a2266" stroke-width="2" fill="none"/>
+        <circle cx="100" cy="27" r="4.5" fill="#3a2266"/>
+        <text x="100" y="60" text-anchor="middle" font-family="Bungee, Arial Black, sans-serif" font-size="15" font-weight="700" fill="#fff" letter-spacing="1">OHANA</text>
+        <path d="M44 70 Q100 62 156 70 Q158 80 100 80 Q42 80 44 70 Z" fill="#3a2266"/>
+      </g>
       <ellipse cx="48" cy="92" rx="7" ry="10" fill="#b87a4f"/>
       <ellipse cx="152" cy="92" rx="7" ry="10" fill="#b87a4f"/>
-      <path d="M62 82 H138 L134 98 C132 106 116 108 110 100 L104 90 H96 L90 100 C84 108 68 106 66 98 Z" fill="#14213d"/>
-      <path d="M70 86 L80 86" stroke="#7bdff2" stroke-width="3" stroke-linecap="round"/>
-      <path d="M112 86 L122 86" stroke="#7bdff2" stroke-width="3" stroke-linecap="round"/>
-      <path class="yoshi-mouth" d="M82 118 Q100 132 118 118" stroke="#5a2e1a" stroke-width="5" stroke-linecap="round" fill="none"/>
-      <g class="yoshi-flower">
-        <circle cx="138" cy="50" r="7" fill="#ff8fab"/><circle cx="150" cy="56" r="7" fill="#ff8fab"/>
-        <circle cx="146" cy="68" r="7" fill="#ff8fab"/><circle cx="132" cy="66" r="7" fill="#ff8fab"/>
-        <circle cx="130" cy="54" r="7" fill="#ff8fab"/><circle cx="140" cy="59" r="5" fill="#ffd166"/>
-      </g>
+      <circle cx="80" cy="94" r="5" fill="#2b1d16"/>
+      <circle cx="120" cy="94" r="5" fill="#2b1d16"/>
+      <circle cx="80" cy="94" r="14" fill="#ffffff" fill-opacity="0.25" stroke="#2b1d16" stroke-width="4"/>
+      <circle cx="120" cy="94" r="14" fill="#ffffff" fill-opacity="0.25" stroke="#2b1d16" stroke-width="4"/>
+      <path d="M94 92 Q100 88 106 92 M66 92 L50 88 M134 92 L150 88" stroke="#2b1d16" stroke-width="4" stroke-linecap="round" fill="none"/>
+      <path d="M78 118 Q100 108 122 118 Q112 114 100 116 Q88 114 78 118 Z" fill="#6b6b6b"/>
+      <path class="yoshi-mouth" d="M84 122 Q100 134 116 122" stroke="#5a2e1a" stroke-width="5" stroke-linecap="round" fill="none"/>
+      <path d="M86 132 Q100 152 114 132 Q100 140 86 132 Z" fill="#8a8a8a"/>
     </g>
   </svg>
 `;
